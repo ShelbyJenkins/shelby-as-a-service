@@ -6,22 +6,29 @@ import random
 import json
 import discord
 from discord.ext import commands
-from services.log_service import Logger
-from services.shelby_agent import ShelbyAgent
+from app.services.log_service import Logger
+from app.models.models import DiscordModel
+from app.services.ceq_agent import CEQAgent
 
 # endregion
 
 
 class DiscordSprite:
-    def __init__(self, deployment):
-        self.log = Logger(
-            deployment.deployment_name,
-            "discord_sprite",
-            f"discord_sprite.md",
-            level="INFO",
-        )
-        self.log.print_and_log("Starting DiscordSprite.")
-        self.deployment = deployment
+    
+    model_ = DiscordModel
+    required_services_ = [CEQAgent]
+    
+    def __init__(self):
+  
+        
+        # self.log = Logger(
+        #     deployment.deployment_name,
+        #     "discord_sprite",
+        #     f"discord_sprite.md",
+        #     level="INFO",
+        # )
+        # self.log.print_and_log("Starting DiscordSprite.")
+        # self.deployment = deployment
 
         self.intents = discord.Intents.default()
         self.intents.guilds = True

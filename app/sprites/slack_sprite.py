@@ -3,26 +3,33 @@ import os, asyncio, random
 from concurrent.futures import ThreadPoolExecutor
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
-from services.log_service import Logger
-
-from services.shelby_agent import ShelbyAgent
+from app.services.log_service import Logger
+from app.models.models import SlackModel
+from app.services.ceq_agent import CEQAgent
 
 # endregion
 
 
 class SlackSprite:
-    def __init__(self, deployment):
-        self.log = Logger(
-            deployment.deployment_name,
-            "discord_sprite",
-            f"discord_sprite.md",
-            level="INFO",
-        )
-        self.log.print_and_log("Starting SlackSprite.")
-        self.deployment = deployment
+    
+    model_ = SlackModel
+    required_services_ = [CEQAgent]
+    
+    def __init__(self):
 
-        self.bot_user_id = None
-        self.app = AsyncApp(token=self.deployment.secrets["slack_bot_token"])
+        
+        # self.log = Logger(
+        #     deployment.deployment_name,
+        #     "discord_sprite",
+        #     f"discord_sprite.md",
+        #     level="INFO",
+        # )
+        # self.log.print_and_log("Starting SlackSprite.")
+        # self.deployment = deployment
+
+        # self.bot_user_id = None
+        # self.app = AsyncApp(token=self.deployment.secrets["slack_bot_token"])
+        self.app = AsyncApp()
 
         @self.app.command("/query")
         async def query_command(ack, body):

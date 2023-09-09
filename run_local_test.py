@@ -78,6 +78,8 @@ def main():
         config_module = import_module(config_module_path)
         deployment = DeploymentInstance(config_module, run_index_management)
         
+        if args.run:
+            deployment.run()
         ### Right now we don't have index_agent set up for anything but manual input ###
 
         # Add documents to the vectorstore based on what's enabled in index_description.yaml

@@ -1,9 +1,7 @@
 import sys
 import argparse
 from importlib import import_module
-from services.deployment_service import DeploymentInstance
-from deployment_maker import deploy_stackpath_container
-from sprites.local_client.local_client import LocalClientSprite
+from app.services.deployment_instantiator import DeploymentInstance
 
 def main():
     """
@@ -34,13 +32,14 @@ def main():
             deployment_name = args.run_container_deployment
             config_module_path = f"deployments.{deployment_name}.deployment_config"
             config_module = import_module(config_module_path)
-            DeploymentInstance(config_module)
+            deployment = DeploymentInstance(config_module)
+            deployment.run()
         elif args.deploy_container:
             deployment_name = args.deploy_container
             deploy_stackpath_container.main(deployment_name)
     else:
-        local_client = LocalClientSprite()
-        local_client.run_sprite()
+        deployment = DeploymentInstance('base') 
+        deployment.run()
 
 if __name__ == "__main__":
     main()

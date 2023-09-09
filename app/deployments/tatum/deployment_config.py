@@ -54,7 +54,7 @@ class DeploymentConfig:
                 ceq_max_response_tokens: int = 250
                 openai_timeout_seconds: float = None
                 # APIAgent
-                api_agent_select_operationID_llm_model: str = None
+                api_agent_select_operation_id_llm_model: str = None
                 api_agent_create_function_llm_model: str = None
                 api_agent_populate_function_llm_model: str = None
             class SlackConfig:
@@ -87,6 +87,6 @@ class DeploymentConfig:
                 ceq_max_response_tokens: int = None
                 openai_timeout_seconds: float = None
                 # APIAgent
-                api_agent_select_operationID_llm_model: str = None
+                api_agent_select_operation_id_llm_model: str = None
                 api_agent_create_function_llm_model: str = None
                 api_agent_populate_function_llm_model: str = None

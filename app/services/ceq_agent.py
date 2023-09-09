@@ -4,31 +4,37 @@ import traceback
 import json, yaml, re
 import openai, pinecone, tiktoken
 from langchain.embeddings import OpenAIEmbeddings
-from services.log_service import Logger
+from app.models.models import CEQModel
 
 # endregion
 
 
-class ShelbyAgent:
-    def __init__(self, moniker_instance, config):
-        self.deployment_name = moniker_instance.deployment_instance.deployment_name
-        self.secrets = moniker_instance.deployment_instance.secrets
-        self.moniker_name = moniker_instance.moniker_name
-        self.sprite_name = config.__class__.__name__
-        self.log = Logger(
-            self.deployment_name,
-            f"{self.moniker_name}_{self.sprite_name}_shelby_agent",
-            f"{self.moniker_name}_{self.sprite_name}_shelby_agent.md",
-            level="INFO",
-        )
+class CEQAgent:
+    
+    model_ = CEQModel
+    
+    def __init__(self, deployment_instance, service_model):
+        self.deployment = deployment_instance
+        self.config = service_model
+        pass
+        # self.deployment_name = deployment_instance.deployment_instance.deployment_name
+        # self.secrets = deployment_instance.deployment_instance.secrets
+        # self.moniker_name = deployment_instance.moniker_name
+        # self.sprite_name = config.__class__.__name__
+        # self.log = Logger(
+        #     self.deployment_name,
+        #     f"{self.moniker_name}_{self.sprite_name}_shelby_agent",
+        #     f"{self.moniker_name}_{self.sprite_name}_shelby_agent.md",
+        #     level="INFO",
+        # )
 
-        self.moniker_instance = moniker_instance
-        self.config = config
-        self.data_domains = moniker_instance.moniker_data_domains
-        self.index_env = moniker_instance.deployment_instance.index_env
-        self.index_name = moniker_instance.deployment_instance.index_name
-        self.action_agent = ActionAgent(self)
-        self.ceq_agent = CEQAgent(self)
+        # self.deployment_instance = deployment_instance
+        # self.config = config
+        # self.data_domains = deployment_instance.deployment_data_domains
+        # self.index_env = deployment_instance.deployment_instance.index_env
+        # self.index_name = deployment_instance.deployment_instance.index_name
+        # self.action_agent = ActionAgent(self)
+        # self.ceq_agent = CEQAgent(self)
 
     def request_thread(self, request):
         try:
@@ -186,7 +192,7 @@ class ActionAgent:
         return data_domain_name
 
 
-class CEQAgent:
+class QueryAgent:
     ### QueryAgent answers questions ###
 
     def __init__(self, shelby_agent):
