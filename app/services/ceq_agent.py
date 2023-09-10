@@ -5,6 +5,7 @@ import json, yaml, re
 import openai, pinecone, tiktoken
 from langchain.embeddings import OpenAIEmbeddings
 from app.models.models import CEQModel
+from app.services.log_service import Logger
 
 # endregion
 
@@ -15,26 +16,21 @@ class CEQAgent:
     
     def __init__(self, deployment_instance, service_model):
         self.deployment = deployment_instance
+        self.secrets = deployment_instance.secrets
         self.config = service_model
-        pass
-        # self.deployment_name = deployment_instance.deployment_instance.deployment_name
-        # self.secrets = deployment_instance.deployment_instance.secrets
-        # self.moniker_name = deployment_instance.moniker_name
-        # self.sprite_name = config.__class__.__name__
-        # self.log = Logger(
-        #     self.deployment_name,
-        #     f"{self.moniker_name}_{self.sprite_name}_shelby_agent",
-        #     f"{self.moniker_name}_{self.sprite_name}_shelby_agent.md",
-        #     level="INFO",
-        # )
-
-        # self.deployment_instance = deployment_instance
-        # self.config = config
-        # self.data_domains = deployment_instance.deployment_data_domains
-        # self.index_env = deployment_instance.deployment_instance.index_env
-        # self.index_name = deployment_instance.deployment_instance.index_name
-        # self.action_agent = ActionAgent(self)
-        # self.ceq_agent = CEQAgent(self)
+        if not self.deployment.check_secrets(CEQModel.secrets_):
+            return 
+        
+        self.log = Logger(
+            self.deployment.deployment_name,
+            "CEQAgent",
+            "ceq_agent.md",
+            level="INFO",
+        )
+        
+        self.data_domains = deployment_instance.local_sprite.index_service.config.deployment_data_domains
+        self.action_agent = ActionAgent(self)
+        self.query_agent = QueryAgent(self)
 
     def request_thread(self, request):
         try:
@@ -44,7 +40,7 @@ class CEQAgent:
             workflow = 1
             match workflow:
                 case 1:
-                    response = self.ceq_agent.run_context_enriched_query(request)
+                    response = self.query_agent.run_context_enriched_query(request)
                 # case 2:
                 #     # Run APIAgent
                 #     response = self.API_agent.run_API_agent(request)
@@ -81,11 +77,11 @@ class CEQAgent:
 
 class ActionAgent:
     ### ActionAgent orchestrates the path requests flow through workflows ###
-    def __init__(self, shelby_agent):
-        self.shelby_agent = shelby_agent
-        self.config = shelby_agent.config
-        self.secrets = shelby_agent.secrets
-        self.data_domains = shelby_agent.data_domains
+    def __init__(self, ceq_agent):
+        self.ceq_agent = ceq_agent
+        self.config = ceq_agent.config
+        self.secrets = ceq_agent.secrets
+        self.data_domains = ceq_agent.data_domains
 
     def action_prompt_template(self, query):
         # Chooses workflow
@@ -172,7 +168,7 @@ class ActionAgent:
             logit_bias=logit_bias,
         )
 
-        domain_response = self.shelby_agent.check_response(response)
+        domain_response = self.ceq_agent.check_response(response)
         if not domain_response:
             return None
 
@@ -185,28 +181,27 @@ class ActionAgent:
             domain_key - 1
         ]  # We subtract 1 because list indices start at 0
 
-        self.shelby_agent.log.print_and_log(
+        self.ceq_agent.log.print_and_log(
             f"{self.config.ceq_data_domain_constraints_llm_model} chose to fetch context docs from {data_domain_name} data domain."
         )
 
         return data_domain_name
 
-
 class QueryAgent:
     ### QueryAgent answers questions ###
 
-    def __init__(self, shelby_agent):
-        self.shelby_agent = shelby_agent
-        self.config = shelby_agent.config
-        self.secrets = shelby_agent.secrets
-        self.data_domains = shelby_agent.data_domains
+    def __init__(self, ceq_agent):
+        self.ceq_agent = ceq_agent
+        self.config = ceq_agent.config
+        self.secrets = ceq_agent.secrets
+        self.data_domains = ceq_agent.data_domains
 
     def select_data_domain(self, query):
         response = None
 
         if len(self.data_domains) == 0:
-            self.shelby_agent.log.print_and_log(
-                f"Error: no enabled data domains for moniker: {self.shelby_agent.moniker_name}"
+            self.ceq_agent.log.print_and_log(
+                f"Error: no enabled data domains for moniker: {self.ceq_agent.moniker_name}"
             )
             return
         elif len(self.data_domains) == 1:
@@ -214,7 +209,7 @@ class QueryAgent:
             for key, _ in self.data_domains.items():
                 data_domain_name = key
         else:
-            data_domain_name = self.shelby_agent.action_agent.data_domain_decision(
+            data_domain_name = self.ceq_agent.action_agent.data_domain_decision(
                 query
             )
 
@@ -224,7 +219,7 @@ class QueryAgent:
             response += "\n"
             for key, value in self.data_domains.items():
                 response += f"{key}: {value}\n"
-            self.shelby_agent.log.print_and_log(response)
+            self.ceq_agent.log.print_and_log(response)
 
         return data_domain_name, response
 
@@ -249,7 +244,7 @@ class QueryAgent:
             max_tokens=25,
         )
 
-        keyword_generator_response = self.shelby_agent.check_response(response)
+        keyword_generator_response = self.ceq_agent.check_response(response)
         if not keyword_generator_response:
             return None
 
@@ -273,9 +268,9 @@ class QueryAgent:
 
         pinecone.init(
             api_key=self.secrets["pinecone_api_key"],
-            environment=self.shelby_agent.index_env,
+            environment=self.config.ceq_index_env,
         )
-        index = pinecone.Index(self.shelby_agent.index_name)
+        index = pinecone.Index(self.config.ceq_index_name)
 
         if data_domain_name is None:
             data_domain_names = []
@@ -305,7 +300,7 @@ class QueryAgent:
         soft_query_response = index.query(
             top_k=self.config.ceq_docs_to_retrieve,
             include_values=False,
-            namespace=self.shelby_agent.deployment_name,
+            namespace=self.ceq_agent.deployment_name,
             include_metadata=True,
             filter=soft_filter,
             vector=dense_embedding
@@ -314,7 +309,7 @@ class QueryAgent:
         hard_query_response = index.query(
             top_k=self.config.ceq_docs_to_retrieve,
             include_values=False,
-            namespace=self.shelby_agent.deployment_name,
+            namespace=self.ceq_agent.deployment_name,
             include_metadata=True,
             filter=hard_filter,
             vector=dense_embedding
@@ -387,7 +382,7 @@ class QueryAgent:
             logit_bias=logit_bias,
         )
 
-        doc_check = self.shelby_agent.check_response(response)
+        doc_check = self.ceq_agent.check_response(response)
         if not doc_check:
             return None
 
@@ -396,7 +391,7 @@ class QueryAgent:
         matches = re.findall(pattern_num, doc_check)
 
         if (len(matches) == 1 and matches[0] == "0") or len(matches) == 0:
-            self.shelby_agent.log.print_and_log(f"Error in doc_check: {response}")
+            self.ceq_agent.log.print_and_log(f"Error in doc_check: {response}")
             return None
 
         relevant_documents = []
@@ -450,7 +445,7 @@ class QueryAgent:
 
         embeddings_tokens = _docs_tiktoken_len(sorted_documents)
 
-        self.shelby_agent.log.print_and_log(
+        self.ceq_agent.log.print_and_log(
             f"context docs token count: {embeddings_tokens}"
         )
         iterations = 0
@@ -501,14 +496,14 @@ class QueryAgent:
                 sorted_documents.pop(max_token_count_idx)
 
             embeddings_tokens = _docs_tiktoken_len(sorted_documents)
-            self.shelby_agent.log.print_and_log(
+            self.ceq_agent.log.print_and_log(
                 "removed lowest scoring embedding doc ."
             )
-            self.shelby_agent.log.print_and_log(
+            self.ceq_agent.log.print_and_log(
                 f"context docs token count: {embeddings_tokens}"
             )
             iterations += 1
-        self.shelby_agent.log.print_and_log(
+        self.ceq_agent.log.print_and_log(
             f"number of context docs now: {len(sorted_documents)}"
         )
         # Same as above but removes based on total count of docs instead of token count.
@@ -525,7 +520,7 @@ class QueryAgent:
                         sorted_documents.pop(idx)
                         hard_count -= 1
                         break
-            # sself.shelby_agent.log.print_and_log("removed lowest scoring embedding doc.")
+            # sself.ceq_agent.log.print_and_log("removed lowest scoring embedding doc.")
 
         for i, document in enumerate(sorted_documents, start=1):
             document["doc_num"] = i
@@ -559,7 +554,7 @@ class QueryAgent:
                     "content"
                 ] = prompt_message  # Replace the 'content' with 'prompt_message'
 
-        # self.shelby_agent.log.print_and_log(f"prepared prompt: {json.dumps(prompt_template, indent=4)}")
+        # self.ceq_agent.log.print_and_log(f"prepared prompt: {json.dumps(prompt_template, indent=4)}")
 
         return prompt_template
 
@@ -570,7 +565,7 @@ class QueryAgent:
             messages=prompt,
             max_tokens=self.config.ceq_max_response_tokens,
         )
-        prompt_response = self.shelby_agent.check_response(response)
+        prompt_response = self.ceq_agent.check_response(response)
         if not prompt_response:
             return None
 
@@ -589,7 +584,7 @@ class QueryAgent:
         print(matches)
 
         if not matches:
-            self.shelby_agent.log.print_and_log("No supporting docs.")
+            self.ceq_agent.log.print_and_log("No supporting docs.")
             answer_obj = {
                 "answer_text": input_text,
                 "llm": self.config.ceq_main_prompt_llm_model,
@@ -622,11 +617,11 @@ class QueryAgent:
                     answer_obj["documents"].append(document)
                 else:
                     pass
-                    self.shelby_agent.log.print_and_log(
+                    self.ceq_agent.log.print_and_log(
                         f"Document{doc_num} not found in the list."
                     )
 
-        self.shelby_agent.log.print_and_log(f"response with metadata: {answer_obj}")
+        self.ceq_agent.log.print_and_log(f"response with metadata: {answer_obj}")
 
         return answer_obj
 
@@ -637,11 +632,11 @@ class QueryAgent:
             if response is not None:
                 return response
 
-        self.shelby_agent.log.print_and_log(f"Running query: {query}")
+        self.ceq_agent.log.print_and_log(f"Running query: {query}")
 
         if self.config.ceq_keyword_generator_enabled:
             generated_keywords = self.keyword_generator(query)
-            self.shelby_agent.log.print_and_log(
+            self.ceq_agent.log.print_and_log(
                 f"ceq_keyword_generator response: {generated_keywords}"
             )
             # dense_embedding, sparse_embedding = self.get_query_embeddings(generated_keywords)
@@ -649,7 +644,7 @@ class QueryAgent:
         else:
             # dense_embedding, sparse_embedding = self.get_query_embeddings(query)
             dense_embedding = self.get_query_embeddings(query)
-        self.shelby_agent.log.print_and_log("Embeddings retrieved")
+        self.ceq_agent.log.print_and_log("Embeddings retrieved")
 
         # returned_documents = self.query_vectorstore(dense_embedding, sparse_embedding, data_domain_name)
         returned_documents = self.query_vectorstore(dense_embedding, data_domain_name)
@@ -657,7 +652,7 @@ class QueryAgent:
         def doc_handling(returned_documents):
             # Need to rewrite all of this to make it more readable and build cases for when documentation is not being found.
             if not returned_documents:
-                self.shelby_agent.log.print_and_log(
+                self.ceq_agent.log.print_and_log(
                     "No supporting documents after initial query!"
                 )
                 return None
@@ -665,21 +660,21 @@ class QueryAgent:
             returned_documents_list = []
             for returned_doc in returned_documents:
                 returned_documents_list.append(returned_doc["url"])
-            self.shelby_agent.log.print_and_log(
+            self.ceq_agent.log.print_and_log(
                 f"{len(returned_documents)} documents returned from vectorstore: {returned_documents_list}"
             )
 
             if self.config.ceq_doc_relevancy_check_enabled:
                 returned_documents = self.doc_relevancy_check(query, returned_documents)
                 if not returned_documents:
-                    self.shelby_agent.log.print_and_log(
+                    self.ceq_agent.log.print_and_log(
                         "No supporting documents after doc_relevancy_check!"
                     )
                     return None
                 returned_documents_list = []
                 for returned_doc in returned_documents:
                     returned_documents_list.append(returned_doc["url"])
-                self.shelby_agent.log.print_and_log(
+                self.ceq_agent.log.print_and_log(
                     f"{len(returned_documents)} documents returned from doc_check: {returned_documents_list}"
                 )
 
@@ -687,12 +682,12 @@ class QueryAgent:
             final_documents_list = []
             for parsed_document in parsed_documents:
                 final_documents_list.append(parsed_document["url"])
-            self.shelby_agent.log.print_and_log(
+            self.ceq_agent.log.print_and_log(
                 f"{len(parsed_documents)} documents returned after parsing: {final_documents_list}"
             )
 
             if not parsed_documents:
-                self.shelby_agent.log.print_and_log(
+                self.ceq_agent.log.print_and_log(
                     "No supporting documents after parsing!"
                 )
                 return None
@@ -705,11 +700,11 @@ class QueryAgent:
         else:
             prompt = self.ceq_main_prompt_template(query, prepared_documents)
 
-        self.shelby_agent.log.print_and_log("Sending prompt to LLM")
+        self.ceq_agent.log.print_and_log("Sending prompt to LLM")
         llm_response = self.ceq_main_prompt_llm(prompt)
 
         parsed_response = self.ceq_append_meta(llm_response, prepared_documents)
-        self.shelby_agent.log.print_and_log(
+        self.ceq_agent.log.print_and_log(
             f"LLM response with appended metadata: {json.dumps(parsed_response, indent=4)}"
         )
 
@@ -721,9 +716,9 @@ class QueryAgent:
 #     ### APIAgent makes API calls on behalf the user ###
 #     # Currently under development
 
-#     def __init__(self, shelby_agent, log_service, config):
+#     def __init__(self, ceq_agent, log_service, config):
 
-#         self.shelby_agent = shelby_agent
+#         self.ceq_agent = ceq_agent
 #         # self.log = log_service
 #         self.config = config
 
@@ -768,7 +763,7 @@ class QueryAgent:
 #                         logit_bias=logit_bias,
 #                         stop='x'
 #                     )
-#             operation_response = self.shelby_agent.check_response(response)
+#             operation_response = self.ceq_agent.check_response(response)
 #             if not operation_response:
 #                 return None
 
@@ -811,7 +806,7 @@ class QueryAgent:
 #                         messages=prompt_template,
 #                         max_tokens=500,
 #                     )
-#         url_response = self.shelby_agent.check_response(response)
+#         url_response = self.ceq_agent.check_response(response)
 #         if not url_response:
 #             return None
 

@@ -97,51 +97,61 @@ class DeploymentManager:
         deployment_config_file = DeploymentManager.load_deployment_file(deployment_name)
 
         if deployment_config_file is None:
-            deployment_config_file = {
-                'deployment_instance': {}
-            }
+            deployment_config_file = {}
         
         # Deployment
         if 'deployment_instance' not in deployment_config_file:
-            deployment_config_file['deployment_instance'] = {}
-        deployment_instance_config = deployment_config_file['deployment_instance']
+            deployment_instance_config = {}
+        else:
+            deployment_instance_config = deployment_config_file['deployment_instance']
+            
         deployment_instance_config = self.load_variables_as_dicts(deployment_instance.model_, deployment_instance_config)
-
+        
         # Sprites
         if 'sprites' not in deployment_instance_config:
-            deployment_instance_config['sprites'] = {}
-        sprites_config = deployment_instance_config['sprites']
+            sprites_config = {}
+        else:
+            sprites_config = deployment_instance_config['sprites']
         
         # Sprite
         for sprite_class in deployment_instance.available_sprites_:
             sprite_model = sprite_class.model_
             sprite_name_model = sprite_model.sprite_name_
             if sprite_name_model not in sprites_config:
-                sprites_config[sprite_name_model] = {}
-            sprite_config = sprites_config[sprite_name_model]
+                sprite_config = {}
+            else:
+                sprite_config = sprites_config[sprite_name_model]
+                
             sprite_config = self.load_variables_as_dicts(sprite_model, sprite_config)
             
             # Services
             if 'services' not in sprite_config:
                 sprite_config['services'] = {}
+                services_config = {}
+            else:
+                services_config = sprite_config['services']
+                
             for sprite_class_required_service in sprite_class.required_services_:
                 service_model =  sprite_class_required_service.model_
                 service_class_name = service_model.service_name_
                 
                 # Service
-                if service_class_name not in sprite_config['services']:
-                    sprite_config['services'][service_class_name] = {}
-                service_config = sprite_config['services'][service_class_name]
+                if service_class_name not in services_config:
+                    service_config = {}
+                else:
+                    service_config = services_config[service_class_name]
+                
                 service_config = self.load_variables_as_dicts(service_model, service_config)
 
                 sprite_config['services'][service_class_name] = service_config
                 
             sprites_config[sprite_name_model] = sprite_config
+            
         deployment_instance_config['sprites'] = sprites_config
         deployment_config_file['deployment_instance'] = deployment_instance_config
             
         # Save the updated configuration
-        with open("app/deployments/base/deployment_config.yaml", "w", encoding="utf-8") as stream:
+        with open(f"app/deployments/{deployment_name}/deployment_config.yaml", "w", encoding="utf-8") as stream:
             yaml.safe_dump(deployment_config_file, stream)
             
     def load_variables_as_dicts(self, model_class, config):
@@ -149,37 +159,31 @@ class DeploymentManager:
         Adds variables from models if they don't exist in deployment_config.py.
         If values exist for variables in deployment_config.py it uses those.
         """
-        # Create temporary dictionaries to store variables before sorting
-        temp_required = {}
-        temp_optional = {}
-
+        if not config.get('required'):
+            config['required'] = {}
         # Handle 'required'
         for var, value in sorted(vars(model_class).items()):  # sort by variable name
             if not var.startswith("_") and not var.endswith("_") and not callable(value):
                 if var in model_class.required_variables_:
-                    if config.get(var, None) in [None, '']:
-                        temp_required[var] = value
+                    if config['required'].get(var) in [None, '']:
+                        config['required'][var] = value
                     else:
-                        temp_required[var] = config[var]
+                        continue
                         
+        if not config.get('optional'):
+            config['optional'] = {}
         # Handle 'optional'
         for var, value in sorted(vars(model_class).items()):  # sort by variable name
             if not var.startswith("_") and not var.endswith("_") and not callable(value):
                 if var not in model_class.required_variables_:
-                    if config.get(var, None) in [None, '']:
-                        temp_optional[var] = value
+                    if config['optional'].get(var) in [None, '']:
+                        config['optional'][var] = value
                     else:
-                        temp_optional[var] = config[var]
+                        continue
+                        # config['optional'][var] = config['optional'].get(var)
+                        
 
-        # Construct a new dictionary to ensure the order
-        new_config = {}
-
-        # Add 'required' and 'optional' variables into new_config
-        new_config['required'] = temp_required
-        new_config['optional'] = temp_optional
-
-
-        return new_config
+        return config
           
     def load_moniker_requirments(self):
         for moniker in self.config.DeploymentConfig.MonikerConfigs.__dict__:

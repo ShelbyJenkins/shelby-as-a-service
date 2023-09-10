@@ -18,7 +18,12 @@ class DiscordSprite:
     model_ = DiscordModel
     required_services_ = [CEQAgent]
     
-    def __init__(self):
+    def __init__(self, deployment_instance, sprite_model, service_classes):
+        self.deployment = deployment_instance
+        self.config = sprite_model
+        self.services = service_classes
+        for service_instance in self.services:
+            setattr(self, service_instance.config.service_name_, service_instance)
   
         
         # self.log = Logger(

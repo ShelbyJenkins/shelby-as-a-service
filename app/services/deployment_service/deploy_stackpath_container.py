@@ -5,7 +5,7 @@ import sys
 import time
 from importlib import import_module
 
-def main(deployment_name):
+def deploy_container(deployment_name):
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
     url = "https://gateway.stackpath.com/identity/v1/oauth2/token"

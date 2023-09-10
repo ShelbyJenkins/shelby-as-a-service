@@ -3,9 +3,6 @@ from typing import List
 
 @dataclass
 class IndexModel:
-    service_name_: str = 'index_service'
-    required_variables_ = ['index_name']
-    secrets_ = ['openai_api_key', 'pinecone_api_key']
     
     index_name: str = None
     index_env: str = 'us-central1-gcp'
@@ -30,15 +27,18 @@ class IndexModel:
         'date_indexed',
     ]
 
+    service_name_: str = 'index_service'
+    required_variables_ = ['index_name', 'index_env']
+    secrets_ = ['openai_api_key', 'pinecone_api_key']
 
 @dataclass
 class CEQModel:
-    service_name_: str = 'ceq_service'
-    secrets_ = ['openai_api_key', 'pinecone_api_key']
 
     # ActionAgent
     action_llm_model: str = 'gpt-4'
     # QueryAgent
+    ceq_index_name: str = None
+    ceq_index_env: str = None
     ceq_data_domain_constraints_enabled: bool = False
     ceq_data_domain_constraints_llm_model: str = 'gpt-4'
     ceq_data_domain_none_found_message: str = 'Query not related to any supported data domains (aka topics). Supported data domains are:'
@@ -60,7 +60,9 @@ class CEQModel:
     api_agent_create_function_llm_model: str = 'gpt-4'
     api_agent_populate_function_llm_model: str = 'gpt-4'
     
-    required_variables_ = []
+    service_name_: str = 'ceq_agent'
+    required_variables_ = ['ceq_index_name', 'ceq_index_env']
+    secrets_ = ['openai_api_key', 'pinecone_api_key']
 
 
 @dataclass

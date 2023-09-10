@@ -30,7 +30,7 @@ class DeploymentInstance(metaclass=SingletonMeta):
         """
         
         self.config = None
-        self.secrets = set()
+        self.secrets = {}
         self.sprites = []
         
         existing_deployment_names = DeploymentManager.check_for_existing_deployments()
@@ -45,14 +45,17 @@ class DeploymentInstance(metaclass=SingletonMeta):
       
             # In the case of local deployment we check for a default_local_deployment
             deployment_config = DeploymentManager.load_deployment_file(deployment_name)
-            base_instance = deployment_config['deployment_instance']
-            if base_instance.get('sprites', {}).get('local_sprite', {}).get('default_deployment_enabled') is True:
-                default_local_deployment_name = base_instance['sprites']['local_sprite'].get('default_local_deployment_name', None)
+            default_settings = deployment_config['deployment_instance'].get('sprites', {}).get('local_sprite', {}).get('optional', {})
+            if default_settings.get('default_deployment_enabled') is True:
+                default_local_deployment_name = default_settings.get('default_local_deployment_name', None)
                 if default_local_deployment_name is not None and default_local_deployment_name in existing_deployment_names:
                     deployment_name = default_local_deployment_name
-                    print(f"Loading default deployment {deployment_name}.")
+                    print(f"Loading default deployment '{deployment_name}'.")
+                    DeploymentManager().update_deployment_yaml(DeploymentInstance, deployment_name)
+                    deployment_config = DeploymentManager.load_deployment_file(default_local_deployment_name)
                 else:
-                    print(f"Default deployment {deployment_name} not found. Loading 'base' instead.")
+                    print(f"Default deployment '{default_local_deployment_name}' not found. Loading 'base' instead.")
+                    
             self.deployment_name = deployment_name
             self.load_local_sprite_deployment(deployment_name, deployment_config)        
             
@@ -164,26 +167,34 @@ class DeploymentInstance(metaclass=SingletonMeta):
         for var, value in vars(model_class).items():  # sort by variable name
             if not var.startswith("_") and not var.endswith("_") and not callable(value):
                 if var in model_class.required_variables_:
-                    config_setting = config.get('required', None).get(var, None)
-                    if config_setting in [None, '']:
-                        raise ValueError(f"Required variable {var} can not be None")
-                    else:
-                        setattr(model_class, var, config_setting)
-                else:
-                    config_setting = config.get('optional', None).get(var, None)
-                    if config_setting in [None, '']:
+                    required_dict = config.get('required')
+                    if not required_dict or required_dict.get(var) in [None, '']:
+                        # raise ValueError(f"Required variable {var} can not be None")
                         continue
                     else:
-                        setattr(model_class, var, config_setting)
+                        setattr(model_class, var, required_dict[var])
+                else:
+                    optional_dict = config.get('optional')
+                    if not optional_dict or optional_dict.get(var) in [None, '']:
+                        continue
+                    else:
+                        setattr(model_class, var, optional_dict[var])
             
         for secret_key in model_class.secrets_:
             secret_value = os.environ.get(
                 f"{self.deployment_name.upper()}_{secret_key.upper()}"
             )
-            self.secrets.add(secret_value)
+            self.secrets[secret_key] = secret_value
 
         return model_class
     
+    def check_secrets(self, model_secrets):
+        """For disabling services lacking secrets"""
+        for secret in model_secrets:
+            if not self.secrets.get(secret):
+                return False
+        
+        return True
     
     def run(self):
         with concurrent.futures.ThreadPoolExecutor() as executor:

@@ -10,13 +10,13 @@ import openai
 from dotenv import load_dotenv
 import time
 
-from services.tiny_jmap_library.tiny_jmap_library import TinyJMAPClient
-from services.data_processing_service import TextProcessing
-from services.log_service import Logger
+from app.services.tiny_jmap_library.tiny_jmap_library import TinyJMAPClient
+from app.services.data_processing_service import TextProcessing
+from app.services.log_service import Logger
 from bs4 import BeautifulSoup
 from langchain.embeddings import OpenAIEmbeddings
 import pinecone
-from models.models import IndexModel
+from app.models.models import IndexModel
 
 # endregion
 
@@ -36,7 +36,7 @@ class Aggregator:
         self.total_completion_tokens = 0
         self.service_dir = "app/content_aggregator/"
         self.prompt_path = "app/prompt_templates/aggregator/"
-        config_module_path = f"content_aggregator.config"
+        config_module_path = f"app.content_aggregator.config"
         self.config = import_module(config_module_path).MonikerAggregatorConfig
         self.vector_db = VectorIndex(self)
 
@@ -93,6 +93,46 @@ class Aggregator:
         # total_cost = math.ceil(total_cost * 100) / 100
         return total_cost
 
+    @staticmethod
+    def split_with_regex(text):
+            if text is None:
+                return None
+            # Split the text by patterns of numbered lists like "n. "
+            list_pattern = r"\s+\d{1,2}\.(?!\d)\s+"
+            list_matches = re.findall(list_pattern, text)
+
+
+            # Split the text by patterns of ".n." where n is a digit, and on each side of ".n.", there's either one or more whitespace characters or an alphabetical character.
+            dot_pattern = r"(\b|\s+)\.\d+\.(?=\s+|\b)"
+            dot_matches = re.findall(dot_pattern, text)
+            
+            # Split the text by patterns of n)
+            num_bracket_pattern = r"\s+\d+\)\s+"
+            num_bracket_matches = re.findall(num_bracket_pattern, text)
+
+            # Check which pattern has the most matches
+            pattern_counts = {
+                'list': len(list_matches),
+                'dot': len(dot_matches),
+                'num_bracket': len(num_bracket_matches),
+            }
+
+            most_common_pattern = max(pattern_counts, key=pattern_counts.get)
+
+            # Using match-case statement for better readability and structure
+            match most_common_pattern:
+                case 'list':
+                    splits = re.split(list_pattern, text)
+                case 'dot':
+                    splits = re.split(dot_pattern, text)
+                case 'num_bracket': 
+                    splits = re.split(num_bracket_pattern, text)
+                case _:
+                    return None
+            
+            if len(splits) < 1:
+                return None
+            return [story for story in splits if len(story) >= 5]
 
 class AggregateEmailNewsletter:
     def __init__(self, main_ag: Aggregator):
@@ -403,15 +443,24 @@ class AggregateEmailNewsletter:
                     role[
                         "content"
                     ] = content  # Replace the 'content' with 'prompt_message'
-
-            response = openai.ChatCompletion.create(
-                api_key=os.environ.get("OPENAI_API_KEY"),
-                model=self.main_ag.config.LLM_writing_model,
-                messages=prompt_template,
-                max_tokens=750,
-            )
-
-            checked_response = self.main_ag.check_response(response)
+                    
+            retries = 3
+            success = False
+            while retries > 0 and not success:
+                try:
+                    response = openai.ChatCompletion.create(
+                        api_key=os.environ.get("OPENAI_API_KEY"),
+                        model=self.main_ag.config.LLM_writing_model,
+                        messages=prompt_template,
+                        max_tokens=750,
+                    )
+                    checked_response = self.main_ag.check_response(response)
+                    success = True
+                except Exception as e:
+                    retries -= 1
+                    if retries == 0:  # If no more retries left, raise the exception
+                        raise e
+                    time.sleep(20)  # Timeout before retrying
 
             self.main_ag.log.print_and_log(
                 f"split_email response token count: {TextProcessing.tiktoken_len(checked_response)}"
@@ -420,53 +469,8 @@ class AggregateEmailNewsletter:
             email["summary"] = checked_response
             pre_split_output.append(email)
 
-            # Split the text by patterns of numbered lists like n.
-            list_pattern = r"\s+\d\.(?!\d)\s+"
-            list_matches = re.findall(list_pattern, checked_response)
-
-            # Split the text by patterns of [n], (n)
-            brackets_pattern = r"\[\d+\]|\(\d+\)"
-            brackets_matches = re.findall(brackets_pattern, checked_response)
-
-            # Split the text by patterns of .n.
-            dot_pattern = r"\.\d+\."
-            dot_matches = re.findall(dot_pattern, checked_response)
-            
-            # Split the text by patterns of n)
-            num_bracket_pattern = r"\d+\)"
-            num_bracket_matches = re.findall(num_bracket_pattern, checked_response)
-
-            # Check which pattern has the most matches
-            pattern_counts = {
-                'list': len(list_matches),
-                'brackets': len(brackets_matches),
-                'dot': len(dot_matches),
-                'num_bracket': len(num_bracket_matches),
-            }
-
-            most_common_pattern = max(pattern_counts, key=pattern_counts.get)
-
-            # Using match-case statement for better readability and structuref
-            match most_common_pattern:
-                case 'list':
-                    # Removes the first item in the list if it starts with "n. "
-                    checked_response = re.sub(r"^\d\.\s", "", checked_response)
-                    splits = re.split(list_pattern, checked_response)
-                case 'dot':
-                    # Removes the first item if it starts with ".n. "
-                    checked_response = re.sub(r"^\.\d+\.\s", "", checked_response)
-                    splits = re.split(dot_pattern, checked_response)
-                case 'brackets':
-                    # Removes the first item if it starts with "[n] "
-                    checked_response = re.sub(r"^\[\d+\]\s|^\(\d+\)\s", "", checked_response)
-                    splits = re.split(brackets_pattern, checked_response)
-                case 'num_bracket':  # Assuming you would like to handle this case similarly to 'brackets'
-                    # Removes the first item if it starts with "n) "
-                    checked_response = re.sub(r"^\d+\)\s", "", checked_response)
-                    splits = re.split(num_bracket_pattern, checked_response)
-                case _:
-                    break
-
+            splits = Aggregator.split_with_regex(checked_response)
+                
             # self.log.print_and_log each part
             for story in splits:
                 story = TextProcessing.remove_all_white_space_except_space(story)
@@ -645,7 +649,7 @@ class VectorIndex:
         )
 
     def matching_in_period(self, topic_embeddings, target_type):
-        initial_matching_vectors = []
+        
         filter = {
             "target_type": {"$eq": target_type},
             "date_indexed": {
@@ -657,18 +661,32 @@ class VectorIndex:
         query_response = self.vectorstore.query(
             namespace=self.main_ag.config.index_namespace,
             include_values=False,
-            include_metadata=False,
+            include_metadata=True,
             filter=filter,
             vector=topic_embeddings,
-            top_k=20,
+            top_k=100,
         )
-        # Destructures the QueryResponse object the pinecone library generates.
-        for v in query_response.matches:
-            if v.score > self.main_ag.config.story_topic_score:
-                initial_matching_vectors.append(v)
-
+        
+        initial_matching_vectors = self.score_initial_stories(query_response, self.main_ag.config.story_topic_score)
+        
         return initial_matching_vectors
 
+    def score_initial_stories(self, query_response, story_topic_score):
+        initial_matching_vectors = []
+        # Destructures the QueryResponse object the pinecone library generates.
+        for v in query_response.matches:
+            if v.score > story_topic_score:
+                if len(Aggregator.split_with_regex(v.metadata['content'])) > 1:
+                    continue
+                initial_matching_vectors.append(v)
+                
+        if len(initial_matching_vectors) < 5:
+            if story_topic_score + .10 < self.main_ag.config.story_topic_score:
+                return initial_matching_vectors
+            initial_matching_vectors = self.score_initial_stories(query_response, story_topic_score - 0.01)
+        
+        return initial_matching_vectors
+        
     def semantically_similar_sources(self, vectors, target_type):
         # Set filter for entire date range used
         filter = {
@@ -687,24 +705,30 @@ class VectorIndex:
             query_response = self.vectorstore.query(
                 namespace=self.main_ag.config.index_namespace,
                 include_values=False,
-                include_metadata=False,
+                include_metadata=True,
                 filter=filter,
                 id=vector.id,
                 top_k=20,
             )
 
             # Retain only the top N highest scored matches
-            top_matches = sorted(
+            sorted_matches = sorted(
                 query_response.matches, key=lambda x: x["score"], reverse=True
-            )[:5]
-            for v in top_matches:
+            )
+            counter = 0
+            for v in sorted_matches:
+                if counter > 5:
+                    break
                 if v.id == vector.id:
                     semantically_similar_sources.add(v.id)
+                    counter += 1
                     continue
                 # Removing any below score threshold
                 if v.score > self.main_ag.config.story_correlation_score:
+                    if len(Aggregator.split_with_regex(v.metadata['content'])) > 1:
+                        continue
+                    counter += 1
                     semantically_similar_sources.add(v.id)
-
             stories.append(semantically_similar_sources)
 
         return stories
@@ -825,8 +849,13 @@ class CreateNewsletter:
         for story_sources in top_vectorstore_content:
             story_string = ""
             for source in story_sources.items():
+                if len(Aggregator.split_with_regex(source[1].metadata['content'])) > 1:
+                    continue
+                if TextProcessing.tiktoken_len(source[1].metadata['content']) + TextProcessing.tiktoken_len(story_string) > 3000:
+                    continue 
                 story_string += f"\nsource: {source[1].metadata['content']}\n"
-            story_strings.append(story_string)
+            if len(story_string) > 1:
+                story_strings.append(story_string)
 
         summarized_stories = []
         # Writing the dictionary into a YAML file
@@ -836,6 +865,10 @@ class CreateNewsletter:
             yaml.dump(story_strings, yaml_file, default_flow_style=False)
 
         for story in story_strings:
+            if TextProcessing.tiktoken_len(story) > 3000:
+                continue
+            if TextProcessing.tiktoken_len(story) < 50:
+                continue
             prompt_template[1]["content"] = story
             
             retries = 3
@@ -1024,7 +1057,8 @@ class CreateNewsletter:
         dots3 = ["🔵", "🟢", "🟡", "🟠", "🟣", "🟤", "⚪️", "⚫️", "🔴"]
         dots4 = ["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘"]
         all_dots = [dots1, dots2, dots3, dots4]
-        selected_dots = random.choice(all_dots)
+        # selected_dots = random.choice(all_dots)
+        selected_dots = dots3
 
         content = intro_text
         content += "\n\n"

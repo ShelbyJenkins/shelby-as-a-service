@@ -1,42 +1,48 @@
 import sys
 import argparse
-from importlib import import_module
 from app.services.deployment_instantiator import DeploymentInstance
+from app.services.deployment_service.deploy_stackpath_container import deploy_container
 
 def main():
     """
-    This script runs shelby-as-a-serice when deployed to a container.
+    This script runs shelby-as-a-service when deployed to a container.
     AND
     When running locally.
 
     Usage:
         None. Deployment will be configured via automation.
-        If ran with our args, local_web is ran.
+        If ran without args, local_web is ran.
     """
     print(f"app.py is being run as: {__name__}")
 
     parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--run_container_deployment",
+        type=str,
         help="This will be called from the dockerfile after the container deploys.",
     )
     group.add_argument(
         "--deploy_container",
+        type=str,
         help="This will be called from the github actions workflow to deploy the container.",
     )
-    
-    if len(sys.argv) > 1:
-        args = parser.parse_args(sys.argv[1:])
-        if args.run_container_deployment:
-            deployment_name = args.run_container_deployment
-            config_module_path = f"deployments.{deployment_name}.deployment_config"
-            config_module = import_module(config_module_path)
-            deployment = DeploymentInstance(config_module)
-            deployment.run()
-        elif args.deploy_container:
-            deployment_name = args.deploy_container
-            deploy_stackpath_container.main(deployment_name)
+    parser.add_argument(
+        "deployment_name",
+        type=str,
+        nargs='?',
+        help="For local deployment provide the name of the deployment.",
+    )
+    args = parser.parse_args()
+   
+    if args.run_container_deployment:
+        deployment = DeploymentInstance(args.run_container_deployment)
+        deployment.run()
+    elif args.deploy_container: 
+        deploy_container(args.deploy_container)
+    elif args.deployment_name: 
+        deployment = DeploymentInstance(args.deployment_name) 
+        deployment.run()
     else:
         deployment = DeploymentInstance('base') 
         deployment.run()

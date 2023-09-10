@@ -6,6 +6,7 @@ import shutil
 import gradio as gr
 from app.models.models import LocalModel
 from app.services.ceq_agent import CEQAgent
+from app.services.index_service import IndexService
 from app.services.log_service import Logger
 from app.services.deployment_service.deployment_management import DeploymentManager
 
@@ -15,20 +16,19 @@ from app.services.deployment_service.deployment_management import DeploymentMana
 class LocalSprite:
     
     model_ = LocalModel
-    required_services_ = [CEQAgent]
+    required_services_ = [CEQAgent, IndexService]
     
     def __init__(self, deployment_instance, sprite_model, service_classes):
         self.deployment = deployment_instance
         self.config = sprite_model
         self.services = service_classes
         for service_instance in self.services:
-            instance_class_name = service_instance.__class__.__name__
-            setattr(self, instance_class_name, service_instance)
+            setattr(self, service_instance.config.service_name_, service_instance)
             
         self.log = Logger(
-            "local_client",
-            "LocalClientSprite",
-            f"local_client.md",
+            self.deployment.deployment_name,
+            "LocalSprite",
+            "local_sprite.md",
             level="INFO",
         )
         self.existing_deployment_names = None
@@ -40,23 +40,23 @@ class LocalSprite:
         try:
             with gr.Blocks() as local_client:
                 with gr.Tab(label="Context Enhanced Querying"):
-                    with gr.Row():
-                        chat = gr.Textbox(value="tbd...", lines=30)
-                        # gr.ChatInterface(
-                        #     self.yes_man,
-                        #     chatbot=gr.Chatbot(height=300),
-                        #     textbox=gr.Textbox(
-                        #         placeholder="Ask me a yes or no question", container=False, scale=7
-                        #     ),
-                        #     title="Context Enriched Querying",
-                        #     description="Ask Yes Man any question",
-                        #     retry_btn=None,
-                        #     undo_btn="Delete Previous",
-                        #     clear_btn="Clear",
-                        #     )
+                    with gr.Column(variant="panel"):
+                        ceq_chatbot = gr.Textbox(label="Chatbot", lines=20)
+                        with gr.Group():
+                            with gr.Row():
+                                ceq_message_textbox = gr.Textbox(
+                                    container=False,
+                                    show_label=False,
+                                    label="Message",
+                                    placeholder="Type a message...",
+                                    scale=7,
+                                )
+                            
                 with gr.Tab(label="Config"):
                     config_status_textboxt = gr.Textbox(label="", value="A sprite is a wily interface for interacting with AI.")
                     with gr.Tab(label="Local App"):
+                        save_deployment_btn = gr.Button(value="Save Config Changes")
+                        undo_deployment_btn = gr.Button(value="Undo Config Change")
                         self.local_ui_interface.render()
                     with gr.Tab(label="Deployment Management"):
                         with gr.Group():
@@ -88,9 +88,11 @@ class LocalSprite:
                                 delete_deployment_radio = gr.Radio(value="Don't Delete", choices=["Don't Delete", "Check to Confirm Delete"])
                             with gr.Row():
                                 delete_deployment_btn = gr.Button(value="Delete Existing Deployment")
-                    with gr.Tab(label="Deployment Settings"):
-                        save_deployment_btn = gr.Button(value="Save Config Changes")
-                        undo_deployment_btn = gr.Button(value="Undo Config Change")
+                    with gr.Tab(label="Index Management"):
+                        index_ingest_docs = gr.Button(value="ingest_docs")
+                        index_delete_index = gr.Button(value="delete_index")
+                        index_clear_index = gr.Button(value="clear_index")
+                        index_create_index = gr.Button(value="create_index")
                     
                 with gr.Tab(label="Logs", id="log"):
                     with gr.Row():
@@ -99,6 +101,17 @@ class LocalSprite:
                             lines=30,
                             )
 
+                ceq_message_textbox.submit(
+                    fn=self._run_ceq_request,
+                    inputs=ceq_message_textbox,
+                    outputs=[ceq_message_textbox, ceq_chatbot],
+                )
+                index_ingest_docs.click(
+                    fn=self.index_service.ingest_docs,
+                    inputs=None,
+                    outputs=None,
+                )
+                
                 load_deployment_btn.click(
                     fn=self._load_new_deployment,
                     inputs=load_deployments_dropdown,
@@ -126,6 +139,7 @@ class LocalSprite:
                 )
                 local_client.load(fn=self._gradio_logging, inputs=None, outputs=logs_output, every=3)
             
+                self.log.print_and_log_gradio('LocalSprite launched')
                 local_client.queue().launch()
                 
         except Exception as error:
@@ -165,23 +179,6 @@ class LocalSprite:
                                 gr.Textbox(value=value, label=name, elem_id=id, interactive=True)
                     
         return settings_component
-
-    #     for _, component in self.structured_config_components['required_vars'].items():
-    #     self.interface_config_components.append(component)
-    #     component.render()
-    # with gr.Accordion(label='optional', open=False):
-    #     for _, component in self.structured_config_components['optional_vars'].items():
-    #         self.interface_config_components.append(component)
-    #         component.render()
-    # for sprite_name, components_list in self.structured_config_components['sprites'].items():
-    #     with gr.Accordion(label=sprite_name, open=False):
-    #         for _, component in components_list['required_vars'].items():
-    #             self.interface_config_components.append(component)
-    #             component.render()
-    #         with gr.Accordion(label='optional', open=False):
-    #             for _, component in components_list['optional_vars'].items():
-    #                 self.interface_config_components.append(component)
-    #                 component.render()
 
     def _load_new_deployment(self, deployment_name):
         """Loads new deployment to deployment object."""
@@ -238,15 +235,16 @@ class LocalSprite:
         elif not all(char.isalnum() or char == '_' for char in new_deployment_name):
             output_message = "Please only use alpha numeric chars and '_' chars."
             self.log.print_and_log_gradio(output_message)
-        if self.existing_deployment_names:
-            if new_deployment_name in self.existing_deployment_names:
-                output_message = "That deployment already exists. Please delete it first"
-                self.log.print_and_log_gradio(output_message)
-            else:
-                DeploymentMaker().create_deployment(new_deployment_name)
-                self.existing_deployment_names = self._check_for_existing_deployments()
-                output_message = f" Deployment '{new_deployment_name}' created"
-                self.log.print_and_log_gradio(output_message)
+        if not self.existing_deployment_names:
+            self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
+        if new_deployment_name in self.existing_deployment_names:
+            output_message = "That deployment already exists. Please delete it first"
+            self.log.print_and_log_gradio(output_message)
+        else:
+            DeploymentManager().create_deployment(deployment_instance=self.deployment, deployment_name=new_deployment_name)
+            self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
+            output_message = f" Deployment '{new_deployment_name}' created"
+            self.log.print_and_log_gradio(output_message)
         
         return (
             output_message,
@@ -287,17 +285,18 @@ class LocalSprite:
             gr.Radio.update(value = "Don't Delete", choices=["Don't Delete", "Check to Confirm Delete"]),
         )
 
-    def yes_man(self, message, history):
-        if message.endswith("?"):
-            return "Yes"
-        else:
-            return "Ask me anything!"
-
+    async def _run_ceq_request(self, request):
+        # Required to run multiple requests at a time in async
+        with ThreadPoolExecutor() as executor:
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                executor, self.ceq_agent.request_thread, request
+            )
+            return '', response
+    
     def _gradio_logging(self):
         return self.log.read_logs()
 
-    def _set_status(self):
-        return f"Deployment '{self.deployment.deployment_name}' Loaded."
     
     def run_sprite(self):
         try:

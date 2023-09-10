@@ -2,30 +2,38 @@ import os, traceback
 from typing import Iterator
 import yaml, json
 import pinecone
-from services.log_service import Logger
-from services.open_api_minifier_service import OpenAPIMinifierService
-from services.data_processing_service import CEQTextPreProcessor
+from app.services.log_service import Logger
+from app.services.open_api_minifier_service import OpenAPIMinifierService
+from app.services.data_processing_service import CEQTextPreProcessor
 from langchain.schema import Document
 from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUrlLoader
 from langchain.embeddings import OpenAIEmbeddings
 from bs4 import BeautifulSoup
+from app.models.models import IndexModel
 
 
 class IndexService:
-    def __init__(self, deployment_instance):
+    
+    model_ = IndexModel
+    
+    def __init__(self, deployment_instance, service_model):
         self.deployment_name = deployment_instance.deployment_name
-        self.secrets = deployment_instance.secrets
-        self.config = deployment_instance.index_config
+        self.deployment = deployment_instance
+        self.config = service_model
+        self.index_env = self.config.index_env
+        self.index_name = self.config.index_name
+        
         self.log = Logger(
             self.deployment_name,
             f"{self.deployment_name}_index_agent",
             f"{self.deployment_name}_index_agent.md",
             level="INFO",
         )
-
-        self.index_env = deployment_instance.index_env
-        self.index_name = deployment_instance.index_name
-
+        
+        self.secrets = deployment_instance.secrets
+        if not self.deployment.check_secrets(IndexModel.secrets_):
+            return 
+        
         self.prompt_template_path = "app/prompt_templates"
         self.index_dir = f"app/deployments/{self.deployment_name}/index"
         # Loads data sources from file
@@ -37,9 +45,10 @@ class IndexService:
             self.index_description_file = yaml.safe_load(stream)
 
         if self.index_description_file["index_name"] != self.index_name:
-            raise ValueError(
-                "Index name in index_description.yaml does not match index from deployment.env!"
-            )
+            # raise ValueError(
+            #     "Index name in index_description.yaml does not match index from deployment.env!"
+            # )
+            self.index_name = self.index_description_file["index_name"]
 
         pinecone.init(
             environment=self.index_env,
@@ -154,7 +163,7 @@ class IndexService:
                     # If the "resource" already has vectors delete the existing vectors before upserting new vectors
                     # We have to delete all because the difficulty in specifying specific documents in pinecone
                     if existing_resource_vector_count != 0:
-                        self.clear_data_source(data_source)
+                        self._clear_data_source(data_source)
                         index_resource_stats = (
                             data_source.vectorstore.describe_index_stats(
                                 filter={
@@ -241,14 +250,14 @@ class IndexService:
             self.vectorstore.delete(deleteAll="true", namespace=key)
         self.log.print_and_log(self.vectorstore.describe_index_stats())
 
-    def clear_deplyoment(self):
+    def clear_deployment(self):
         self.log.print_and_log(
             f"Clearing namespace aka deployment: {self.deployment_name}"
         )
         self.vectorstore.delete(deleteAll="true", namespace=self.deployment_name)
         self.log.print_and_log(self.vectorstore.describe_index_stats())
 
-    def clear_data_source(self, data_source):
+    def _clear_data_source(self, data_source):
         data_source.vectorstore.delete(
             namespace=self.deployment_name,
             delete_all=False,
