@@ -16,7 +16,7 @@ from app.services.log_service import Logger
 from bs4 import BeautifulSoup
 from langchain.embeddings import OpenAIEmbeddings
 import pinecone
-from app.models.models import IndexModel
+from app.models.service_models import IndexModel
 
 # endregion
 

@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from app.services.log_service import Logger
-from app.models.models import SlackModel
+from app.models.service_models import SlackModel
 from app.services.ceq_agent import CEQAgent
 
 # endregion

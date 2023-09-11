@@ -9,75 +9,78 @@ from langchain.schema import Document
 from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUrlLoader
 from langchain.embeddings import OpenAIEmbeddings
 from bs4 import BeautifulSoup
-from app.models.models import IndexModel
+from app.models.service_models import IndexModel
+from app.models.service_models import ServiceBase
 
 
-class IndexService:
+class IndexService(ServiceBase):
     
-    model_ = IndexModel
+    model = IndexModel()
     
-    def __init__(self, deployment_instance, service_model):
-        self.deployment_name = deployment_instance.deployment_name
-        self.deployment = deployment_instance
-        self.config = service_model
-        self.index_env = self.config.index_env
-        self.index_name = self.config.index_name
+    def __init__(self, service_config = None, **kwargs):
+        super().__init__()
+        self.services = self.setup_config(service_config = service_config, **kwargs)
+        # self.deployment_name = deployment_instance.deployment_name
+        # self.deployment = deployment_instance
+        # self.config = service_model
+        # self.index_env = self.config.index_env
+        # self.index_name = self.config.index_name
         
-        self.log = Logger(
-            self.deployment_name,
-            f"{self.deployment_name}_index_agent",
-            f"{self.deployment_name}_index_agent.md",
-            level="INFO",
-        )
+        # self.log = Logger(
+        #     self.deployment_name,
+        #     f"{self.deployment_name}_index_agent",
+        #     f"{self.deployment_name}_index_agent.md",
+        #     level="INFO",
+        # )
         
-        self.secrets = deployment_instance.secrets
-        if not self.deployment.check_secrets(IndexModel.secrets_):
-            return 
+        # self.secrets = deployment_instance.secrets
+        # if not self.deployment.check_secrets(IndexModel.secrets_):
+        #     return 
         
-        self.prompt_template_path = "app/prompt_templates"
-        self.index_dir = f"app/deployments/{self.deployment_name}/index"
-        # Loads data sources from file
-        with open(
-            f"app/deployments/{self.deployment_name}/index_description.yaml",
-            "r",
-            encoding="utf-8",
-        ) as stream:
-            self.index_description_file = yaml.safe_load(stream)
+        # self.prompt_template_path = "app/prompt_templates"
+        # self.index_dir = f"app/deployments/{self.deployment_name}/index"
+        # # Loads data sources from file
+        # with open(
+        #     f"app/deployments/{self.deployment_name}/index_description.yaml",
+        #     "r",
+        #     encoding="utf-8",
+        # ) as stream:
+        #     self.index_description_file = yaml.safe_load(stream)
 
-        if self.index_description_file["index_name"] != self.index_name:
-            # raise ValueError(
-            #     "Index name in index_description.yaml does not match index from deployment.env!"
-            # )
-            self.index_name = self.index_description_file["index_name"]
+        # if self.index_description_file["index_name"] != self.index_name:
+        #     # raise ValueError(
+        #     #     "Index name in index_description.yaml does not match index from deployment.env!"
+        #     # )
+        #     self.index_name = self.index_description_file["index_name"]
 
-        pinecone.init(
-            environment=self.index_env,
-            api_key=self.secrets["pinecone_api_key"],
-        )
+        # pinecone.init(
+        #     environment=self.index_env,
+        #     api_key=self.secrets["pinecone_api_key"],
+        # )
 
-        indexes = pinecone.list_indexes()
-        if self.index_name not in indexes:
-            # create new index
-            self.create_index()
-            indexes = pinecone.list_indexes()
-            self.log.print_and_log(f"Created index: {indexes}")
-        self.vectorstore = pinecone.Index(self.index_name)
+        # indexes = pinecone.list_indexes()
+        # if self.index_name not in indexes:
+        #     # create new index
+        #     self.create_index()
+        #     indexes = pinecone.list_indexes()
+        #     self.log.print_and_log(f"Created index: {indexes}")
+        # self.vectorstore = pinecone.Index(self.index_name)
 
-        ### Adds sources from yaml config file to queue ###
+        # ### Adds sources from yaml config file to queue ###
 
-        self.enabled_data_sources = []
-        # Iterate over each source aka namespace
-        for domain in self.index_description_file["data_domains"]:
-            data_domain_name = domain["name"]
-            domain_description = domain["description"]
-            for data_source_name, source in domain["sources"].items():
-                data_source = DataSourceConfig(
-                    self, data_domain_name, domain_description, data_source_name, source
-                )
-                if data_source.update_enabled == False:
-                    continue
-                self.enabled_data_sources.append(data_source)
-                self.log.print_and_log(f"Will index: {data_source_name}")
+        # self.enabled_data_sources = []
+        # # Iterate over each source aka namespace
+        # for domain in self.index_description_file["data_domains"]:
+        #     data_domain_name = domain["name"]
+        #     domain_description = domain["description"]
+        #     for data_source_name, source in domain["sources"].items():
+        #         data_source = DataSourceConfig(
+        #             self, data_domain_name, domain_description, data_source_name, source
+        #         )
+        #         if data_source.update_enabled == False:
+        #             continue
+        #         self.enabled_data_sources.append(data_source)
+        #         self.log.print_and_log(f"Will index: {data_source_name}")
 
     def ingest_docs(self):
         self.log.print_and_log(

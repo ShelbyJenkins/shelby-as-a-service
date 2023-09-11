@@ -37,16 +37,16 @@ class DeploymentManager:
         return existing_deployment_names
     
     @staticmethod
-    def load_deployment_file(deployment_name):
+    def load_deployment_file(deployment_name, service_name):
         
         with open(
             f"app/deployments/{deployment_name}/deployment_config.yaml",
             "r",
             encoding="utf-8",
         ) as stream:
-            deployment_config = yaml.safe_load(stream)
+            config_from_file = yaml.safe_load(stream)
             
-        return deployment_config
+        return config_from_file[service_name]
     
     def create_deployment(self, deployment_instance, deployment_name):
         """Creates a new deployment by copying from the template folder.

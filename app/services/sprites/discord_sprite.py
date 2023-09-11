@@ -7,7 +7,7 @@ import json
 import discord
 from discord.ext import commands
 from app.services.log_service import Logger
-from app.models.models import DiscordModel
+from app.models.service_models import DiscordModel
 from app.services.ceq_agent import CEQAgent
 
 # endregion

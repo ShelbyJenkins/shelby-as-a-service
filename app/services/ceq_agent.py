@@ -4,38 +4,42 @@ import traceback
 import json, yaml, re
 import openai, pinecone, tiktoken
 from langchain.embeddings import OpenAIEmbeddings
-from app.models.models import CEQModel
+from app.models.service_models import CEQModel
 from app.services.log_service import Logger
-from app.models.models import DeploymentInstance
+from app.models.service_models import ServiceBase
 # endregion
 
 
-class CEQAgent(DeploymentInstance):
+class CEQAgent(ServiceBase):
     
-    # Overwrite the DeploymentInstance model
+    # Overwrite the ServiceBase model
     model = CEQModel()
-    
-    def __init__(self, config_from_file: dict=None, **kwargs):
-        super().__init__()
-        if config_from_file is None:
-            config_from_file = {}
-        self.setup_config(config_from_file, **kwargs)
 
-        self.deployment = deployment_instance
-        self.secrets = deployment_instance.secrets
-        self.config = model
-        if not self.deployment.check_secrets(CEQModel.secrets_):
-            return 
+    
+    def __init__(self, service_config = None, **kwargs):
+        """Initialized like any other service from sprites.
+        However, non-sprite services have the option to also load as modules:
+        They can take a config from a config dict service_config, 
+        or by setting variables with **kwargs.
+        """
+        super().__init__()
+        self.services = self.setup_config(service_config = service_config, **kwargs)
+
+        # self.deployment = deployment_instance
+        # self.secrets = deployment_instance.secrets
+        # self.config = model
+        # if not self.deployment.check_secrets(CEQModel.secrets_):
+        #     return 
         
-        self.log = Logger(
-            self.deployment.deployment_name,
-            "CEQAgent",
-            "ceq_agent.md",
-            level="INFO",
-        )
-        self.data_domains = deployment_instance.local_sprite.index_service.config.deployment_data_domains
-        self.action_agent = ActionAgent(self)
-        self.query_agent = QueryAgent(self)
+        # self.log = Logger(
+        #     self.deployment.deployment_name,
+        #     "CEQAgent",
+        #     "ceq_agent.md",
+        #     level="INFO",
+        # )
+        # self.data_domains = deployment_instance.local_sprite.index_service.config.deployment_data_domains
+        # self.action_agent = ActionAgent(self)
+        # self.query_agent = QueryAgent(self)
 
     def request_thread(self, request):
         try:

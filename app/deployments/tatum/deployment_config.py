@@ -1,4 +1,4 @@
-from models.models import DiscordModel, SlackModel, DeploymentModel
+from app.models.service_models import DiscordModel, SlackModel, DeploymentModel
 
 class DeploymentConfig:
     # Required #
