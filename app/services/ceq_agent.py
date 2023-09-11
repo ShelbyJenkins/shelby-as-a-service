@@ -6,18 +6,24 @@ import openai, pinecone, tiktoken
 from langchain.embeddings import OpenAIEmbeddings
 from app.models.models import CEQModel
 from app.services.log_service import Logger
-
+from app.models.models import DeploymentInstance
 # endregion
 
 
-class CEQAgent:
+class CEQAgent(DeploymentInstance):
     
-    model_ = CEQModel
+    # Overwrite the DeploymentInstance model
+    model = CEQModel()
     
-    def __init__(self, deployment_instance, service_model):
+    def __init__(self, config_from_file: dict=None, **kwargs):
+        super().__init__()
+        if config_from_file is None:
+            config_from_file = {}
+        self.setup_config(config_from_file, **kwargs)
+
         self.deployment = deployment_instance
         self.secrets = deployment_instance.secrets
-        self.config = service_model
+        self.config = model
         if not self.deployment.check_secrets(CEQModel.secrets_):
             return 
         
@@ -27,7 +33,6 @@ class CEQAgent:
             "ceq_agent.md",
             level="INFO",
         )
-        
         self.data_domains = deployment_instance.local_sprite.index_service.config.deployment_data_domains
         self.action_agent = ActionAgent(self)
         self.query_agent = QueryAgent(self)

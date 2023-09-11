@@ -1,29 +1,20 @@
 import os
 import concurrent.futures
 import yaml
+from dataclasses import asdict
 from dotenv import load_dotenv
-from app.models.models import DeploymentModel
-from app.sprites.local_sprite import LocalSprite
-from app.sprites.discord_sprite import DiscordSprite
-from app.sprites.slack_sprite import SlackSprite
+
 from app.services.deployment_service.deployment_management import DeploymentManager
+from app.models.models import DeploymentInstance
+from app.services.sprites.local_sprite import LocalSprite
 
-class SingletonMeta(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(SingletonMeta, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class DeploymentInstance(metaclass=SingletonMeta):
+class DeploymentInsantiator(DeploymentInstance):
     
-    model_ = DeploymentModel()
-    available_sprites_ = [LocalSprite, SlackSprite, DiscordSprite]
-
+    # All child classes will have access to all class variables with self.variable
+    available_sprites_ = [LocalSprite]
     
     def __init__(self, deployment_name):
+        super().__init__(deployment_name)
         """Instantiates deployment
         First it creates the deployment object and loads default variables from template.
         Then it overwrites them with the actual deployment.
@@ -68,7 +59,7 @@ class DeploymentInstance(metaclass=SingletonMeta):
                 DeploymentManager().update_deployment_yaml(DeploymentInstance, deployment_name)
                 deployment_config = DeploymentManager.load_deployment_file(deployment_name)
                     
-        
+
                     
     def _load_instance_from_models(self):
         

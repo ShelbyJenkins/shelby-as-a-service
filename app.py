@@ -1,6 +1,6 @@
 import sys
 import argparse
-from app.services.deployment_instantiator import DeploymentInstance
+from app.services.deployment_instantiator import DeploymentInsantiator
 from app.services.deployment_service.deploy_stackpath_container import deploy_container
 
 def main():
@@ -44,7 +44,7 @@ def main():
         deployment = DeploymentInstance(args.deployment_name) 
         deployment.run()
     else:
-        deployment = DeploymentInstance('base') 
+        deployment = DeploymentInsantiator('base') 
         deployment.run()
 
 if __name__ == "__main__":
