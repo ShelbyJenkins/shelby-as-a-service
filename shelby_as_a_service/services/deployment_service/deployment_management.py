@@ -28,8 +28,8 @@ class DeploymentManager:
     def check_for_existing_deployments():
         
         existing_deployment_names = []
-        for deployment in os.listdir("app/deployments"):
-            deployment_path = os.path.join("app/deployments", deployment)
+        for deployment in os.listdir("shelby_as_a_service/deployments"):
+            deployment_path = os.path.join("shelby_as_a_service/deployments", deployment)
             if os.path.isdir(deployment_path):
                 if "deployment_config.yaml" in os.listdir(deployment_path):
                     existing_deployment_names.append(deployment)
@@ -40,7 +40,7 @@ class DeploymentManager:
     def load_deployment_file(deployment_name, service_name):
         
         with open(
-            f"app/deployments/{deployment_name}/deployment_config.yaml",
+            f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.yaml",
             "r",
             encoding="utf-8",
         ) as stream:
@@ -53,7 +53,7 @@ class DeploymentManager:
         Does not overwrite existing deployments.
         To start fresh delete the deployment and then use this function.
         """
-        dir_path = f"app/deployments/{deployment_name}"
+        dir_path = f"shelby_as_a_service/deployments/{deployment_name}"
         
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
@@ -70,12 +70,12 @@ class DeploymentManager:
             
         index_description_dest_path = os.path.join(dir_path, "index_description.yaml")
         if not os.path.exists(index_description_dest_path):
-            index_description_source_path = "app/services/deployment_service/template/index_description.yaml"
+            index_description_source_path = "shelby_as_a_service/services/deployment_service/template/index_description.yaml"
             shutil.copy(index_description_source_path, index_description_dest_path)
 
         dot_env_dest_path = os.path.join(dir_path, ".env")
         if not os.path.exists(dot_env_dest_path):
-            dot_env_source_path = "app/services/deployment_service/template/template.env"    
+            dot_env_source_path = "shelby_as_a_service/services/deployment_service/template/template.env"    
             with open(dot_env_source_path, 'r', encoding='utf-8') as file:
                 lines = file.readlines()
                 modified_lines = []
@@ -151,7 +151,7 @@ class DeploymentManager:
         deployment_config_file['deployment_instance'] = deployment_instance_config
             
         # Save the updated configuration
-        with open(f"app/deployments/{deployment_name}/deployment_config.yaml", "w", encoding="utf-8") as stream:
+        with open(f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.yaml", "w", encoding="utf-8") as stream:
             yaml.safe_dump(deployment_config_file, stream)
             
     def load_variables_as_dicts(self, model_class, config):
@@ -222,13 +222,13 @@ WORKDIR /shelby-as-a-service
 COPY ./ ./ 
 
 # Install python packages
-RUN pip install --no-cache-dir -r app/deployments/{self.deployment_name}/requirements.txt
+RUN pip install --no-cache-dir -r shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt
 
 # Run Deployment
-CMD ["python", "app/app.py", "--run_container_deployment", "{self.deployment_name}"]
+CMD ["python", "shelby_as_a_service/app.py", "--run_container_deployment", "{self.deployment_name}"]
         """
         with open(
-            f"app/deployments/{self.deployment_name}/Dockerfile", "w", encoding="utf-8"
+            f"shelby_as_a_service/deployments/{self.deployment_name}/Dockerfile", "w", encoding="utf-8"
         ) as f:
             f.write(dockerfile)
 
@@ -236,7 +236,7 @@ CMD ["python", "app/app.py", "--run_container_deployment", "{self.deployment_nam
         combined_requirements = set()
         for sprite_name in self.used_sprites:
             with open(
-                f"app/deployment_maker/{sprite_name}_requirements.txt",
+                f"shelby_as_a_service/deployment_maker/{sprite_name}_requirements.txt",
                 "r",
                 encoding="utf-8",
             ) as file:
@@ -244,7 +244,7 @@ CMD ["python", "app/app.py", "--run_container_deployment", "{self.deployment_nam
             combined_requirements.update(sprite_requirements)
 
         with open(
-            f"app/deployments/{self.deployment_name}/requirements.txt",
+            f"shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt",
             "w",
             encoding="utf-8",
         ) as file:
@@ -295,14 +295,14 @@ CMD ["python", "app/app.py", "--run_container_deployment", "{self.deployment_nam
                         id: cache
                         with:
                             path: ~/.cache/pip 
-                            key: ${{{{ runner.os }}}}-pip-${{{{  hashFiles('**app/deployments/{self.deployment_name}/requirements.txt') }}}}
+                            key: ${{{{ runner.os }}}}-pip-${{{{  hashFiles('**shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt') }}}}
                             restore-keys: |
                                 ${{{{ runner.os }}}}-pip-
 
                     - name: Install dependencies
                         run: |
                             python -m pip install --upgrade pip
-                            if [ -f app/deployments/{self.deployment_name}/requirements.txt ]; then pip install -r app/deployments/{self.deployment_name}/requirements.txt; fi
+                            if [ -f shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt ]; then pip install -r shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt; fi
 
                     - name: Login to Docker registry
                         uses: docker/login-action@v2 
@@ -315,15 +315,15 @@ CMD ["python", "app/app.py", "--run_container_deployment", "{self.deployment_nam
                         uses: docker/build-push-action@v4
                         with:
                             context: .
-                            file: app/deployments/{self.deployment_name}/Dockerfile
+                            file: shelby_as_a_service/deployments/{self.deployment_name}/Dockerfile
                             push: true
                             tags: {self.required_deployment_vars['docker_username']}/{self.required_deployment_vars['docker_repo']}:{self.deployment_name}-latest
 
                     - name: Add execute permissions to the script
-                        run: chmod +x app/app.py
+                        run: chmod +x shelby_as_a_service/app.py
 
                     - name: Run deployment script
-                        run: python app/app.py --deploy_container {self.deployment_name}
+                        run: python shelby_as_a_service/app.py --deploy_container {self.deployment_name}
         """
         )
 

@@ -1,6 +1,6 @@
 import argparse
-from app.services.deployment_instantiator import DeploymentInstance
-from app.services.deployment_service.deploy_stackpath_container import deploy_container
+from services.deployment_instantiator import DeploymentInstance
+from services.deployment_service.deploy_stackpath_container import deploy_container
 
 def main():
     """

@@ -1,4 +1,4 @@
-from app.models.service_models import DiscordModel, SlackModel, LocalModel, IndexModel
+from models.service_models import DiscordModel, SlackModel, LocalModel, IndexModel
 
 class IndexConfig:
     index_name: str = None

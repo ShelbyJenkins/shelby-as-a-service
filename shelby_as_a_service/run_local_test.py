@@ -1,7 +1,7 @@
 import sys
 import argparse
 
-from app.services.aggregator_service import Aggregator, CreateNewsletter
+from services.aggregator_service import Aggregator, CreateNewsletter
 
 def main():
     """

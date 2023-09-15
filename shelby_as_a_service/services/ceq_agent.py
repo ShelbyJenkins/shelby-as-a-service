@@ -4,9 +4,9 @@ import traceback
 import json, yaml, re
 import openai, pinecone, tiktoken
 from langchain.embeddings import OpenAIEmbeddings
-from app.models.service_models import CEQModel
-from app.services.log_service import Logger
-from app.models.service_models import ServiceBase
+from models.service_models import CEQModel
+from services.log_service import Logger
+from models.service_models import ServiceBase
 # endregion
 
 

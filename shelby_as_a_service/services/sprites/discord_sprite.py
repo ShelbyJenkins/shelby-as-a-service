@@ -6,9 +6,9 @@ import random
 import json
 import discord
 from discord.ext import commands
-from app.services.log_service import Logger
-from app.models.service_models import DiscordModel
-from app.services.ceq_agent import CEQAgent
+from services.log_service import Logger
+from models.service_models import DiscordModel
+from services.ceq_agent import CEQAgent
 
 # endregion
 

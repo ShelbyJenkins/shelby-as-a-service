@@ -2,15 +2,15 @@ import os, traceback
 from typing import Iterator
 import yaml, json
 import pinecone
-from app.services.log_service import Logger
-from app.services.open_api_minifier_service import OpenAPIMinifierService
-from app.services.data_processing_service import CEQTextPreProcessor
+from services.log_service import Logger
+from services.open_api_minifier_service import OpenAPIMinifierService
+from services.data_processing_service import CEQTextPreProcessor
 from langchain.schema import Document
 from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUrlLoader
 from langchain.embeddings import OpenAIEmbeddings
 from bs4 import BeautifulSoup
-from app.models.service_models import IndexModel
-from app.models.service_models import ServiceBase
+from models.service_models import IndexModel
+from models.service_models import ServiceBase
 
 
 class IndexService(ServiceBase):

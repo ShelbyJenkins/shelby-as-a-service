@@ -4,12 +4,12 @@ shelby-as-a-service.code-workspace
 logs/
 .vscode/
 **/__pycache__/
-
-app/deployments/*/index/*/*
-app/deployments/*
-!app/deployments/deployment_maker/
-!app/deployments/template/
-!app/deployments/tatum/
+.mypy_cache/
+shelby_as_a_service/deployments/*/index/*/*
+shelby_as_a_service/deployments/*
+!shelby_as_a_service/deployments/deployment_maker/
+!shelby_as_a_service/deployments/template/
+!shelby_as_a_service/deployments/tatum/
 !template.env
 content_aggregator/
 

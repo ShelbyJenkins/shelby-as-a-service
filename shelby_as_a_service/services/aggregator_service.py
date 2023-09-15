@@ -10,13 +10,13 @@ import openai
 from dotenv import load_dotenv
 import time
 
-from app.services.tiny_jmap_library.tiny_jmap_library import TinyJMAPClient
-from app.services.data_processing_service import TextProcessing
-from app.services.log_service import Logger
+from services.tiny_jmap_library.tiny_jmap_library import TinyJMAPClient
+from services.data_processing_service import TextProcessing
+from services.log_service import Logger
 from bs4 import BeautifulSoup
 from langchain.embeddings import OpenAIEmbeddings
 import pinecone
-from app.models.service_models import IndexModel
+from models.service_models import IndexModel
 
 # endregion
 
@@ -36,7 +36,7 @@ class Aggregator:
         self.total_completion_tokens = 0
         self.service_dir = "app/content_aggregator/"
         self.prompt_path = "app/prompt_templates/aggregator/"
-        config_module_path = f"app.content_aggregator.config"
+        config_module_path = f"content_aggregator.config"
         self.config = import_module(config_module_path).MonikerAggregatorConfig
         self.vector_db = VectorIndex(self)
 

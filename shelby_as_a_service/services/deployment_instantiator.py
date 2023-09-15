@@ -4,10 +4,10 @@ import yaml
 from dotenv import load_dotenv
 from typing import List
 
-from app.services.deployment_service.deployment_management import DeploymentManager
-from app.models.service_models import ServiceBase
-from app.models.service_models import DeploymentModel
-from app.services.sprites.local_sprite import LocalSprite
+from services.deployment_service.deployment_management import DeploymentManager
+from models.service_models import ServiceBase
+from models.service_models import DeploymentModel
+from services.sprites.local_sprite import LocalSprite
 
 
 class DeploymentInstance(ServiceBase):

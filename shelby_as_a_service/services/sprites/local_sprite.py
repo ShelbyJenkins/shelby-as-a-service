@@ -5,12 +5,12 @@ from concurrent.futures import ThreadPoolExecutor
 import shutil
 import gradio as gr
 
-from app.services.log_service import Logger
-from app.services.deployment_service.deployment_management import DeploymentManager
-from app.models.service_models import ServiceBase
-from app.models.service_models import LocalModel
-from app.services.ceq_agent import CEQAgent
-from app.services.index_service import IndexService
+from services.log_service import Logger
+from services.deployment_service.deployment_management import DeploymentManager
+from models.service_models import ServiceBase
+from models.service_models import LocalModel
+from services.ceq_agent import CEQAgent
+from services.index_service import IndexService
 
 # endregion
 

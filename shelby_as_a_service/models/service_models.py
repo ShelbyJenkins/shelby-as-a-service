@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Any
-from app.services.deployment_service.deployment_management import DeploymentManager
+from services.deployment_service.deployment_management import DeploymentManager
 
 @dataclass
 class IndexModel:
