@@ -19,7 +19,7 @@ data_domains:
         doc_type: "soft"
       "api.tatum.io":
         update_enabled: True
-        target_url: "app/deployments/template/index/inputs/input_open_api_specs/tatum"
+        target_url: "shelby_as_a_service/deployments/template/index/inputs/input_open_api_specs/tatum"
         target_type: "open_api_spec"
         doc_type: "hard"
         api_url_format: "https://apidoc.tatum.io/tag/{tag}#operation/{operationId}"

@@ -15,11 +15,12 @@ from models.service_models import ServiceBase
 
 class IndexService(ServiceBase):
     
-    model = IndexModel()
+    model_ = IndexModel()
+    required_services_ = None
     
     def __init__(self, service_config = None, **kwargs):
         super().__init__()
-        self.services = self.setup_config(service_config = service_config, **kwargs)
+        self.setup_config(service_config = service_config, **kwargs)
         # self.deployment_name = deployment_instance.deployment_name
         # self.deployment = deployment_instance
         # self.config = service_model
@@ -37,11 +38,11 @@ class IndexService(ServiceBase):
         # if not self.deployment.check_secrets(IndexModel.secrets_):
         #     return 
         
-        # self.prompt_template_path = "app/prompt_templates"
-        # self.index_dir = f"app/deployments/{self.deployment_name}/index"
+        # self.prompt_template_path = "shelby_as_a_service/prompt_templates"
+        # self.index_dir = f"shelby_as_a_service/deployments/{self.deployment_name}/index"
         # # Loads data sources from file
         # with open(
-        #     f"app/deployments/{self.deployment_name}/index_description.yaml",
+        #     f"shelby_as_a_service/deployments/{self.deployment_name}/index_description.yaml",
         #     "r",
         #     encoding="utf-8",
         # ) as stream:

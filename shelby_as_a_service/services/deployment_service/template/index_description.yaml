@@ -6,7 +6,7 @@ data_domains:
     sources:
       "developers.deepgram.com/reference": # A data_source is a specific source within a data_domain
         update_enabled: True # Set to true when running index managment to update
-        target_url: "app/deployments/template/index/inputs/input_open_api_specs/deepgram" # Either URL or location of open api spec docs
+        target_url: "shelby_as_a_service/deployments/template/index/inputs/input_open_api_specs/deepgram" # Either URL or location of open api spec docs
         target_type: "open_api_spec" 
         doc_type: "hard" # A metadata tag used in pinecone to select between technical documentation and marketing/sales documents
         api_url_format: "https://developers.deepgram.com/reference/{operationId}" # Specific for open api spec docs to properly link to the online documents correctly
@@ -20,7 +20,7 @@ data_domains:
         doc_type: "soft"
       "stackpath.dev/reference":
         update_enabled: True
-        target_url: "app/deployments/template/index/inputs/input_open_api_specs/stackpath"
+        target_url: "shelby_as_a_service/deployments/template/index/inputs/input_open_api_specs/stackpath"
         target_type: "open_api_spec"
         doc_type: "hard"
         api_url_format: "https://stackpath.dev/reference/{operationId}"

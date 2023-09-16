@@ -12,7 +12,7 @@ def create_api():
 
     @local_web.get("/")
     def read_root():
-        return FileResponse(os.path.join(os.getcwd(), 'app/sprites/local_web/index.html'))
+        return FileResponse(os.path.join(os.getcwd(), 'shelby_as_a_service/sprites/local_web/index.html'))
 
     @local_web.post("/run-function/")
     def run_function(data: str = Form(...)):

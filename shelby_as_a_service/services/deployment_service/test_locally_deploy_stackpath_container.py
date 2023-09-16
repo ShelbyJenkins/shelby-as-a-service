@@ -69,7 +69,7 @@ for workload in workloads:
             print("workload deleted")
                 
 # Load configuration from JSON file
-with open("app/deployment_maker/sp-2_container_request_template.json", "r", encoding="utf-8") as f:
+with open("shelby_as_a_service/deployment_maker/sp-2_container_request_template.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
 # Add env vars to the environment variables of the container

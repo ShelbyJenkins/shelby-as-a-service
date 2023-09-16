@@ -4,7 +4,7 @@ import textwrap
 import inspect
 import shutil
 from importlib import import_module
-import yaml
+import json
 
 class DeploymentManager:
     def __init__(self):
@@ -26,48 +26,54 @@ class DeploymentManager:
 
     @staticmethod
     def check_for_existing_deployments():
-        
         existing_deployment_names = []
         for deployment in os.listdir("shelby_as_a_service/deployments"):
-            deployment_path = os.path.join("shelby_as_a_service/deployments", deployment)
+            deployment_path = os.path.join(
+                "shelby_as_a_service/deployments", deployment
+            )
             if os.path.isdir(deployment_path):
-                if "deployment_config.yaml" in os.listdir(deployment_path):
+                if "deployment_config.json" in os.listdir(deployment_path):
                     existing_deployment_names.append(deployment)
-                    
+
         return existing_deployment_names
-    
+
     @staticmethod
-    def load_deployment_file(deployment_name, service_name):
-        
-        with open(
-            f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.yaml",
-            "r",
-            encoding="utf-8",
-        ) as stream:
-            config_from_file = yaml.safe_load(stream)
-            
-        return config_from_file[service_name]
-    
-    def create_deployment(self, deployment_instance, deployment_name):
+    def load_deployment_file(deployment_name, service_name=None):
+        try:
+            with open(
+                f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.json",
+                "r",
+                encoding="utf-8",
+            ) as stream:
+                config_from_file = json.load(stream)
+        except json.JSONDecodeError:
+            # If the JSON file is empty or invalid, return an empty dictionary (or handle in a way you see fit)
+            config_from_file = {}
+
+        if service_name:
+            return config_from_file.get(service_name, None)
+        else:
+            return config_from_file
+
+    @staticmethod
+    def create_deployment(deployment_name):
         """Creates a new deployment by copying from the template folder.
         Does not overwrite existing deployments.
         To start fresh delete the deployment and then use this function.
         """
         dir_path = f"shelby_as_a_service/deployments/{deployment_name}"
-        
+
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
         if not os.path.exists(os.path.join(dir_path, "index/inputs")):
             os.makedirs(os.path.join(dir_path, "index/inputs"))
-        
-        # Creates blank deployment_config.yaml
-        deployment_config_dest_path = os.path.join(dir_path, "deployment_config.yaml")
+
+        # Creates blank deployment_config.json
+        deployment_config_dest_path = os.path.join(dir_path, "deployment_config.json")
         if not os.path.exists(deployment_config_dest_path):
-            with open(deployment_config_dest_path, 'w', encoding='utf-8') as file:
-                pass
-            # Adds variables to config file from models
-            self.update_deployment_yaml(deployment_instance, deployment_name)
-            
+            with open(deployment_config_dest_path, "w", encoding="utf-8") as file:
+                file.write("{}")
+
         index_description_dest_path = os.path.join(dir_path, "index_description.yaml")
         if not os.path.exists(index_description_dest_path):
             index_description_source_path = "shelby_as_a_service/services/deployment_service/template/index_description.yaml"
@@ -75,8 +81,10 @@ class DeploymentManager:
 
         dot_env_dest_path = os.path.join(dir_path, ".env")
         if not os.path.exists(dot_env_dest_path):
-            dot_env_source_path = "shelby_as_a_service/services/deployment_service/template/template.env"    
-            with open(dot_env_source_path, 'r', encoding='utf-8') as file:
+            dot_env_source_path = (
+                "shelby_as_a_service/services/deployment_service/template/template.env"
+            )
+            with open(dot_env_source_path, "r", encoding="utf-8") as file:
                 lines = file.readlines()
                 modified_lines = []
                 for line in lines:
@@ -85,106 +93,97 @@ class DeploymentManager:
                         modified_lines.append(line)
                     else:
                         modified_lines.append(f"{deployment_name.upper()}_{line}")
-       
-            with open(dot_env_dest_path, 'w', encoding='utf-8') as file:
+
+            with open(dot_env_dest_path, "w", encoding="utf-8") as file:
                 file.writelines(modified_lines)
-    
-    def update_deployment_yaml(self, deployment_instance, deployment_name):
+
+    @staticmethod
+    def update_deployment_json(deployment_instance, deployment_name):
         """Populates deployment_config.py from models.
         If the existing deployment_config.py has existing values it does not overwrite them.
         """
-        
+
         deployment_config_file = DeploymentManager.load_deployment_file(deployment_name)
 
         if deployment_config_file is None:
             deployment_config_file = {}
-        
+
         # Deployment
-        if 'deployment_instance' not in deployment_config_file:
+        if "deployment_instance" not in deployment_config_file:
             deployment_instance_config = {}
         else:
-            deployment_instance_config = deployment_config_file['deployment_instance']
-            
-        deployment_instance_config = self.load_variables_as_dicts(deployment_instance.model_, deployment_instance_config)
-        
-        # Sprites
-        if 'sprites' not in deployment_instance_config:
-            sprites_config = {}
-        else:
-            sprites_config = deployment_instance_config['sprites']
-        
+            deployment_instance_config = deployment_config_file["deployment_instance"]
+
+        deployment_config_file["deployment_instance"] = DeploymentManager.load_variables_as_dicts(
+            deployment_instance.model_, deployment_instance_config
+        )
+
         # Sprite
-        for sprite_class in deployment_instance.available_sprites_:
+        for sprite_class in deployment_instance.required_sprites_:
             sprite_model = sprite_class.model_
-            sprite_name_model = sprite_model.sprite_name_
-            if sprite_name_model not in sprites_config:
+            sprite_name_model = sprite_model.service_name_
+            if sprite_name_model not in deployment_config_file:
                 sprite_config = {}
             else:
-                sprite_config = sprites_config[sprite_name_model]
-                
-            sprite_config = self.load_variables_as_dicts(sprite_model, sprite_config)
-            
+                sprite_config = deployment_config_file[sprite_name_model]
+
+            sprite_config = DeploymentManager.load_variables_as_dicts(sprite_model, sprite_config)
+
             # Services
-            if 'services' not in sprite_config:
-                sprite_config['services'] = {}
+            if "services" not in sprite_config:
+                sprite_config["services"] = {}
                 services_config = {}
             else:
-                services_config = sprite_config['services']
-                
+                services_config = sprite_config["services"]
+
             for sprite_class_required_service in sprite_class.required_services_:
-                service_model =  sprite_class_required_service.model_
+                service_model = sprite_class_required_service.model_
                 service_class_name = service_model.service_name_
-                
+
                 # Service
                 if service_class_name not in services_config:
                     service_config = {}
                 else:
                     service_config = services_config[service_class_name]
-                
-                service_config = self.load_variables_as_dicts(service_model, service_config)
 
-                sprite_config['services'][service_class_name] = service_config
-                
-            sprites_config[sprite_name_model] = sprite_config
-            
-        deployment_instance_config['sprites'] = sprites_config
-        deployment_config_file['deployment_instance'] = deployment_instance_config
-            
+                service_config = DeploymentManager.load_variables_as_dicts(
+                    service_model, service_config
+                )
+
+                sprite_config["services"][service_class_name] = service_config
+
+            deployment_config_file[sprite_name_model] = sprite_config
+
         # Save the updated configuration
-        with open(f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.yaml", "w", encoding="utf-8") as stream:
-            yaml.safe_dump(deployment_config_file, stream)
-            
-    def load_variables_as_dicts(self, model_class, config):
+        with open(
+            f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.json",
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(deployment_config_file, file, ensure_ascii=False, indent=4)
+
+    @staticmethod
+    def load_variables_as_dicts(model_class, config):
         """Loads variables and values from models and existing deployment_config.py.
         Adds variables from models if they don't exist in deployment_config.py.
         If values exist for variables in deployment_config.py it uses those.
         """
-        if not config.get('required'):
-            config['required'] = {}
+        if not config:
+            config = {}
         # Handle 'required'
         for var, value in sorted(vars(model_class).items()):  # sort by variable name
-            if not var.startswith("_") and not var.endswith("_") and not callable(value):
-                if var in model_class.required_variables_:
-                    if config['required'].get(var) in [None, '']:
-                        config['required'][var] = value
-                    else:
-                        continue
-                        
-        if not config.get('optional'):
-            config['optional'] = {}
-        # Handle 'optional'
-        for var, value in sorted(vars(model_class).items()):  # sort by variable name
-            if not var.startswith("_") and not var.endswith("_") and not callable(value):
-                if var not in model_class.required_variables_:
-                    if config['optional'].get(var) in [None, '']:
-                        config['optional'][var] = value
-                    else:
-                        continue
-                        # config['optional'][var] = config['optional'].get(var)
-                        
+            if (
+                not var.startswith("_")
+                and not var.endswith("_")
+                and not callable(value)
+            ):
+                if config.get(var) in [None, ""]:
+                    config[var] = value
+                else:
+                    continue
 
         return config
-          
+
     def load_moniker_requirments(self):
         for moniker in self.config.DeploymentConfig.MonikerConfigs.__dict__:
             if not moniker.startswith("_") and not moniker.endswith("_"):
@@ -228,7 +227,9 @@ RUN pip install --no-cache-dir -r shelby_as_a_service/deployments/{self.deployme
 CMD ["python", "shelby_as_a_service/app.py", "--run_container_deployment", "{self.deployment_name}"]
         """
         with open(
-            f"shelby_as_a_service/deployments/{self.deployment_name}/Dockerfile", "w", encoding="utf-8"
+            f"shelby_as_a_service/deployments/{self.deployment_name}/Dockerfile",
+            "w",
+            encoding="utf-8",
         ) as f:
             f.write(dockerfile)
 

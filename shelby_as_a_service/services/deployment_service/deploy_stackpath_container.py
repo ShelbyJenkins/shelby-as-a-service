@@ -69,7 +69,7 @@ def deploy_container(deployment_name):
                 
     # Load configuration from JSON file
     with open(
-        "app/deployment_maker/sp-2_container_request_template.json", "r", encoding="utf-8"
+        "shelby_as_a_service/deployment_maker/sp-2_container_request_template.json", "r", encoding="utf-8"
     ) as f:
         request_template = json.load(f)
 

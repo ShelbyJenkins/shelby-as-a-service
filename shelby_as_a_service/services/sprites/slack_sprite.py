@@ -197,7 +197,7 @@ class SlackSprite:
         return markdown_string
 
     async def get_random_animal(self):
-        animals_txt_path = os.path.join("app/prompt_templates/", "animals.txt")
+        animals_txt_path = os.path.join("shelby_as_a_service/prompt_templates/", "animals.txt")
         with open(animals_txt_path, "r") as file:
             animals = file.readlines()
 

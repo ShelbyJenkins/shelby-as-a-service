@@ -34,8 +34,8 @@ class Aggregator:
 
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
-        self.service_dir = "app/content_aggregator/"
-        self.prompt_path = "app/prompt_templates/aggregator/"
+        self.service_dir = "shelby_as_a_service/content_aggregator/"
+        self.prompt_path = "shelby_as_a_service/prompt_templates/aggregator/"
         config_module_path = f"content_aggregator.config"
         self.config = import_module(config_module_path).MonikerAggregatorConfig
         self.vector_db = VectorIndex(self)

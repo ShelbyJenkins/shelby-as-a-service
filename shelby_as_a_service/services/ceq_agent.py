@@ -13,8 +13,8 @@ from models.service_models import ServiceBase
 class CEQAgent(ServiceBase):
     
     # Overwrite the ServiceBase model
-    model = CEQModel()
-
+    model_ = CEQModel()
+    required_services_ = None
     
     def __init__(self, service_config = None, **kwargs):
         """Initialized like any other service from sprites.
@@ -23,8 +23,8 @@ class CEQAgent(ServiceBase):
         or by setting variables with **kwargs.
         """
         super().__init__()
-        self.services = self.setup_config(service_config = service_config, **kwargs)
-
+        self.setup_config(service_config = service_config, **kwargs)
+        
         # self.deployment = deployment_instance
         # self.secrets = deployment_instance.secrets
         # self.config = model
@@ -96,7 +96,7 @@ class ActionAgent:
         # Chooses workflow
         # Currently disabled
         with open(
-            os.path.join("app/prompt_templates/", "action_topic_constraint.yaml"),
+            os.path.join("shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -139,7 +139,7 @@ class ActionAgent:
         # Chooses topic
         # If no matching topic found, returns 0.
         with open(
-            os.path.join("app/prompt_templates/", "action_topic_constraint.yaml"),
+            os.path.join("shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -234,7 +234,7 @@ class QueryAgent:
 
     def keyword_generator(self, query):
         with open(
-            os.path.join("app/prompt_templates/", "ceq_keyword_generator.yaml"),
+            os.path.join("shelby_as_service/prompt_templates/", "ceq_keyword_generator.yaml"),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -352,7 +352,7 @@ class QueryAgent:
 
     def doc_relevancy_check(self, query, documents=None):
         with open(
-            os.path.join("app/prompt_templates/", "ceq_doc_check.yaml"),
+            os.path.join("shelby_as_service/prompt_templates/", "ceq_doc_check.yaml"),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -538,7 +538,7 @@ class QueryAgent:
 
     def ceq_main_prompt_template(self, query, documents=None):
         with open(
-            os.path.join("app/prompt_templates/", "ceq_main_prompt.yaml"),
+            os.path.join("shelby_as_service/prompt_templates/", "ceq_main_prompt.yaml"),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -737,7 +737,7 @@ class QueryAgent:
 
 #         API_spec_path = self.API_spec_path
 #         # Load prompt template to be used with all APIs
-#         with open(os.path.join('app/prompt_templates/', 'action_topic_constraint.yaml'), 'r', encoding="utf-8") as stream:
+#         with open(os.path.join('shelby_as_service/prompt_templates/', 'action_topic_constraint.yaml'), 'r', encoding="utf-8") as stream:
 #             # Load the YAML data and print the result
 #             prompt_template = yaml.safe_load(stream)
 #         operationID_file = None
@@ -799,7 +799,7 @@ class QueryAgent:
 
 #     def create_bodyless_function(self, query, operationID_file):
 
-#         with open(os.path.join('app/prompt_templates/', 'action_topic_constraint.yaml'), 'r', encoding="utf-8") as stream:
+#         with open(os.path.join('shelby_as_service/prompt_templates/', 'action_topic_constraint.yaml'), 'r', encoding="utf-8") as stream:
 #             # Load the YAML data and print the result
 #             prompt_template = yaml.safe_load(stream)
 
