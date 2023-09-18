@@ -1,9 +1,4 @@
-import os
 import concurrent.futures
-import yaml
-from dotenv import load_dotenv
-from typing import List
-
 from services.deployment_service.deployment_management import DeploymentManager
 from models.service_models import ServiceBase
 from models.service_models import DeploymentModel
@@ -36,7 +31,7 @@ class DeploymentInstance(ServiceBase):
                 print(f"Deployment {deployment_name} not found.")
                 
         if "base" == deployment_name:
-            DeploymentManager().update_deployment_json(DeploymentInstance, "base")
+            DeploymentManager().update_deployment_json_from_model(DeploymentInstance, "base")
             # In the case of local deployment we check for a default_local_deployment
             deployment_config = DeploymentManager.load_deployment_file(deployment_name)
             default_settings = (
@@ -60,7 +55,7 @@ class DeploymentInstance(ServiceBase):
                     )
         
         if deployment_name != "base":
-                DeploymentManager().update_deployment_json(
+                DeploymentManager().update_deployment_json_from_model(
                     DeploymentInstance, deployment_name
                 )
                 deployment_config = DeploymentManager.load_deployment_file(
@@ -69,15 +64,8 @@ class DeploymentInstance(ServiceBase):
                 
         self.deployment_name = deployment_name
         self.setup_config(**kwargs)
-        load_dotenv(os.path.join(f"shelby_as_a_service/deployments/{self.deployment_name}/", ".env"))
         
-    def check_secrets(self, model_secrets):
-        """For disabling services lacking secrets"""
-        for secret in model_secrets:
-            if not self.secrets.get(secret):
-                return False
-
-        return True
+        
 
     def run(self):
         with concurrent.futures.ThreadPoolExecutor() as executor:

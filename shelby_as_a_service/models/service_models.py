@@ -1,6 +1,9 @@
+import os
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional
+from dotenv import load_dotenv
 from services.deployment_service.deployment_management import DeploymentManager
+from services.log_service import Logger
 
 @dataclass
 class IndexModel:
@@ -30,7 +33,7 @@ class IndexModel:
 
     service_name_: str = 'index_service'
     required_variables_: List[str] = field(default_factory=lambda: ['index_name', 'index_env'])
-    secrets_: List[str] = field(default_factory=lambda: ['openai_api_key', 'pinecone_api_key'])
+    required_secrets_: List[str] = field(default_factory=lambda: ['openai_api_key', 'pinecone_api_key'])
     
     
 @dataclass
@@ -64,7 +67,7 @@ class CEQModel:
     
     service_name_: str = 'ceq_agent'
     required_variables_: List[str] = field(default_factory=lambda: ['ceq_index_name', 'ceq_index_env'])
-    secrets_: List[str] = field(default_factory=lambda: ['openai_api_key', 'pinecone_api_key'])
+    required_secrets_: List[str] = field(default_factory=lambda: ['openai_api_key', 'pinecone_api_key'])
 
 
 @dataclass
@@ -87,7 +90,7 @@ class DiscordModel:
 
     service_name_: str = 'discord_sprite'
     required_variables_: List[str] = field(default_factory=lambda: ['discord_enabled_servers'])
-    secrets_: List[str] = field(default_factory=lambda: ['discord_bot_token'])
+    required_secrets_: List[str] = field(default_factory=lambda: ['discord_bot_token'])
 
 
 @dataclass
@@ -101,7 +104,7 @@ class SlackModel:
 
     service_name_: str = 'slack_sprite'
     required_variables_: List[str] = field(default_factory=lambda: ['slack_enabled_teams'])
-    secrets_: List[str] = field(default_factory=lambda: ['slack_app_token', 'slack_bot_token'])
+    required_secrets_: List[str] = field(default_factory=lambda: ['slack_app_token', 'slack_bot_token'])
 
 
 @dataclass
@@ -114,14 +117,14 @@ class LocalModel:
 
     service_name_: str = 'local_sprite'
     required_variables_: List[str] = field(default_factory=list) 
-    secrets_: List[str] = field(default_factory=list) 
+    required_secrets_: List[str] = field(default_factory=list) 
     
     
 # @dataclass
 # class ContainerDeploymentModel:
     
 #     required_variables_ = ['docker_registry', 'docker_username', 'docker_repo']
-#     secrets_ = [
+#     required_secrets_ = [
 #         'docker_token',
 #         'stackpath_stack_slug',
 #         'stackpath_client_id',
@@ -139,22 +142,23 @@ class DeploymentModel:
     enabled_sprites: List[str] = field(default_factory=lambda: ['local_sprite'])
     required_variables_: List[str] = field(default_factory=lambda: ['enabled_sprites'])
     
-@dataclass
 class ServiceBase:
     """Base model for all services.
     Child classes have access to all class variables of ServiceBase with self.variable.
     setup_config uses asdict to load settings from models, configs, and function params.
     It then loads child services by passing a config file and instantiating the service.
     """
+    secrets: Dict[str, str] = {}
     deployment_name: str = 'base'
-    secrets_: Dict[str, str] = field(default_factory=dict)
     
     def setup_config(self, service_config = None, **kwargs):
         
+        # Initial call
         if service_config is None:
             config_from_file = DeploymentManager.load_deployment_file(
                 self.deployment_name, self.model_.service_name_
             )
+            load_dotenv(os.path.join(f"shelby_as_a_service/deployments/{self.deployment_name}/", ".env"))
         else:
             config_from_file = service_config[self.model_.service_name_]
             
@@ -171,7 +175,10 @@ class ServiceBase:
             for service in self.required_services_:
                 service_instance = service(config_from_file['services'])
                 setattr(self, service.model_.service_name_, service_instance)
-     
+                
+        if hasattr(self.model_, 'required_secrets_'):
+            ServiceBase.load_secrets(self.model_)
+            
         merged_config = {**asdict(self.model_), **config_from_file, **kwargs}
             
         if merged_config.get('services', None):
@@ -179,4 +186,23 @@ class ServiceBase:
         
         for key, value in merged_config.items():
             setattr(self, key, value)
-            
+    
+    @classmethod
+    def load_secrets(cls, model):
+        for secret in model.required_secrets_:
+            secret_str = f"{cls.deployment_name}_{secret}"
+            secret_str = secret_str.upper()
+            env_secret = os.environ.get(secret_str, None)
+            if env_secret in [None, '']:
+                print(f"Secret: {secret_str} is None!")
+            cls.secrets[secret] = 'test'
+        
+        
+    # def check_secrets(self, model_secrets):
+    #     """For disabling services lacking secrets"""
+    #     for secret in model_secrets:
+    #         if not self.secrets.get(secret):
+    #             return False
+
+    #     return True
+

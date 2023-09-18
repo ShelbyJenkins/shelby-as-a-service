@@ -4,6 +4,7 @@ import textwrap
 import inspect
 import shutil
 from importlib import import_module
+from inspect import isclass
 import json
 
 class DeploymentManager:
@@ -98,7 +99,7 @@ class DeploymentManager:
                 file.writelines(modified_lines)
 
     @staticmethod
-    def update_deployment_json(deployment_instance, deployment_name):
+    def update_deployment_json_from_model(deployment_instance, deployment_name):
         """Populates deployment_config.py from models.
         If the existing deployment_config.py has existing values it does not overwrite them.
         """
@@ -114,7 +115,7 @@ class DeploymentManager:
         else:
             deployment_instance_config = deployment_config_file["deployment_instance"]
 
-        deployment_config_file["deployment_instance"] = DeploymentManager.load_variables_as_dicts(
+        deployment_config_file["deployment_instance"] = DeploymentManager.load_file_variables_as_dicts(
             deployment_instance.model_, deployment_instance_config
         )
 
@@ -127,7 +128,7 @@ class DeploymentManager:
             else:
                 sprite_config = deployment_config_file[sprite_name_model]
 
-            sprite_config = DeploymentManager.load_variables_as_dicts(sprite_model, sprite_config)
+            sprite_config = DeploymentManager.load_file_variables_as_dicts(sprite_model, sprite_config)
 
             # Services
             if "services" not in sprite_config:
@@ -146,8 +147,96 @@ class DeploymentManager:
                 else:
                     service_config = services_config[service_class_name]
 
-                service_config = DeploymentManager.load_variables_as_dicts(
+                service_config = DeploymentManager.load_file_variables_as_dicts(
                     service_model, service_config
+                )
+
+                sprite_config["services"][service_class_name] = service_config
+
+            deployment_config_file[sprite_name_model] = sprite_config
+
+        # Save the updated configuration
+        with open(
+            f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.json",
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(deployment_config_file, file, ensure_ascii=False, indent=4)
+    
+    @staticmethod
+    def load_file_variables_as_dicts(model_class, config):
+        """Loads variables and values from models and existing deployment_config.py.
+        Adds variables from models if they don't exist in deployment_config.py.
+        If values exist for variables in deployment_config.py it uses those.
+        """
+        if not config:
+            config = {}
+        # Handle 'required'
+        for var, value in sorted(vars(model_class).items()):  # sort by variable name
+            if (
+                not var.startswith("_")
+                and not var.endswith("_")
+                and not callable(value)
+            ):
+                if config.get(var) in [None, ""]:
+                    config[var] = value
+                else:
+                    continue
+
+        return config
+    
+    @staticmethod
+    def update_deployment_json_from_memory(deployment_instance, deployment_name):
+        """Populates deployment_config.py from models.
+        If the existing deployment_config.py has existing values it does not overwrite them.
+        """
+
+        deployment_config_file = DeploymentManager.load_deployment_file(deployment_name)
+
+        if deployment_config_file is None:
+            deployment_config_file = {}
+
+        # Deployment
+        if "deployment_instance" not in deployment_config_file:
+            deployment_instance_config = {}
+        else:
+            deployment_instance_config = deployment_config_file["deployment_instance"]
+
+        deployment_config_file["deployment_instance"] = DeploymentManager.load_memory_variables_as_dicts(
+            deployment_instance.model_, deployment_instance_config
+        )
+
+        # Sprite
+        for sprite_class in deployment_instance.required_sprites_:
+            sprite_model = sprite_class.model_
+            sprite_name_model = sprite_model.service_name_
+            sprite_instance = getattr(deployment_instance, sprite_name_model)
+            if sprite_name_model not in deployment_config_file:
+                sprite_config = {}
+            else:
+                sprite_config = deployment_config_file[sprite_name_model]
+
+            sprite_config = DeploymentManager.load_memory_variables_as_dicts(sprite_instance, sprite_config)
+
+            # Services
+            if "services" not in sprite_config:
+                sprite_config["services"] = {}
+                services_config = {}
+            else:
+                services_config = sprite_config["services"]
+
+            # Service
+            for sprite_class_required_service in sprite_class.required_services_:
+                service_model = sprite_class_required_service.model_
+                service_class_name = service_model.service_name_
+                service_instance = getattr(sprite_instance, service_class_name)
+                if service_class_name not in services_config:
+                    service_config = {}
+                else:
+                    service_config = services_config[service_class_name]
+
+                service_config = DeploymentManager.load_memory_variables_as_dicts(
+                    service_instance, service_config
                 )
 
                 sprite_config["services"][service_class_name] = service_config
@@ -163,21 +252,16 @@ class DeploymentManager:
             json.dump(deployment_config_file, file, ensure_ascii=False, indent=4)
 
     @staticmethod
-    def load_variables_as_dicts(model_class, config):
-        """Loads variables and values from models and existing deployment_config.py.
-        Adds variables from models if they don't exist in deployment_config.py.
-        If values exist for variables in deployment_config.py it uses those.
+    def load_memory_variables_as_dicts(class_instance, config):
+        """Loads variables and values from class_instance and existing deployment_config.py.
+        If values exist for variables in class_instance it uses those.
         """
         if not config:
             config = {}
-        # Handle 'required'
-        for var, value in sorted(vars(model_class).items()):  # sort by variable name
-            if (
-                not var.startswith("_")
-                and not var.endswith("_")
-                and not callable(value)
-            ):
-                if config.get(var) in [None, ""]:
+     
+        for var, value in sorted(vars(class_instance).items()):  # sort by variable name
+            if var in config:
+                if value not in [None, ""]:
                     config[var] = value
                 else:
                     continue

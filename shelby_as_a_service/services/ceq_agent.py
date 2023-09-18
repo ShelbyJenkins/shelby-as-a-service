@@ -25,18 +25,16 @@ class CEQAgent(ServiceBase):
         super().__init__()
         self.setup_config(service_config = service_config, **kwargs)
         
-        # self.deployment = deployment_instance
-        # self.secrets = deployment_instance.secrets
         # self.config = model
         # if not self.deployment.check_secrets(CEQModel.secrets_):
         #     return 
         
-        # self.log = Logger(
-        #     self.deployment.deployment_name,
-        #     "CEQAgent",
-        #     "ceq_agent.md",
-        #     level="INFO",
-        # )
+        self.log = Logger(
+            self.deployment_name,
+            "CEQAgent",
+            "ceq_agent.md",
+            level="INFO",
+        )
         # self.data_domains = deployment_instance.local_sprite.index_service.config.deployment_data_domains
         # self.action_agent = ActionAgent(self)
         # self.query_agent = QueryAgent(self)
@@ -89,7 +87,6 @@ class ActionAgent:
     def __init__(self, ceq_agent):
         self.ceq_agent = ceq_agent
         self.config = ceq_agent.config
-        self.secrets = ceq_agent.secrets
         self.data_domains = ceq_agent.data_domains
 
     def action_prompt_template(self, query):
@@ -202,7 +199,6 @@ class QueryAgent:
     def __init__(self, ceq_agent):
         self.ceq_agent = ceq_agent
         self.config = ceq_agent.config
-        self.secrets = ceq_agent.secrets
         self.data_domains = ceq_agent.data_domains
 
     def select_data_domain(self, query):

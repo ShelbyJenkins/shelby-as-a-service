@@ -26,7 +26,7 @@ class LocalSprite(ServiceBase):
         """
         super().__init__()
         self.setup_config()
-        self.settings_components = self._create_settings_components()
+        self.config_components, self.config_dict, self.secrets_components = self._create_config_components()
         self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
         self.deployment_instance = deployment_instance
         self.log = Logger(
@@ -40,6 +40,7 @@ class LocalSprite(ServiceBase):
         """Creates gradio app."""
         try:
             with gr.Blocks() as local_client:
+                
                 with gr.Tab(label="Context Enhanced Querying"):
                     with gr.Column(variant="panel"):
                         ceq_chatbot = gr.Textbox(label="Chatbot", lines=20)
@@ -52,61 +53,73 @@ class LocalSprite(ServiceBase):
                                     placeholder="Type a message...",
                                     scale=7,
                                 )
-                with gr.Tab(label="Apps Settings"):
-                    save_deployment_btn = gr.Button(value="Save Config Changes")
-                    undo_deployment_btn = gr.Button(value="Undo Config Change")
-                    self.settings_components.render()
+                                
+                with gr.Tab(label="Index Management"):
+                    index_ingest_docs = gr.Button(size='sm', value="ingest_docs")
+                    index_delete_index = gr.Button(size='sm', value="delete_index")
+                    index_clear_index = gr.Button(size='sm', value="clear_index")
+                    index_create_index = gr.Button(size='sm', value="create_index")
                     
-                with gr.Tab(label="Tara's too tab"):
+                with gr.Tab(label="Settings"):
                     config_status_textboxt = gr.Textbox(
                         label="",
                         value="A sprite is a wily interface for interacting with AI.",
                     )
-                    with gr.Tab(label="Deployment/project/app Management"):
-                        with gr.Group():
-                            with gr.Row():
-                                load_deployments_dropdown = gr.Dropdown(
-                                    value=self.existing_deployment_names[0],
-                                    multiselect=False,
-                                    choices=self.existing_deployment_names,
-                                    label="Existing Deployments:",
-                                )
-                            with gr.Row():
-                                load_deployment_btn = gr.Button(
-                                    value="Load Existing Deployment"
-                                )
-                        with gr.Group():
-                            with gr.Row():
-                                make_deployment_textbox = gr.Textbox(
-                                    label="Enter new deployment name (new_deployment_name):"
-                                )
-                            with gr.Row():
-                                make_deployment_btn = gr.Button(
-                                    value="Make New Deployment"
-                                )
-                        with gr.Group():
-                            with gr.Row():
-                                delete_deployments_dropdown = gr.Dropdown(
-                                    value="Danger!",
-                                    multiselect=False,
-                                    choices=self.existing_deployment_names,
-                                    label="Existig Deployments:",
-                                )
-                            with gr.Row():
-                                delete_deployment_radio = gr.Radio(
-                                    value="Don't Delete",
-                                    choices=["Don't Delete", "Check to Confirm Delete"],
-                                )
-                            with gr.Row():
-                                delete_deployment_btn = gr.Button(
-                                    value="Delete Existing Deployment"
-                                )
-                    with gr.Tab(label="Index Management"):
-                        index_ingest_docs = gr.Button(value="ingest_docs")
-                        index_delete_index = gr.Button(value="delete_index")
-                        index_clear_index = gr.Button(value="clear_index")
-                        index_create_index = gr.Button(value="create_index")
+                    with gr.Tab(label="Configuration"):
+                        with gr.Row():
+                            gr.Textbox(show_label=False, scale=2, lines=5, value="Instructions here")
+                            with gr.Column():
+                                config_memory_btn = gr.Button(size='sm', value="Save Config to Memory") 
+                                config_revert_btn = gr.Button(size='sm', value="Revert Config from File")
+                                config_file_btn = gr.Button(size='sm', value="Save Config to File")
 
+                        self.config_components.render()
+                        
+                    with gr.Tab(label="Secrets"):
+                        with gr.Row():
+                            gr.Textbox(show_label=False, scale=2, lines=3, value="Instructions here")
+                            with gr.Column():
+                                secrets_file_btn = gr.Button(size='sm', value="Save Secrets to .env File")
+
+                        self.secrets_components.render()
+                        
+                    with gr.Tab(label="Management"):
+                        with gr.Row():
+                            gr.Textbox(show_label=False, lines=15, scale=2, value="Instructions here")
+                            with gr.Column():
+                                with gr.Group():
+                                    load_deployment_btn = gr.Button(size='sm', 
+                                        value="Load Existing Deployment"
+                                    )
+                                    load_deployments_dropdown = gr.Dropdown(
+                                        value=self.existing_deployment_names[0],
+                                        multiselect=False,
+                                        choices=self.existing_deployment_names,
+                                        label="Existing Deployments:",
+                                    )
+                                with gr.Group():
+                                    make_deployment_btn = gr.Button(size='sm', 
+                                        value="Make New Deployment"
+                                    )
+                                    make_deployment_textbox = gr.Textbox(
+                                        label="Enter new deployment name (new_deployment_name):"
+                                    )
+                                with gr.Group():
+                                    with gr.Group():
+                                        delete_deployment_btn = gr.Button(size='sm', 
+                                            value="Delete Existing Deployment"
+                                        )
+                                        delete_deployment_chk_box = gr.Checkbox(
+                                            value=False,
+                                            label="Check to confirm",
+                                        )
+                                    delete_deployments_dropdown = gr.Dropdown(
+                                        value="Danger!",
+                                        multiselect=False,
+                                        choices=self.existing_deployment_names,
+                                        label="Existing Deployments:",
+                                    )
+                                    
                 with gr.Tab(label="Logs", id="log"):
                     with gr.Row():
                         logs_output = gr.Textbox(
@@ -125,14 +138,31 @@ class LocalSprite(ServiceBase):
                     outputs=None,
                 )
 
-                load_deployment_blocks = [
-                    block for _, block in self.settings_components.blocks.items()
+                config_blocks = [
+                    block for _, block in self.config_components.blocks.items()
                     if block.elem_id is not None and hasattr(block, 'value')
                 ]
+                
+                config_memory_btn.click(
+                    fn=self._save_config_to_memory,
+                    inputs=config_blocks,
+                    outputs=config_status_textboxt,
+                )
+                config_revert_btn.click(
+                    fn=self._load_new_deployment_from_file,
+                    inputs=None,
+                    outputs=config_blocks,
+                )
+                config_file_btn.click(
+                    fn=self._save_config_to_file,
+                    inputs=config_blocks,
+                    outputs=config_status_textboxt,
+                )
+                
                 load_deployment_btn.click(
-                    fn=self._load_new_deployment,
+                    fn=self._load_new_deployment_from_file,
                     inputs=load_deployments_dropdown,
-                    outputs=load_deployment_blocks,
+                    outputs=config_blocks,
                 )
                 make_deployment_btn.click(
                     fn=self._create_new_deployment,
@@ -146,18 +176,17 @@ class LocalSprite(ServiceBase):
                 )
                 delete_deployment_btn.click(
                     fn=self._delete_deployment,
-                    inputs=[delete_deployments_dropdown, delete_deployment_radio],
+                    inputs=[delete_deployments_dropdown, delete_deployment_chk_box],
                     outputs=[
                         config_status_textboxt,
                         load_deployments_dropdown,
                         delete_deployments_dropdown,
-                        delete_deployment_radio,
+                        delete_deployment_chk_box,
                     ],
                 )
                 local_client.load(
                     fn=self._gradio_logging, inputs=None, outputs=logs_output, every=3
                 )
-
                 self.log.print_and_log_gradio("LocalSprite launched")
                 local_client.queue().launch()
 
@@ -167,52 +196,64 @@ class LocalSprite(ServiceBase):
 
         return local_client
     
-
-    def _create_settings_components(self):
+    def _create_config_components(self):
         """Loads template interface config components and emits structured_config_components."""
+        
+        config_dict = {}
+        config_dict = self._create_config_dict(
+            class_config=self, class_name="local_sprite"
+        )
+        
+        for service in self.required_services_:
+            service_name = service.model_.service_name_
+            config_dict.update(self._create_config_dict(
+                class_config=getattr(self, service_name),
+                class_name=service_name,
+            ))
 
-        with gr.Blocks() as settings_interface:
+        with gr.Blocks() as config_interface:
             self._create_components_from_classes(
-                class_config=self, class_name="local_sprite", secrets=True
+                class_config=self, class_name="local_sprite"
             )
             for service in self.required_services_:
                 service_name = service.model_.service_name_
                 with gr.Tab(
                     label=service_name,
-                    open=False,
                     elem_id=f"{service_name}_accordion",
                 ):
                     self._create_components_from_classes(
                         class_config=getattr(self, service_name),
                         class_name=service_name,
                     )
+                    
+        with gr.Blocks() as secrets_interface:
+            for secret_name, secret in self.secrets.items():
+                if secret in [None, '']:
+                    value = ''
+                else:
+                    value = 'Secret loaded succesfully.'
+                gr.Textbox(
+                    value=value, label=secret_name, elem_id=secret_name, interactive=True,
+                )
 
-        return settings_interface
-
-    def _create_components_from_classes(self, class_config, class_name, secrets=False):
+        return config_interface, config_dict, secrets_interface
+    
+    def _create_components_from_classes(self, class_config, class_name):
         with gr.Blocks(title=class_name) as settings_component:
             with gr.Group():
                 with gr.Tab(
-                    label="Required Settings",
-                    open=True,
+                    label=f"{class_name}_required_settings",
                     elem_id=f"{class_name}_required_settings",
                 ):
                     for var in class_config.required_variables_:
                         req_var = getattr(class_config, var)
                         id = f"{class_name}_{var}"
                         gr.Textbox(
-                            value=req_var, label=var, elem_id=id, interactive=True
+                            value=req_var, label=var, elem_id=id, elem_classes=class_name, interactive=True
                         )
-                    if secrets:
-                        with gr.Accordion(
-                            label="Required Secrets",
-                            open=True,
-                            elem_id=f"{class_name}_required_Secrets",
-                        ):
-                            pass
+          
                 with gr.Tab(
-                    label="Optional Settings",
-                    open=False,
+                    label=f"{class_name}_optional_settings",
                     elem_id=f"{class_name}_optional_settings",
                 ):
                     for name, value in class_config.__dict__.items():
@@ -221,83 +262,103 @@ class LocalSprite(ServiceBase):
                             and not callable(value)
                             and not isinstance(value, ServiceBase)
                             and not isinstance(value, type)
+                            and not isinstance(value, Logger)
                             and not name.endswith("_")
                             and name != 'deployment_name'
+                            and name != 'secrets'
                         ):
+                            id = f"{class_name}_{name}"
                             if name not in class_config.required_variables_:
-                                id = f"{class_name}_{name}"
                                 gr.Textbox(
                                     value=value,
                                     label=name,
                                     elem_id=id,
+                                    elem_classes=class_name,
                                     interactive=True,
                                 )
+                            
 
         return settings_component
-
-    def _load_new_deployment(self, load_deployment_name):
-        """Loads new deployment to deployment object."""
-
-        self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
-
-        if load_deployment_name not in self.existing_deployment_names:
-            output_message = f"Can't find a deployment named: '{load_deployment_name}'"
-            self.log.print_and_log_gradio(output_message)
-            return None
-        if load_deployment_name in self.deployment_name:
-            output_message = f"Deployment already loaded: '{load_deployment_name}'"
-            self.log.print_and_log_gradio(output_message)
-            return None
-
-        self.deployment_name = load_deployment_name
-        self.setup_config()
-        output = self._update_settings()
-        
-        output_message = f"Deployment loaded: '{load_deployment_name}'"
-        self.log.print_and_log_gradio(output_message)
-        return output
-
-    def _update_settings(self):
-        settings = {}
-        settings = self._create_update_dict(
-            class_config=self, class_name="local_sprite", secrets=True
-        )
-        for service in self.required_services_:
-            service_name = service.model_.service_name_
     
-            settings.update(self._create_update_dict(
-                class_config=getattr(self, service_name),
-                class_name=service_name,
-            ))
-        output = []
-        for _, block in self.settings_components.blocks.items():
-            if block.elem_id is not None and hasattr(block, 'value'):
-                output.append(block.update(value = settings.get(block.elem_id, None)))
-
-        return output
-
-    def _create_update_dict(self, class_config, class_name, secrets=False):
-        settings = {}
+    def _create_config_dict(self, class_config, class_name):
+        class_settings_dict = {}
       
-        # if secrets:
-        #     elem_id = f"{class_name}_required_Secrets",
-        #     pass
-
         for name, value in class_config.__dict__.items():
             if (
                 not name.startswith("__")
                 and not callable(value)
                 and not isinstance(value, ServiceBase)
                 and not isinstance(value, type)
+                and not isinstance(value, Logger)
                 and not name.endswith("_")
                 and name != 'deployment_name'
+                and name != 'secrets'
             ):
              
                 id = f"{class_name}_{name}"
-                settings[id] = value
+                class_settings_dict[id] = value
                     
-        return settings
+        return class_settings_dict
+    
+    def _save_config_to_memory(self, *config_blocks):
+        """Updates settings in memory using input from the gradio config_components.
+        Takes  input from config_blocks, and sets the class using elem_classes field.
+        Then uses the label field to set the attr with the value from the input.
+        """
+        counter = 0
+        for _, block in self.config_components.blocks.items():
+            if block.elem_id is not None and hasattr(block, 'value'):
+                instance_name = block.elem_classes[0]
+                if instance_name == 'local_sprite':
+                    setattr(self, block.label, config_blocks[counter])
+                else:
+                    class_instance = getattr(self, instance_name)
+                    setattr(class_instance, block.label, config_blocks[counter])
+                counter += 1
+        output_message = "Config settings saved to memory."
+        self.log.print_and_log_gradio(output_message)
         
+        return output_message
+    
+    def _save_config_to_file(self, *config_blocks):
+        self._save_config_to_memory(*config_blocks)
+        DeploymentManager.update_deployment_json_from_memory(self.deployment_instance, self.deployment_name)
+        output_message = "Config settings saved to file."
+            
+        self.log.print_and_log_gradio(output_message)
+        
+        return output_message
+        
+    def _load_new_deployment_from_file(self, load_deployment_name = None):
+        """Loads new deployment to deployment object."""
+
+        self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
+
+        if load_deployment_name is not None:
+            if load_deployment_name not in self.existing_deployment_names:
+                output_message = f"Can't find a deployment named: '{load_deployment_name}'"
+                self.log.print_and_log_gradio(output_message)
+                return None
+            if load_deployment_name == self.deployment_name:
+                output_message = f"Deployment already loaded: '{load_deployment_name}'"
+                self.log.print_and_log_gradio(output_message)
+                return None
+            self.deployment_name = load_deployment_name
+
+        
+        DeploymentManager.update_deployment_json_from_model(self.deployment_instance, self.deployment_name)
+        self.setup_config()
+        
+        output = []
+        for _, block in self.config_components.blocks.items():
+            if block.elem_id is not None and hasattr(block, 'value'):
+                output.append(block.update(value = self.config_dict.get(block.elem_id, None)))
+        
+        output_message = f"Deployment loaded: '{self.deployment_name}'"
+        self.log.print_and_log_gradio(output_message)
+        
+        return output
+     
     def _create_new_deployment(self, new_deployment_name):
         
         new_deployment_name = new_deployment_name.strip()
@@ -318,7 +379,7 @@ class LocalSprite(ServiceBase):
             
         else:
             DeploymentManager().create_deployment(new_deployment_name)
-            DeploymentManager().update_deployment_json(self.deployment_instance, new_deployment_name)
+            DeploymentManager().update_deployment_json_from_model(self.deployment_instance, new_deployment_name)
             self.existing_deployment_names = (
                 DeploymentManager.check_for_existing_deployments()
             )
@@ -335,12 +396,12 @@ class LocalSprite(ServiceBase):
             gr.Dropdown.update(value="Danger!", choices=self.existing_deployment_names),
         )
 
-    def _delete_deployment(self, delete_deployment_name, delete_deployment_radio):
+    def _delete_deployment(self, delete_deployment_name, delete_deployment_chk_box):
         if delete_deployment_name == self.deployment_name:
             output_message = "Can't delete in use deployment. Please switch first."
             self.log.print_and_log_gradio(output_message)
-        elif delete_deployment_radio != "Check to Confirm Delete":
-            output_message = "Please check the radio box to confirm delete"
+        elif delete_deployment_chk_box is False:
+            output_message = "Please check check the box to confirm delete"
             self.log.print_and_log_gradio(output_message)
         else:
             base_dir = "shelby_as_a_service/deployments"
