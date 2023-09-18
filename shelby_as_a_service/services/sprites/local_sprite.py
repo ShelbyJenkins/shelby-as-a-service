@@ -26,7 +26,7 @@ class LocalSprite(ServiceBase):
         """
         super().__init__()
         self.setup_config()
-        self.local_ui_interface = self._create_local_ui_interface()
+        self.settings_components = self._create_settings_components()
         self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
         self.deployment_instance = deployment_instance
         self.log = Logger(
@@ -55,7 +55,7 @@ class LocalSprite(ServiceBase):
                 with gr.Tab(label="Apps Settings"):
                     save_deployment_btn = gr.Button(value="Save Config Changes")
                     undo_deployment_btn = gr.Button(value="Undo Config Change")
-                    self.local_ui_interface.render()
+                    self.settings_components.render()
                     
                 with gr.Tab(label="Tara's too tab"):
                     config_status_textboxt = gr.Textbox(
@@ -125,10 +125,14 @@ class LocalSprite(ServiceBase):
                     outputs=None,
                 )
 
+                load_deployment_blocks = [
+                    block for _, block in self.settings_components.blocks.items()
+                    if block.elem_id is not None and hasattr(block, 'value')
+                ]
                 load_deployment_btn.click(
                     fn=self._load_new_deployment,
                     inputs=load_deployments_dropdown,
-                    outputs=self.local_ui_interface,
+                    outputs=load_deployment_blocks,
                 )
                 make_deployment_btn.click(
                     fn=self._create_new_deployment,
@@ -162,12 +166,13 @@ class LocalSprite(ServiceBase):
             self.log.print_and_log_gradio(output_message)
 
         return local_client
+    
 
-    def _create_local_ui_interface(self):
+    def _create_settings_components(self):
         """Loads template interface config components and emits structured_config_components."""
 
         with gr.Blocks() as settings_interface:
-            self._load_vars_from_classes(
+            self._create_components_from_classes(
                 class_config=self, class_name="local_sprite", secrets=True
             )
             for service in self.required_services_:
@@ -177,14 +182,14 @@ class LocalSprite(ServiceBase):
                     open=False,
                     elem_id=f"{service_name}_accordion",
                 ):
-                    self._load_vars_from_classes(
+                    self._create_components_from_classes(
                         class_config=getattr(self, service_name),
                         class_name=service_name,
                     )
 
         return settings_interface
 
-    def _load_vars_from_classes(self, class_config, class_name, secrets=False):
+    def _create_components_from_classes(self, class_config, class_name, secrets=False):
         with gr.Blocks(title=class_name) as settings_component:
             with gr.Group():
                 with gr.Tab(
@@ -230,57 +235,69 @@ class LocalSprite(ServiceBase):
 
         return settings_component
 
-    def _load_new_deployment(self, deployment_name):
+    def _load_new_deployment(self, load_deployment_name):
         """Loads new deployment to deployment object."""
 
-        self.existing_deployment_names = self._check_for_existing_deployments()
+        self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
 
-        if deployment_name not in self.existing_deployment_names:
-            output_message = f"Can't find a deployment named: '{deployment_name}'"
+        if load_deployment_name not in self.existing_deployment_names:
+            output_message = f"Can't find a deployment named: '{load_deployment_name}'"
             self.log.print_and_log_gradio(output_message)
             return None
-        if deployment_name in self.deployment.deployment_name:
-            output_message = f"Trying to load current deployment: '{deployment_name}'"
+        if load_deployment_name in self.deployment_name:
+            output_message = f"Deployment already loaded: '{load_deployment_name}'"
             self.log.print_and_log_gradio(output_message)
             return None
 
-        self.deployment.load_deployment_from_file(deployment_name)
-
-        interface_components_updated = []
-        for sprite_name, sprite_class in self.deployment.sprites.items():
-            attributes = {}
-
-            try:
-                type_annotations = sprite_class.__annotations__  # Get type annotations
-            except AttributeError:
-                type_annotations = {}
-
-            for name, value in sprite_class.__dict__.items():
-                if (
-                    not name.startswith("__")
-                    and not callable(value)
-                    and not name.endswith("_")
-                ):
-                    attr_type = type_annotations.get(name, None)
-                    attributes[name] = (value, attr_type)
-            for name, (value, attr_type) in attributes.items():
-                for component in self.interface_config_components:
-                    if attr_type == bool:
-                        id = f"{sprite_name}_{name}_bool"
-                    else:
-                        id = f"{sprite_name}_{name}_str"
-                    if component.elem_id == id:
-                        if attr_type == bool:
-                            component = gr.Checkbox.update(value=value)
-                        else:
-                            component = gr.Textbox.update(value=value)
-                        interface_components_updated.append(component)
-                        break
-
-        output_message = f"Deployment loaded: '{deployment_name}'"
+        self.deployment_name = load_deployment_name
+        self.setup_config()
+        output = self._update_settings()
+        
+        output_message = f"Deployment loaded: '{load_deployment_name}'"
         self.log.print_and_log_gradio(output_message)
-        return interface_components_updated
+        return output
 
+    def _update_settings(self):
+        settings = {}
+        settings = self._create_update_dict(
+            class_config=self, class_name="local_sprite", secrets=True
+        )
+        for service in self.required_services_:
+            service_name = service.model_.service_name_
+    
+            settings.update(self._create_update_dict(
+                class_config=getattr(self, service_name),
+                class_name=service_name,
+            ))
+        output = []
+        for _, block in self.settings_components.blocks.items():
+            if block.elem_id is not None and hasattr(block, 'value'):
+                output.append(block.update(value = settings.get(block.elem_id, None)))
+
+        return output
+
+    def _create_update_dict(self, class_config, class_name, secrets=False):
+        settings = {}
+      
+        # if secrets:
+        #     elem_id = f"{class_name}_required_Secrets",
+        #     pass
+
+        for name, value in class_config.__dict__.items():
+            if (
+                not name.startswith("__")
+                and not callable(value)
+                and not isinstance(value, ServiceBase)
+                and not isinstance(value, type)
+                and not name.endswith("_")
+                and name != 'deployment_name'
+            ):
+             
+                id = f"{class_name}_{name}"
+                settings[id] = value
+                    
+        return settings
+        
     def _create_new_deployment(self, new_deployment_name):
         
         new_deployment_name = new_deployment_name.strip()
