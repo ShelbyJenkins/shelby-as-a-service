@@ -177,7 +177,7 @@ class ServiceBase:
                 setattr(self, service.model_.service_name_, service_instance)
                 
         if hasattr(self.model_, 'required_secrets_'):
-            ServiceBase.load_secrets(self.model_)
+            ServiceBase._load_secrets(self.model_)
             
         merged_config = {**asdict(self.model_), **config_from_file, **kwargs}
             
@@ -188,7 +188,7 @@ class ServiceBase:
             setattr(self, key, value)
     
     @classmethod
-    def load_secrets(cls, model):
+    def _load_secrets(cls, model):
         for secret in model.required_secrets_:
             secret_str = f"{cls.deployment_name}_{secret}"
             secret_str = secret_str.upper()

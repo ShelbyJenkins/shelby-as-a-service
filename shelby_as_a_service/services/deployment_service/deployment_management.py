@@ -79,25 +79,9 @@ class DeploymentManager:
         if not os.path.exists(index_description_dest_path):
             index_description_source_path = "shelby_as_a_service/services/deployment_service/template/index_description.yaml"
             shutil.copy(index_description_source_path, index_description_dest_path)
-
-        dot_env_dest_path = os.path.join(dir_path, ".env")
-        if not os.path.exists(dot_env_dest_path):
-            dot_env_source_path = (
-                "shelby_as_a_service/services/deployment_service/template/template.env"
-            )
-            with open(dot_env_source_path, "r", encoding="utf-8") as file:
-                lines = file.readlines()
-                modified_lines = []
-                for line in lines:
-                    # If the line starts with a comment or is empty, keep it unchanged
-                    if line.startswith("#") or line.strip() == "":
-                        modified_lines.append(line)
-                    else:
-                        modified_lines.append(f"{deployment_name.upper()}_{line}")
-
-            with open(dot_env_dest_path, "w", encoding="utf-8") as file:
-                file.writelines(modified_lines)
-
+        
+        DeploymentManager.create_update_env_file(deployment_name)
+        
     @staticmethod
     def update_deployment_json_from_model(deployment_instance, deployment_name):
         """Populates deployment_config.py from models.
@@ -268,27 +252,55 @@ class DeploymentManager:
 
         return config
 
-    def load_moniker_requirments(self):
-        for moniker in self.config.DeploymentConfig.MonikerConfigs.__dict__:
-            if not moniker.startswith("_") and not moniker.endswith("_"):
-                moniker_config = getattr(
-                    self.config.DeploymentConfig.MonikerConfigs, moniker
-                )
-                if moniker_config.enabled:
-                    for _, sprite_config in moniker_config.__dict__.items():
-                        if inspect.isclass(sprite_config):
-                            if sprite_config.enabled:
-                                self.used_sprites.add(sprite_config.model.sprite_name)
-                                for secret in sprite_config.model.SECRETS_:
-                                    self.required_secrets.add(secret)
+    @staticmethod
+    def create_update_env_file(deployment_name, secrets = None):
+        
+        dir_path = f"shelby_as_a_service/deployments/{deployment_name}"
+        dot_env_dest_path = os.path.join(dir_path, ".env")
+        dot_env_source_path = "shelby_as_a_service/services/deployment_service/template/template.env"
 
-    def load_deployment_requirments(self):
-        for req_var in self.config.DeploymentConfig.model.DEPLOYMENT_REQUIREMENTS_:
-            self.required_deployment_vars[req_var] = getattr(
-                self.config.DeploymentConfig, req_var
-            )
-        for secret in self.config.DeploymentConfig.model.SECRETS_:
-            self.required_secrets.add(secret)
+        # Helper function to read env file into a dictionary
+        def read_env_to_dict(filepath):
+            with open(filepath, "r", encoding="utf-8") as file:
+                lines = file.readlines()
+            return {line.split('=')[0].strip(): line.split('=')[1].strip() for line in lines if '=' in line}
+
+        # If .env file doesn't exist, create it from template
+        if not os.path.exists(dot_env_dest_path):
+            with open(dot_env_source_path, "r", encoding="utf-8") as file:
+                lines = file.readlines()
+                modified_lines = []
+                for line in lines:
+                    if line.startswith("#") or line.strip() == "":
+                        continue
+                    else:
+                        modified_lines.append(f"{deployment_name.upper()}_{line.upper()}")
+
+            with open(dot_env_dest_path, "w", encoding="utf-8") as file:
+                file.writelines(modified_lines)
+    
+        # Read the existing .env and template files into dictionaries
+        existing_env_dict = read_env_to_dict(dot_env_dest_path)
+        template_env_dict = read_env_to_dict(dot_env_source_path)
+        
+        # Update the existing dictionary with missing keys from template
+        for key, value in template_env_dict.items():
+            prefixed_key = f"{deployment_name.upper()}_{key.upper()}"
+            if prefixed_key not in existing_env_dict:
+                existing_env_dict[prefixed_key] = value
+        
+        if secrets is None:
+            return
+                
+        for key, value in secrets.items():
+            prefixed_key = f"{deployment_name.upper()}_{key.upper()}"
+            if prefixed_key in existing_env_dict and (value not in [None, ""]):
+                existing_env_dict[prefixed_key] = secrets[key]
+
+        # Write the updated dictionary back to the .env file
+        with open(dot_env_dest_path, "w", encoding="utf-8") as file:
+            for key, value in existing_env_dict.items():
+                file.write(f"{key}={value}\n")
 
     def generate_dockerfile(self):
         dockerfile = f"""\
