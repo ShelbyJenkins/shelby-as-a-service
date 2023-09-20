@@ -7,7 +7,7 @@ import json
 import discord
 from discord.ext import commands
 from services.log_service import Logger
-from models.service_models import DiscordModel
+from models.service_models import DiscordSpriteModel
 from services.ceq_agent import CEQAgent
 
 # endregion
@@ -15,7 +15,7 @@ from services.ceq_agent import CEQAgent
 
 class DiscordSprite:
     
-    model_ = DiscordModel
+    model_ = DiscordSpriteModel
     required_services_ = [CEQAgent]
     
     def __init__(self, deployment_instance, sprite_model, service_classes):

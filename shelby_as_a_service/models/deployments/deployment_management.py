@@ -28,9 +28,9 @@ class DeploymentManager:
     @staticmethod
     def check_for_existing_deployments():
         existing_deployment_names = []
-        for deployment in os.listdir("shelby_as_a_service/deployments"):
+        for deployment in os.listdir("deployments"):
             deployment_path = os.path.join(
-                "shelby_as_a_service/deployments", deployment
+                "deployments", deployment
             )
             if os.path.isdir(deployment_path):
                 if "deployment_config.json" in os.listdir(deployment_path):
@@ -39,10 +39,10 @@ class DeploymentManager:
         return existing_deployment_names
 
     @staticmethod
-    def load_deployment_file(deployment_name, service_name=None):
+    def load_deployment_file(deployment_name):
         try:
             with open(
-                f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.json",
+                f"deployments/{deployment_name}/deployment_config.json",
                 "r",
                 encoding="utf-8",
             ) as stream:
@@ -51,10 +51,7 @@ class DeploymentManager:
             # If the JSON file is empty or invalid, return an empty dictionary (or handle in a way you see fit)
             config_from_file = {}
 
-        if service_name:
-            return config_from_file.get(service_name, None)
-        else:
-            return config_from_file
+        return config_from_file
 
     @staticmethod
     def create_deployment(deployment_name):
@@ -62,7 +59,7 @@ class DeploymentManager:
         Does not overwrite existing deployments.
         To start fresh delete the deployment and then use this function.
         """
-        dir_path = f"shelby_as_a_service/deployments/{deployment_name}"
+        dir_path = f"deployments/{deployment_name}"
 
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
@@ -74,16 +71,11 @@ class DeploymentManager:
         if not os.path.exists(deployment_config_dest_path):
             with open(deployment_config_dest_path, "w", encoding="utf-8") as file:
                 file.write("{}")
-
-        index_description_dest_path = os.path.join(dir_path, "index_description.yaml")
-        if not os.path.exists(index_description_dest_path):
-            index_description_source_path = "shelby_as_a_service/services/deployment_service/template/index_description.yaml"
-            shutil.copy(index_description_source_path, index_description_dest_path)
         
         DeploymentManager.create_update_env_file(deployment_name)
         
     @staticmethod
-    def update_deployment_json_from_model(deployment_instance, deployment_name):
+    def update_app_json_from_model(deployment_instance, deployment_name):
         """Populates deployment_config.py from models.
         If the existing deployment_config.py has existing values it does not overwrite them.
         """
@@ -101,6 +93,16 @@ class DeploymentManager:
 
         deployment_config_file["deployment_instance"] = DeploymentManager.load_file_variables_as_dicts(
             deployment_instance.model_, deployment_instance_config
+        )
+        
+        # Index
+        if "index" not in deployment_config_file:
+            index_config = {}
+        else:
+            index_config = deployment_config_file["index"]
+
+        deployment_config_file["index"] = DeploymentManager.load_file_variables_as_dicts(
+            deployment_instance.index, index_config
         )
 
         # Sprite
@@ -141,7 +143,7 @@ class DeploymentManager:
 
         # Save the updated configuration
         with open(
-            f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.json",
+            f"deployments/{deployment_name}/deployment_config.json",
             "w",
             encoding="utf-8",
         ) as file:
@@ -229,7 +231,7 @@ class DeploymentManager:
 
         # Save the updated configuration
         with open(
-            f"shelby_as_a_service/deployments/{deployment_name}/deployment_config.json",
+            f"deployments/{deployment_name}/deployment_config.json",
             "w",
             encoding="utf-8",
         ) as file:
@@ -255,7 +257,7 @@ class DeploymentManager:
     @staticmethod
     def create_update_env_file(deployment_name, secrets = None):
         
-        dir_path = f"shelby_as_a_service/deployments/{deployment_name}"
+        dir_path = f"deployments/{deployment_name}"
         dot_env_dest_path = os.path.join(dir_path, ".env")
         dot_env_source_path = "shelby_as_a_service/services/deployment_service/template/template.env"
 
@@ -317,13 +319,13 @@ WORKDIR /shelby-as-a-service
 COPY ./ ./ 
 
 # Install python packages
-RUN pip install --no-cache-dir -r shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt
+RUN pip install --no-cache-dir -r deployments/{self.deployment_name}/requirements.txt
 
 # Run Deployment
 CMD ["python", "shelby_as_a_service/app.py", "--run_container_deployment", "{self.deployment_name}"]
         """
         with open(
-            f"shelby_as_a_service/deployments/{self.deployment_name}/Dockerfile",
+            f"deployments/{self.deployment_name}/Dockerfile",
             "w",
             encoding="utf-8",
         ) as f:
@@ -341,7 +343,7 @@ CMD ["python", "shelby_as_a_service/app.py", "--run_container_deployment", "{sel
             combined_requirements.update(sprite_requirements)
 
         with open(
-            f"shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt",
+            f"deployments/{self.deployment_name}/requirements.txt",
             "w",
             encoding="utf-8",
         ) as file:
@@ -392,14 +394,14 @@ CMD ["python", "shelby_as_a_service/app.py", "--run_container_deployment", "{sel
                         id: cache
                         with:
                             path: ~/.cache/pip 
-                            key: ${{{{ runner.os }}}}-pip-${{{{  hashFiles('**shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt') }}}}
+                            key: ${{{{ runner.os }}}}-pip-${{{{  hashFiles('**deployments/{self.deployment_name}/requirements.txt') }}}}
                             restore-keys: |
                                 ${{{{ runner.os }}}}-pip-
 
                     - name: Install dependencies
                         run: |
                             python -m pip install --upgrade pip
-                            if [ -f shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt ]; then pip install -r shelby_as_a_service/deployments/{self.deployment_name}/requirements.txt; fi
+                            if [ -f deployments/{self.deployment_name}/requirements.txt ]; then pip install -r deployments/{self.deployment_name}/requirements.txt; fi
 
                     - name: Login to Docker registry
                         uses: docker/login-action@v2 
@@ -412,7 +414,7 @@ CMD ["python", "shelby_as_a_service/app.py", "--run_container_deployment", "{sel
                         uses: docker/build-push-action@v4
                         with:
                             context: .
-                            file: shelby_as_a_service/deployments/{self.deployment_name}/Dockerfile
+                            file: deployments/{self.deployment_name}/Dockerfile
                             push: true
                             tags: {self.required_deployment_vars['docker_username']}/{self.required_deployment_vars['docker_repo']}:{self.deployment_name}-latest
 

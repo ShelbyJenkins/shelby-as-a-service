@@ -5,20 +5,21 @@ from concurrent.futures import ThreadPoolExecutor
 import shutil
 import gradio as gr
 from services.log_service import Logger
-from services.deployment_service.deployment_management import DeploymentManager
-from models.service_models import ServiceBase
-from models.service_models import LocalModel
+from services.apps.app_management import AppManager
+from models.app_base import AppBase
+from models.service_models import LocalSpriteModel
 from services.ceq_agent import CEQAgent
-from services.index_service import IndexService
 
 # endregion
 
 
-class LocalSprite(ServiceBase):
-    model_ = LocalModel()
-    required_services_ = [CEQAgent, IndexService]
+class LocalSprite(AppBase):
+    
+    model_ = LocalSpriteModel()
+    required_services_ = [CEQAgent]
+    # required_services_ = [CEQAgent, IndexService]
 
-    def __init__(self, deployment_instance):
+    def __init__(self):
         """Sprites are initialized through a deployment.
         setup_config sets services as instance attrs.
         It uses their service_name from model.
@@ -26,11 +27,13 @@ class LocalSprite(ServiceBase):
         """
         super().__init__()
         self.setup_config()
-        self.config_components, self.config_dict, self.secrets_components = self._create_config_components()
-        self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
-        self.deployment_instance = deployment_instance
+        self.setup_services()
+        # self.config_components, self.config_dict, self.secrets_components = self._create_config_components()
+        # self.existing_deployment_names = AppManager.check_for_existing_apps()
+        # self.index = self.deployment_instance.index
+        
         self.log = Logger(
-            self.deployment_name,
+            self.app_name,
             "LocalSprite",
             "local_sprite.md",
             level="INFO",
@@ -272,7 +275,7 @@ class LocalSprite(ServiceBase):
                         if (
                             not name.startswith("__")
                             and not callable(value)
-                            and not isinstance(value, ServiceBase)
+                            and not isinstance(value, AppBase)
                             and not isinstance(value, type)
                             and not isinstance(value, Logger)
                             and not name.endswith("_")
@@ -299,7 +302,7 @@ class LocalSprite(ServiceBase):
             if (
                 not name.startswith("__")
                 and not callable(value)
-                and not isinstance(value, ServiceBase)
+                and not isinstance(value, AppBase)
                 and not isinstance(value, type)
                 and not isinstance(value, Logger)
                 and not name.endswith("_")
@@ -334,7 +337,7 @@ class LocalSprite(ServiceBase):
     
     def _save_config_to_file(self, *config_blocks):
         self._save_config_to_memory(*config_blocks)
-        DeploymentManager.update_deployment_json_from_memory(self.deployment_instance, self.deployment_name)
+        AppManager.update_deployment_json_from_memory(self.deployment_instance, self.deployment_name)
         output_message = "Config settings saved to file."
             
         self.log.print_and_log_gradio(output_message)
@@ -353,7 +356,7 @@ class LocalSprite(ServiceBase):
                 output.append('')
                 counter += 1
                     
-        DeploymentManager.create_update_env_file(self.deployment_name, self.secrets)
+        AppManager.create_update_env_file(self.deployment_name, self.secrets)
         
         output_message = "Secrets saved to .env file and loaded into memory."
         self.log.print_and_log_gradio(output_message)
@@ -363,7 +366,7 @@ class LocalSprite(ServiceBase):
     def _load_new_deployment_from_file(self, load_deployment_name = None):
         """Loads new deployment to deployment object."""
 
-        self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
+        self.existing_deployment_names = AppManager.check_for_existing_apps()
 
         if load_deployment_name is not None:
             if load_deployment_name not in self.existing_deployment_names:
@@ -377,7 +380,7 @@ class LocalSprite(ServiceBase):
             self.deployment_name = load_deployment_name
 
         
-        DeploymentManager.update_deployment_json_from_model(self.deployment_instance, self.deployment_name)
+        AppManager.update_app_json_from_model(self.deployment_instance, self.deployment_name)
         self.setup_config()
         
         output = []
@@ -404,17 +407,17 @@ class LocalSprite(ServiceBase):
             return
         if not self.existing_deployment_names:
             self.existing_deployment_names = (
-                DeploymentManager.check_for_existing_deployments()
+                AppManager.check_for_existing_apps()
             )
         if new_deployment_name in self.existing_deployment_names:
             output_message = "That deployment already exists. Please delete it first"
             self.log.print_and_log_gradio(output_message)
             return
         else:
-            DeploymentManager().create_deployment(new_deployment_name)
-            DeploymentManager().update_deployment_json_from_model(self.deployment_instance, new_deployment_name)
+            AppManager().create_deployment(new_deployment_name)
+            AppManager().update_app_json_from_model(self.deployment_instance, new_deployment_name)
             self.existing_deployment_names = (
-                DeploymentManager.check_for_existing_deployments()
+                AppManager.check_for_existing_apps()
             )
             output_message = f" Deployment '{new_deployment_name}' created"
             self.log.print_and_log_gradio(output_message)
@@ -454,7 +457,7 @@ class LocalSprite(ServiceBase):
                 output_message = f"Deployment: '{delete_deployment_name}' not found."
                 self.log.print_and_log_gradio(output_message)
 
-            self.existing_deployment_names = DeploymentManager.check_for_existing_deployments()
+            self.existing_deployment_names = AppManager.check_for_existing_apps()
 
         return (
             output_message,

@@ -1,49 +1,27 @@
 import os
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Optional
+from typing import List, Dict
 from dotenv import load_dotenv
-from services.deployment_service.deployment_management import DeploymentManager
-from services.log_service import Logger
+from services.apps.app_management import AppManager
+from models.index_model import IndexModel
 
-@dataclass
-class IndexModel:
+
     
-    index_name: Optional[str] = None
-    index_env: str = 'us-central1-gcp'
-    index_embedding_model: str = 'text-embedding-ada-002'
-    index_tiktoken_encoding_model: str = 'text-embedding-ada-002'
-    index_embedding_max_chunk_size: int = 8191
-    index_embedding_batch_size: int = 100
-    index_vectorstore_dimension: int = 1536
-    index_vectorstore_upsert_batch_size: int = 20
-    index_vectorstore_metric: str = 'cosine'
-    index_vectorstore_pod_type: str = 'p1'
-    index_preprocessor_min_length: int = 150
-    # index_text_splitter_goal_length: int = 500
-    index_text_splitter_goal_length: int = 750
-    index_text_splitter_overlap_percent: int = 15  # In percent
-    index_openai_timeout_seconds: float = 180.0
-    index_indexed_metadata = [
-        'data_domain_name',
-        'data_source_name',
-        'doc_type',
-        'target_type',
-        'date_indexed',
-    ]
-
+@dataclass
+class IndexServiceModel:
+    
     service_name_: str = 'index_service'
     required_variables_: List[str] = field(default_factory=lambda: ['index_name', 'index_env'])
     required_secrets_: List[str] = field(default_factory=lambda: ['openai_api_key', 'pinecone_api_key'])
     
     
 @dataclass
-class CEQModel:
+class CEQServiceModel:
 
     # ActionAgent
     action_llm_model: str = 'gpt-4'
     # QueryAgent
-    ceq_index_name: Optional[str] = None
-    ceq_index_env: Optional[str] = None
+    
     ceq_data_domain_constraints_enabled: bool = False
     ceq_data_domain_constraints_llm_model: str = 'gpt-4'
     ceq_data_domain_none_found_message: str = 'Query not related to any supported data domains (aka topics). Supported data domains are:'
@@ -71,7 +49,7 @@ class CEQModel:
 
 
 @dataclass
-class DiscordModel:
+class DiscordSpriteModel:
 
     discord_enabled_servers: List[str] = field(default_factory=list) 
     discord_specific_channels_enabled: bool = False
@@ -94,7 +72,7 @@ class DiscordModel:
 
 
 @dataclass
-class SlackModel:
+class SlackSpriteModel:
 
     slack_enabled_teams: List[str] = field(default_factory=list) 
     slack_welcome_message: str = 'ima tell you about the {}.'
@@ -108,7 +86,7 @@ class SlackModel:
 
 
 @dataclass
-class LocalModel:
+class LocalSpriteModel:
 
     # default_deployment_enabled: bool = True
     # default_local_deployment_name: Optional[str] = None
@@ -150,15 +128,17 @@ class ServiceBase:
     """
     secrets: Dict[str, str] = {}
     deployment_name: str = 'base'
+    index = IndexModel()
     
     def setup_config(self, service_config = None, **kwargs):
         
         # Initial call
         if service_config is None:
-            config_from_file = DeploymentManager.load_deployment_file(
+            config_from_file = AppManager.load_deployment_file(
                 self.deployment_name, self.model_.service_name_
             )
-            load_dotenv(os.path.join(f"shelby_as_a_service/deployments/{self.deployment_name}/", ".env"))
+            # ServiceBase._load_index(config_from_file)
+            load_dotenv(os.path.join(f"deployments/{self.deployment_name}/", ".env"))
         else:
             config_from_file = service_config[self.model_.service_name_]
             
@@ -196,6 +176,10 @@ class ServiceBase:
             if env_secret in [None, '']:
                 print(f"Secret: {secret_str} is None!")
             cls.secrets[secret] = 'test'
+            
+    @classmethod
+    def _load_index(cls, config_from_file):
+        cls.index = {**asdict(cls.index), **config_from_file['index']}
         
         
     # def check_secrets(self, model_secrets):

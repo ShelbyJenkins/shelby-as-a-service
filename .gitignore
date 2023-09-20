@@ -5,12 +5,8 @@ logs/
 .vscode/
 **/__pycache__/
 .mypy_cache/
-shelby_as_a_service/deployments/*/index/*/*
-shelby_as_a_service/deployments/*
-!shelby_as_a_service/deployments/deployment_maker/
-!shelby_as_a_service/deployments/template/
-!shelby_as_a_service/deployments/tatum/
+apps/*
 !template.env
 content_aggregator/
 
-gradio_cached_examples/
+gradio_cached_examples

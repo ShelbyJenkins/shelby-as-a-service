@@ -5,18 +5,18 @@ import pinecone
 from services.log_service import Logger
 from services.open_api_minifier_service import OpenAPIMinifierService
 from services.data_processing_service import CEQTextPreProcessor
+from services.providers.data_base_service import PineconeService, LocalFileStoreService
 from langchain.schema import Document
 from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUrlLoader
 from langchain.embeddings import OpenAIEmbeddings
 from bs4 import BeautifulSoup
-from models.service_models import IndexModel
-from models.service_models import ServiceBase
+from models.service_models import ServiceBase, IndexServiceModel
 
 
 class IndexService(ServiceBase):
     
-    model_ = IndexModel()
-    required_services_ = None
+    model_ = IndexServiceModel()
+    required_services_ = [PineconeService, LocalFileStoreService]
     
     def __init__(self, service_config = None, **kwargs):
         super().__init__()
@@ -35,14 +35,14 @@ class IndexService(ServiceBase):
         # )
         
         # self.secrets = deployment_instance.secrets
-        # if not self.deployment.check_secrets(IndexModel.secrets_):
+        # if not self.deployment.check_secrets(IndexServiceModel.secrets_):
         #     return 
         
         # self.prompt_template_path = "shelby_as_a_service/prompt_templates"
-        # self.index_dir = f"shelby_as_a_service/deployments/{self.deployment_name}/index"
+        # self.index_dir = f"deployments/{self.deployment_name}/index"
         # # Loads data sources from file
         # with open(
-        #     f"shelby_as_a_service/deployments/{self.deployment_name}/index_description.yaml",
+        #     f"deployments/{self.deployment_name}/index_description.yaml",
         #     "r",
         #     encoding="utf-8",
         # ) as stream:

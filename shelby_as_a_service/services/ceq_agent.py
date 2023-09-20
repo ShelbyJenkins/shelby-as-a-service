@@ -4,37 +4,37 @@ import traceback
 import json, yaml, re
 import openai, pinecone, tiktoken
 from langchain.embeddings import OpenAIEmbeddings
-from models.service_models import CEQModel
+from models.service_models import CEQServiceModel
 from services.log_service import Logger
-from models.service_models import ServiceBase
+from models.app_base import AppBase
 # endregion
 
 
-class CEQAgent(ServiceBase):
+class CEQAgent(AppBase):
     
-    # Overwrite the ServiceBase model
-    model_ = CEQModel()
+    # Overwrite the AppBase model
+    model_ = CEQServiceModel()
     required_services_ = None
     
-    def __init__(self, service_config = None, **kwargs):
+    def __init__(self):
         """Initialized like any other service from sprites.
         However, non-sprite services have the option to also load as modules:
         They can take a config from a config dict service_config, 
         or by setting variables with **kwargs.
         """
         super().__init__()
-        self.setup_config(service_config = service_config, **kwargs)
+        self.setup_config()
         
         # self.config = model
-        # if not self.deployment.check_secrets(CEQModel.secrets_):
+        # if not self.deployment.check_secrets(CEQServiceModel.secrets_):
         #     return 
         
-        self.log = Logger(
-            self.deployment_name,
-            "CEQAgent",
-            "ceq_agent.md",
-            level="INFO",
-        )
+        # self.log = Logger(
+        #     self.deployment_name,
+        #     "CEQAgent",
+        #     "ceq_agent.md",
+        #     level="INFO",
+        # )
         # self.data_domains = deployment_instance.local_sprite.index_service.config.deployment_data_domains
         # self.action_agent = ActionAgent(self)
         # self.query_agent = QueryAgent(self)

@@ -16,7 +16,7 @@ from services.log_service import Logger
 from bs4 import BeautifulSoup
 from langchain.embeddings import OpenAIEmbeddings
 import pinecone
-from models.service_models import IndexModel
+from models.service_models import PineconeServiceModel
 
 # endregion
 
@@ -566,7 +566,7 @@ class AggregateEmailNewsletter:
 class VectorIndex:
     def __init__(self, main_ag: Aggregator):
         self.main_ag = main_ag
-        self.index_config = IndexModel()
+        self.index_config = PineconeServiceModel()
 
         pinecone.init(
             environment=self.index_config.index_env,

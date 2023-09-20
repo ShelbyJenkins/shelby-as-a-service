@@ -1,6 +1,29 @@
 import argparse
-from services.deployment_instantiator import DeploymentInstance
-from services.deployment_service.deploy_stackpath_container import deploy_container
+from typing import Dict
+from models.app_base import AppBase
+from services.sprites.local_sprite import LocalSprite
+from services.data_processing.index_service import IndexService
+
+
+class AppInstance(AppBase):
+    
+    enabled_sprites = ['local_sprite']
+    
+    secrets: Dict[str, str] = {}
+    service_name_: str = 'app_instance'
+    required_sprites_ = [LocalSprite]
+    required_services_ = [IndexService]
+    
+    def __init__(self, app_name):
+        """Instantiates deployment.
+        super().__init__() initializes ServiceBase. We then override the base defaults.
+        """
+        super().__init__()
+        self.app_name = app_name
+        self.setup_app_instance(self)
+        self.setup_sprites()
+        self.setup_services()
+       
 
 def main():
     """
@@ -35,16 +58,16 @@ def main():
     args = parser.parse_args()
    
     if args.run_container_deployment:
-        deployment = DeploymentInstance(args.run_container_deployment)
-        deployment.run()
+        deployment = AppInstance(args.run_container_deployment)
+        deployment.run_sprites()
     elif args.deploy_container: 
         deploy_container(args.deploy_container)
     elif args.deployment_name: 
-        deployment = DeploymentInstance(args.deployment_name) 
-        deployment.run()
+        deployment = AppInstance(args.deployment_name) 
+        deployment.run_sprites()
     else:
-        deployment = DeploymentInstance('base') 
-        deployment.run()
+        deployment = AppInstance('base') 
+        deployment.run_sprites()
 
 if __name__ == "__main__":
     main()

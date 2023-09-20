@@ -7,7 +7,7 @@ class Logger:
         self.log_file = log_file
         self.level = level
         self.lock = threading.Lock()
-        self.log_dir = f"shelby_as_a_service/deployments/{deployment_name}/logs"
+        self.log_dir = f"deployments/{deployment_name}/logs"
         os.makedirs(self.log_dir, exist_ok=True)
         self.log_file_path = os.path.join(self.log_dir, log_file)
         self.logger = logging.getLogger(logger_name)

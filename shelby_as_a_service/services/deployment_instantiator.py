@@ -2,6 +2,7 @@ import concurrent.futures
 from services.deployment_service.deployment_management import DeploymentManager
 from models.service_models import ServiceBase
 from models.service_models import DeploymentModel
+from models.service_models import IndexModel
 from services.sprites.local_sprite import LocalSprite
 
 
@@ -31,7 +32,7 @@ class DeploymentInstance(ServiceBase):
                 print(f"Deployment {deployment_name} not found.")
                 
         if "base" == deployment_name:
-            DeploymentManager().update_deployment_json_from_model(DeploymentInstance, "base")
+            DeploymentManager().update_app_json_from_model(DeploymentInstance, "base")
             # In the case of local deployment we check for a default_local_deployment
             deployment_config = DeploymentManager.load_deployment_file(deployment_name)
             default_settings = (
@@ -55,7 +56,7 @@ class DeploymentInstance(ServiceBase):
                     )
         
         if deployment_name != "base":
-                DeploymentManager().update_deployment_json_from_model(
+                DeploymentManager().update_app_json_from_model(
                     DeploymentInstance, deployment_name
                 )
                 deployment_config = DeploymentManager.load_deployment_file(
@@ -63,7 +64,8 @@ class DeploymentInstance(ServiceBase):
                 )
                 
         self.deployment_name = deployment_name
-        self.setup_config(**kwargs)
+        config_from_file = DeploymentManager.load_deployment_file(self.deployment_name)
+        self.setup_config(config_from_file, **kwargs)
         
         
 
