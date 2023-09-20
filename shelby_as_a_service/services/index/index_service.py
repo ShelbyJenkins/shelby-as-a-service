@@ -1,11 +1,11 @@
 from models.index_model import IndexModel
 from models.app_base import AppBase
-from services.providers.data_base_service import PineconeService, LocalFileStoreService
+
 
 class IndexService(AppBase):
     
     model_ = IndexModel()
-    required_services_ = [PineconeService, LocalFileStoreService]
+    required_services_ = []
     
     def __init__(self):
         """

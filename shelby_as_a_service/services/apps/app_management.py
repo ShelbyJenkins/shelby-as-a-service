@@ -1,6 +1,6 @@
 import os
 import json
-
+from dataclasses import asdict, dataclass, field, is_dataclass
 
 class AppManager:
     def __init__(self):
@@ -64,29 +64,49 @@ class AppManager:
         if app_config_file is None:
             app_config_file = {}
 
-        # app
+        # App
         if "app_instance" not in app_config_file:
             app_instance_config = {}
         else:
             app_instance_config = app_config_file["app_instance"]
 
-        app_config_file[
-            "app_instance"
-        ] = AppManager.load_file_variables_as_dicts(
+        app_instance_config = AppManager.load_file_variables_as_dicts(
             app_instance, app_instance_config
         )
 
-        # Index
-        if "index" not in app_config_file:
-            index_config = {}
+        # App instance services
+        if "services" not in app_instance_config:
+            app_instance_config["services"] = {}
+            services_config = {}
         else:
-            index_config = app_config_file["index"]
+            services_config = app_instance_config["services"]
+                
+        for app_instance_required_service in app_instance.required_services_:
+            service_model = app_instance_required_service.model_
+            service_class_name = service_model.service_name_
 
-        app_config_file["index"] = AppManager.load_file_variables_as_dicts(
-            app_instance.index_, index_config
-        )
+            # App instance Service
+            if service_class_name not in services_config:
+                service_config = {}
+            else:
+                service_config = services_config[service_class_name]
+                
+            # Special rules for the index
+            if service_class_name == 'index_service':
+                service_config = AppManager.load_index_model_as_dicts(
+                    service_model, service_config
+                )
+            else:
+                service_config = AppManager.load_file_variables_as_dicts(
+                    service_model, service_config
+                )
 
-        # Sprite
+            app_instance_config["services"][service_class_name] = service_config
+
+        app_config_file["app_instance"] = app_instance_config
+ 
+ 
+        # Sprites
         for sprite_class in app_instance.required_sprites_:
             sprite_model = sprite_class.model_
             sprite_name_model = sprite_model.service_name_
@@ -141,16 +161,33 @@ class AppManager:
         if not config:
             config = {}
         # Handle 'required'
-        for var, value in sorted(vars(model_class).items()):  # sort by variable name
+        for var, val in vars(model_class).items():
             if AppManager.check_for_ignored_objects(
                 var
-            ) and AppManager.check_for_ignored_objects(value):
+            ) and AppManager.check_for_ignored_objects(val):
                 if config.get(var) in [None, ""]:
-                    config[var] = value
+                    config[var] = val
                 else:
                     continue
-
         return config
+
+    @staticmethod
+    def load_index_model_as_dicts(index_model, config: dict):
+        
+        def merge_attributes(obj, config: dict):
+            for key, default_value in vars(obj).items():
+                config_value = config.get(key) if config else None  # Important check
+                if config_value is None:
+                    continue  # We skip this attribute since the config doesn't have data for it
+                if is_dataclass(default_value):
+                    setattr(obj, key, merge_attributes(default_value, config_value))
+                elif isinstance(default_value, list) and len(default_value) > 0 and is_dataclass(default_value[0]):
+                    setattr(obj, key, [merge_attributes(default_value[0], item_config) for item_config in config_value])
+                else:
+                    setattr(obj, key, config_value)
+            return obj
+
+        return asdict(merge_attributes(index_model, config))
 
     @staticmethod
     def update_app_json_from_memory(app_instance, app_name):
@@ -313,6 +350,8 @@ class AppManager:
 
         # Check other conditions
         if callable(variable):
+            return False
+        if is_dataclass(variable):
             return False
         if isinstance(variable, type):
             return False

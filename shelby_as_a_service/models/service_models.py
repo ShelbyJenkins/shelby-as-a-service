@@ -6,15 +6,6 @@ from services.apps.app_management import AppManager
 from models.index_model import IndexModel
 
 
-    
-@dataclass
-class IndexServiceModel:
-    
-    service_name_: str = 'index_service'
-    required_variables_: List[str] = field(default_factory=lambda: ['index_name', 'index_env'])
-    required_secrets_: List[str] = field(default_factory=lambda: ['openai_api_key', 'pinecone_api_key'])
-    
-    
 @dataclass
 class CEQServiceModel:
 
@@ -44,8 +35,8 @@ class CEQServiceModel:
     # api_agent_populate_function_llm_model: str = 'gpt-4'
     
     service_name_: str = 'ceq_agent'
-    required_variables_: List[str] = field(default_factory=lambda: ['ceq_index_name', 'ceq_index_env'])
-    required_secrets_: List[str] = field(default_factory=lambda: ['openai_api_key', 'pinecone_api_key'])
+    required_variables_: List[str] = field(default_factory=list) 
+    required_secrets_: List[str] = field(default_factory=lambda: ['openai_api_key'])
 
 
 @dataclass
@@ -113,13 +104,7 @@ class LocalSpriteModel:
 #     docker_username: Optional[str] = None
 #     docker_repo: Optional[str] = None
 
-@dataclass
-class DeploymentModel:
-    
-    service_name_: str = 'deployment_instance'
-    enabled_sprites: List[str] = field(default_factory=lambda: ['local_sprite'])
-    required_variables_: List[str] = field(default_factory=lambda: ['enabled_sprites'])
-    
+
 class ServiceBase:
     """Base model for all services.
     Child classes have access to all class variables of ServiceBase with self.variable.
@@ -179,7 +164,7 @@ class ServiceBase:
             
     @classmethod
     def _load_index(cls, config_from_file):
-        cls.index = {**asdict(cls.index), **config_from_file['index']}
+        cls.index = {**asdict(cls.index), **config_from_file['index_service']}
         
         
     # def check_secrets(self, model_secrets):

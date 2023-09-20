@@ -9,10 +9,10 @@ class AppBase:
     
     app = None
     app_name = None
+    secrets = {}
 
     def setup_app_instance(self, app):
         app_name = app.app_name
-        AppBase.app_name = app_name
         AppBase.app = app
 
         existing_app_names = AppManager.check_for_existing_apps()
@@ -24,7 +24,7 @@ class AppBase:
             else:
                 # Need to return here with error
                 print(f"app {app_name} not found.")
-
+        
         if "base" == app_name:
             AppManager().update_app_json_from_model(self, "base")
             # In the case of local app we check for a default_local_app
@@ -71,7 +71,7 @@ class AppBase:
             print(f"RNR: {self.model_} not found in {self}!")
             return None
 
-        config_from_file = AppManager.load_app_file(self.app_name)
+        config_from_file = AppManager.load_app_file(self.app.app_name)
         service_config = config_from_file.get(self.model_.service_name_, None)
 
         if service_config is None:
@@ -91,12 +91,12 @@ class AppBase:
 
     def _load_secrets(self, model):
         for secret in model.required_secrets_:
-            secret_str = f"{self.app_name}_{secret}"
+            secret_str = f"{self.app.app_name}_{secret}"
             secret_str = secret_str.upper()
             env_secret = os.environ.get(secret_str, None)
             if env_secret in [None, ""]:
                 print(f"Secret: {secret_str} is None!")
-            self.app.secrets[secret] = "test"
+            AppBase.secrets[secret] = env_secret
 
     def run_sprites(self):
         with concurrent.futures.ThreadPoolExecutor() as executor:

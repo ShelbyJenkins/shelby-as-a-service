@@ -3,9 +3,9 @@ from typing import Iterator
 import yaml, json
 import pinecone
 from services.log_service import Logger
-from services.open_api_minifier_service import OpenAPIMinifierService
-from services.data_processing_service import CEQTextPreProcessor
-from services.providers.data_base_service import PineconeService, LocalFileStoreService
+from services.data_processing.open_api_minifier_service import OpenAPIMinifierService
+from services.data_processing.data_processing_service import CEQTextPreProcessor
+from services.providers.database_service import PineconeService, LocalFileStoreService
 from langchain.schema import Document
 from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUrlLoader
 from langchain.embeddings import OpenAIEmbeddings
