@@ -26,7 +26,7 @@ class AppBase:
                 print(f"app {app_name} not found.")
         
         if "base" == app_name:
-            AppManager().update_app_json_from_model(self, "base")
+            AppManager().update_app_json_from_file(self, "base")
             # In the case of local app we check for a default_local_app
             app_config = AppManager.load_app_file(app_name)
             default_settings = (
@@ -49,7 +49,7 @@ class AppBase:
                     )
 
         if app_name != "base":
-            AppManager().update_app_json_from_model(self, app_name)
+            AppManager().update_app_json_from_file(self, app_name)
 
         load_dotenv(os.path.join(f"apps/{app_name}/", ".env"))
         # AppBase.load_index(app)
@@ -67,12 +67,18 @@ class AppBase:
                 setattr(self, service.model_.service_name_, service_instance)
 
     def setup_config(self):
+        
         if self.model_ is None:
             print(f"RNR: {self.model_} not found in {self}!")
             return None
-
-        config_from_file = AppManager.load_app_file(self.app.app_name)
-        service_config = config_from_file.get(self.model_.service_name_, None)
+        
+        # if any(isinstance(self, service) for service in self.app.required_services_):
+        #     config_from_file = AppManager.load_app_file(self.app.app_name, 'app_instance')
+        #     service_config = config_from_file.get('services', None).get(self.model_.service_name_, None)
+        # elif any(isinstance(self, service) for service in self.app.required_sprites_):
+        # else:
+        #     config_from_file = AppManager.load_app_file(self.app.app_name, self.model_.service_name_)
+        #     service_config = config_from_file.get(self.model_.service_name_, None)
 
         if service_config is None:
             print(f"RNR: {self.model_.service_name_} not found in config_from_file!")

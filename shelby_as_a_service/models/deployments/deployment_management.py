@@ -75,7 +75,7 @@ class DeploymentManager:
         DeploymentManager.create_update_env_file(deployment_name)
         
     @staticmethod
-    def update_app_json_from_model(deployment_instance, deployment_name):
+    def update_app_json_from_file(deployment_instance, deployment_name):
         """Populates deployment_config.py from models.
         If the existing deployment_config.py has existing values it does not overwrite them.
         """

@@ -18,7 +18,7 @@ class AppManager:
         return existing_app_names
 
     @staticmethod
-    def load_app_file(app_name):
+    def load_app_file(app_name, class_name = None):
         try:
             with open(
                 f"apps/{app_name}/app_config.json",
@@ -29,8 +29,11 @@ class AppManager:
         except json.JSONDecodeError:
             # If the JSON file is empty or invalid, return an empty dictionary (or handle in a way you see fit)
             config_from_file = {}
-
-        return config_from_file
+        
+        if class_name is None:
+            return config_from_file
+        else:
+            return config_from_file.get(class_name, None)
 
     @staticmethod
     def create_app(app_name):
@@ -54,7 +57,7 @@ class AppManager:
         AppManager.create_update_env_file(app_name)
 
     @staticmethod
-    def update_app_json_from_model(app_instance, app_name):
+    def update_app_json_from_file(app_instance, app_name, update_class_instance = None):
         """Populates app_config.py from models.
         If the existing app_config.py has existing values it does not overwrite them.
         """
@@ -71,7 +74,7 @@ class AppManager:
             app_instance_config = app_config_file["app_instance"]
 
         app_instance_config = AppManager.load_file_variables_as_dicts(
-            app_instance, app_instance_config
+            app_instance, app_instance_config, update_class_instance
         )
 
         # App instance services
@@ -98,7 +101,7 @@ class AppManager:
                 )
             else:
                 service_config = AppManager.load_file_variables_as_dicts(
-                    service_model, service_config
+                    service_model, service_config, update_class_instance
                 )
 
             app_instance_config["services"][service_class_name] = service_config
@@ -108,6 +111,7 @@ class AppManager:
  
         # Sprites
         for sprite_class in app_instance.required_sprites_:
+            
             sprite_model = sprite_class.model_
             sprite_name_model = sprite_model.service_name_
             if sprite_name_model not in app_config_file:
@@ -116,7 +120,7 @@ class AppManager:
                 sprite_config = app_config_file[sprite_name_model]
 
             sprite_config = AppManager.load_file_variables_as_dicts(
-                sprite_model, sprite_config
+                sprite_model, sprite_config, update_class_instance
             )
 
             # Services
@@ -137,7 +141,7 @@ class AppManager:
                     service_config = services_config[service_class_name]
 
                 service_config = AppManager.load_file_variables_as_dicts(
-                    service_model, service_config
+                    service_model, service_config, update_class_instance
                 )
 
                 sprite_config["services"][service_class_name] = service_config
@@ -153,22 +157,37 @@ class AppManager:
             json.dump(app_config_file, file, ensure_ascii=False, indent=4)
 
     @staticmethod
-    def load_file_variables_as_dicts(model_class, config):
+    def load_file_variables_as_dicts(model_class, config, update_class_instance = None):
         """Loads variables and values from models and existing app_config.py.
         Adds variables from models if they don't exist in app_config.py.
         If values exist for variables in app_config.py it uses those.
         """
         if not config:
             config = {}
-        # Handle 'required'
-        for var, val in vars(model_class).items():
-            if AppManager.check_for_ignored_objects(
-                var
-            ) and AppManager.check_for_ignored_objects(val):
-                if config.get(var) in [None, ""]:
-                    config[var] = val
-                else:
-                    continue
+        if update_class_instance is not None:
+            update_class_instance_name = update_class_instance.service_name_
+        else:
+            update_class_instance_name = None
+            
+        if update_class_instance_name == model_class.service_name_:
+            for var, val in vars(update_class_instance).items():
+                if AppManager.check_for_ignored_objects(
+                    var
+                ) and AppManager.check_for_ignored_objects(val):
+                    if val not in [None, ""]:
+                        config[var] = val
+                    else:
+                        continue
+        else:
+            for var, val in vars(model_class).items():
+                if AppManager.check_for_ignored_objects(
+                    var
+                ) and AppManager.check_for_ignored_objects(val):
+                    if config.get(var) in [None, ""]:
+                        config[var] = val
+                    else:
+                        continue
+            
         return config
 
     @staticmethod
@@ -188,93 +207,6 @@ class AppManager:
             return obj
 
         return asdict(merge_attributes(index_model, config))
-
-    @staticmethod
-    def update_app_json_from_memory(app_instance, app_name):
-        """Populates app_config.py from models.
-        If the existing app_config.py has existing values it does not overwrite them.
-        """
-
-        app_config_file = AppManager.load_app_file(app_name)
-
-        if app_config_file is None:
-            app_config_file = {}
-
-        # app
-        if "app_instance" not in app_config_file:
-            app_instance_config = {}
-        else:
-            app_instance_config = app_config_file["app_instance"]
-
-        app_config_file[
-            "app_instance"
-        ] = AppManager.load_memory_variables_as_dicts(
-            app_instance.model_, app_instance_config
-        )
-
-        # Sprite
-        for sprite_class in app_instance.required_sprites_:
-            sprite_model = sprite_class.model_
-            sprite_name_model = sprite_model.service_name_
-            sprite_instance = getattr(app_instance, sprite_name_model)
-            if sprite_name_model not in app_config_file:
-                sprite_config = {}
-            else:
-                sprite_config = app_config_file[sprite_name_model]
-
-            sprite_config = AppManager.load_memory_variables_as_dicts(
-                sprite_instance, sprite_config
-            )
-
-            # Services
-            if "services" not in sprite_config:
-                sprite_config["services"] = {}
-                services_config = {}
-            else:
-                services_config = sprite_config["services"]
-
-            # Service
-            for sprite_class_required_service in sprite_class.required_services_:
-                service_model = sprite_class_required_service.model_
-                service_class_name = service_model.service_name_
-                service_instance = getattr(sprite_instance, service_class_name)
-                if service_class_name not in services_config:
-                    service_config = {}
-                else:
-                    service_config = services_config[service_class_name]
-
-                service_config = AppManager.load_memory_variables_as_dicts(
-                    service_instance, service_config
-                )
-
-                sprite_config["services"][service_class_name] = service_config
-
-            app_config_file[sprite_name_model] = sprite_config
-
-        # Save the updated configuration
-        with open(
-            f"apps/{app_name}/app_config.json",
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(app_config_file, file, ensure_ascii=False, indent=4)
-
-    @staticmethod
-    def load_memory_variables_as_dicts(class_instance, config):
-        """Loads variables and values from class_instance and existing app_config.py.
-        If values exist for variables in class_instance it uses those.
-        """
-        if not config:
-            config = {}
-
-        for var, value in sorted(vars(class_instance).items()):  # sort by variable name
-            if var in config:
-                if value not in [None, ""]:
-                    config[var] = value
-                else:
-                    continue
-
-        return config
 
     @staticmethod
     def create_update_env_file(app_name, secrets=None):
