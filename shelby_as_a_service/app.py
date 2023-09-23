@@ -8,12 +8,11 @@ from services.index.index_service import IndexService
 class AppInstance(AppBase):
     secrets: Dict[str, str] = {}
     service_name_: str = "app_instance"
-    # required_sprites_ = [LocalSprite]
-    required_services_ = [IndexService, LocalSprite]
+    required_services_ = [LocalSprite, IndexService]
     
     def __init__(self, app_name, enabled_sprites):
         """Instantiates deployment.
-        super().__init__() initializes ServiceBase. We then override the base defaults.
+        super().__init__() initializes AppBase. We then override the base defaults.
         """
         super().__init__()
         self.app_name = app_name

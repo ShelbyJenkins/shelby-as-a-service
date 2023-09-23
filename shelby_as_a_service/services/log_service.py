@@ -48,7 +48,7 @@ class Logger:
         with self.lock:
             try:
                 print(message)
-                self.logger.info(message)
+                self.write_message_top(message)
                 for handler in self.logger.handlers:
                     handler.flush()
                     handler.close()
@@ -56,6 +56,18 @@ class Logger:
             except Exception as error:
                 # Handle the error or print it out
                 print(f"An error occurred while logging: {error}")
+                
+    def write_message_top(self, message):
+        # This function will manually handle inserting log messages at the top of the log file
+        with open(self.log_file_path, 'r') as file:
+            content = file.read()
+
+        formatted_message = self.formatter.format(logging.makeLogRecord({
+            'msg': message, 'levelno': logging.INFO, 'levelname': 'INFO'
+        }))
+
+        with open(self.log_file_path, 'w') as file:
+            file.write(formatted_message + '\n' + content)
             
     def read_logs(self):
         with self.lock:

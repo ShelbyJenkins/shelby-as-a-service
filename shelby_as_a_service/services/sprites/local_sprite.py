@@ -15,8 +15,8 @@ from services.ceq_agent import CEQAgent
 
 class LocalSprite(AppBase):
     model_ = LocalSpriteModel()
+    # required_services_ = [CEQAgent]
     required_services_ = [CEQAgent]
-    # required_services_ = [CEQAgent, IndexService]
 
     def __init__(self):
         """
@@ -30,9 +30,11 @@ class LocalSprite(AppBase):
             level="INFO",
         )
         
-        self.index_service = self.app.index_service
+        
         self.existing_app_names_ = AppManager.check_for_existing_apps()
+        self.existing_index_names_ = AppManager.check_for_existing_indexes(self.app_name)
         self.global_components_ = {}
+        self.index_ = None
         
 
     async def _create_interface(self):
@@ -43,6 +45,7 @@ class LocalSprite(AppBase):
         config_components = None
         
         with gr.Blocks(theme=AtYourServiceTheme()) as local_client:
+        # with gr.Blocks() as local_client:
 
             with gr.Tab(label="Chat"):
                 with gr.Tab(label="Context Enhanced Querying"):
@@ -66,9 +69,12 @@ class LocalSprite(AppBase):
 
                 with gr.Tab(label="Settings"):
                     ceq_components = self._create_settings_tab(self.ceq_agent)
-                
-            
+                 
             with gr.Tab(label="Data Index"):
+                
+                with gr.Tab(label="Index Config"):
+                    self._create_index_config()
+                
                 with gr.Tab(label="Web Source"):
                     source_textbox = gr.Textbox(
                         placeholder="url_source or file path",
@@ -76,7 +82,7 @@ class LocalSprite(AppBase):
                         label="Message",
                     )
                     index_ingest_docs = gr.Button(size="sm", value="ingest_docs")
-                    index_components = self._create_settings_tab(self.index_service)
+                    index_components = self._create_settings_tab(self.app.index_service)
                 with gr.Tab(label="Local File"):
                     source_textbox = gr.Textbox(
                         placeholder="url_source or file path",
@@ -86,22 +92,7 @@ class LocalSprite(AppBase):
                     index_ingest_docs = gr.Button(size="sm", value="ingest_docs")
                 with gr.Tab(label="Log"):
                     index_ingest_docs = gr.Button(size="sm", value="ingest_docs")
-                with gr.Tab(label="Manage Index"):
-                    index_delete_index = gr.Button(size="sm", value="delete_index")
-                    index_clear_index = gr.Button(size="sm", value="clear_index")
-                    # Drop down of providers
-                    index_create_index = gr.Button(size="sm", value="create_index")
-
-            # Will need special function here to load this
-            # with gr.Tab(label="Settings"):
-            #     self._create_settings_tab(self.index_service)
-
-            # index_ingest_docs.click(
-            #     fn=self.index_service.ingest_docs,
-            #     inputs=None,
-            #     outputs=None,
-            # )
-                
+      
             with gr.Tab(label="Config"):
                 with gr.Tab(label="Local Sprite"):
                     config_components = self._create_settings_tab(self)
@@ -201,6 +192,206 @@ class LocalSprite(AppBase):
             local_client.queue().launch()
         
     # Creates interface
+    
+    def _create_index_config(self):
+        settings_components = []
+        
+        index_instance = self.index_.index_instances[0]
+        index_name = index_instance.index_name
+        data_domain_instance = index_instance.index_data_domains[0]
+        data_domain_name = data_domain_instance.data_domain_name
+        data_domain_names = [domain.data_domain_name for domain in index_instance.index_data_domains]
+        source_instance = data_domain_instance.data_domain_sources[0]
+        data_source_name = source_instance.data_source_name
+        data_source_names = [source.data_source_name for source in data_domain_instance.data_domain_sources]
+
+        
+        txb = gr.Textbox(
+            value='index_service',
+            label='index_service',
+            elem_id='index_service',
+            elem_classes='index_service',
+            interactive=False,
+            visible=False,
+        )
+        
+        with gr.Blocks():
+            with gr.Row():
+                gr.Textbox(
+                    show_label=False, scale=2, lines=3, value="Instructions here"
+                )
+                with gr.Column(variant="panel"):
+                    config_memory_btn = gr.Button(
+                        size="sm", value="Save Config to Memory"
+                    )
+                    config_file_btn = gr.Button(
+                        size="sm", value="Save Config to File"
+                    )   
+            
+            with gr.Group():
+                with gr.Tab(label=f'Selected Index: {index_name}'):
+                    index_name_dropdown = gr.Dropdown(
+                        value=index_name,
+                        choices=self.existing_index_names_,
+                        label='Index Name',
+                        elem_id='index_name',
+                        elem_classes='index_service',
+                        multiselect=False,
+                        interactive=True,
+                        )
+                    with gr.Tab(label=f'Selcted Data Domain: {data_domain_name}'):
+                        txb = gr.Dropdown(
+                            value=data_domain_name,
+                            choices=data_domain_names,
+                            label='Data Domain Name',
+                            elem_id='data_domain_name',
+                            elem_classes='index_service',
+                            multiselect=False,
+                            interactive=True,
+                            )
+                        
+                        with gr.Tab(label=f'Selected Data Source: {data_source_name}'):
+                            txb = gr.Dropdown(
+                                value=data_source_name,
+                                choices=data_source_names,
+                                label='Data Source Name',
+                                elem_id='data_source_name',
+                                elem_classes='index_service',
+                                multiselect=False,
+                                interactive=True,
+                                )
+                            
+                        with gr.Tab(label='Rename Selected Data Source'):
+                            make_app_textbox = gr.Textbox(
+                                placeholder="<your_new_data_source_name>",
+                                container=True,
+                            )
+                            with gr.Row():
+                                delete_app_chk_box = gr.Checkbox(
+                                    value=False,
+                                    label="Check to confirm",
+                                    container=True,
+                                )
+                                make_app_btn = gr.Button(size="sm", value="Rename", container=True)
+                        with gr.Tab(label="Clear Selected Data Source"):
+                            with gr.Row():
+                                delete_app_chk_box = gr.Checkbox(
+                                    value=False,
+                                    label="Check to confirm",
+                                    container=True,
+                                )
+                                delete_app_btn = gr.Button(size="sm", value="Clear", container=True)
+                        with gr.Tab(label="Delete Selected Data Source"):
+                            with gr.Row():
+                                delete_app_chk_box = gr.Checkbox(
+                                    value=False,
+                                    label="Check to confirm",
+                                    container=True,
+                                )
+                                delete_app_btn = gr.Button(size="sm", value="Delete", container=True)
+                        with gr.Tab(label='Create New Data Source'):
+                            make_app_textbox = gr.Textbox(
+                                placeholder="<your_new_data_source_name>",
+                                container=True,
+                            )
+                            with gr.Row():
+                                delete_app_chk_box = gr.Checkbox(
+                                    value=False,
+                                    label="Check to confirm",
+                                    container=True,
+                                )
+                                make_app_btn = gr.Button(size="sm", value="Create", container=True)
+                            
+                    with gr.Tab(label='Rename Selected Data Domain'):
+                        make_app_textbox = gr.Textbox(
+                            placeholder="<your_new_data_domain_name>",
+                            container=True,
+                        )
+                        with gr.Row():
+                            delete_app_chk_box = gr.Checkbox(
+                                value=False,
+                                label="Check to confirm",
+                                container=True,
+                            )
+                            make_app_btn = gr.Button(size="sm", value="Rename", container=True)
+                    with gr.Tab(label="Clear Selected Data Domain"):
+                        with gr.Row():
+                            Clear_app_chk_box = gr.Checkbox(
+                                value=False,
+                                label="Check to confirm",
+                                container=True,
+                            )
+                            Clear_app_btn = gr.Button(size="sm", value="Clear", container=True)
+                    with gr.Tab(label="Delete Selected Data Domain"):
+                        with gr.Row():
+                            delete_app_chk_box = gr.Checkbox(
+                                value=False,
+                                label="Check to confirm",
+                                container=True,
+                            )
+                            delete_app_btn = gr.Button(size="sm", value="Delete", container=True)
+                    with gr.Tab(label='Create New Data Domain'):
+                        make_app_textbox = gr.Textbox(
+                            placeholder="<your_new_data_domain_name>",
+                            container=True,
+                        )
+                        with gr.Row():
+                            delete_app_chk_box = gr.Checkbox(
+                                value=False,
+                                label="Check to confirm",
+                                container=True,
+                            )
+                            make_app_btn = gr.Button(size="sm", value="Create", container=True)
+                            
+                with gr.Tab(label='Rename Selected Index'):
+                    make_app_textbox = gr.Textbox(
+                        placeholder="<your_new_index_name>",
+                        container=True,
+                    )
+                    with gr.Row():
+                        delete_app_chk_box = gr.Checkbox(
+                            value=False,
+                            label="Check to confirm",
+                            container=True,
+                        )
+                        make_app_btn = gr.Button(size="sm", value="Rename", container=True)
+                with gr.Tab(label="Clear Selected Index"):
+                    with gr.Row():
+                        Clear_app_chk_box = gr.Checkbox(
+                            value=False,
+                            label="Check to confirm",
+                            container=True,
+                        )
+                        Clear_app_btn = gr.Button(size="sm", value="Clear", container=True)
+                with gr.Tab(label="Delete Selected Index"):
+                    with gr.Row():
+                        delete_app_chk_box = gr.Checkbox(
+                            value=False,
+                            label="Check to confirm",
+                            container=True,
+                        )
+                        delete_app_btn = gr.Button(size="sm", value="Delete", container=True)
+                with gr.Tab(label='Create New Index'):
+                    make_app_textbox = gr.Textbox(
+                        placeholder="<your_new_index_name>",
+                        container=True,
+                    )
+                    with gr.Row():
+                        delete_app_chk_box = gr.Checkbox(
+                            value=False,
+                            label="Check to confirm",
+                            container=True,
+                        )
+                        make_app_btn = gr.Button(size="sm", value="Create", container=True)
+            
+            # index_name_dropdown.change()
+            
+        return settings_components
+    
+
+    def _create_index_config_components(self):
+        pass
+    
     def _create_secrets_components(self):
         secrets_components = []
 
@@ -503,6 +694,6 @@ class LocalSprite(AppBase):
         gr.Info(message)
 
     def run_sprite(self):
-        
+        self.index_ = self.app.index_service
         asyncio.run(self._create_interface())
 

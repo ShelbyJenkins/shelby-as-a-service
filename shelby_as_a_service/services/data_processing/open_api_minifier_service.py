@@ -2,7 +2,7 @@ import os, shutil
 import json, yaml
 import string, re
 from urllib.parse import urlparse
-from services.data_processing_service import TextProcessing
+from services.data_processing.data_processing_service import TextProcessing
 
 
 class OpenAPIMinifierService:

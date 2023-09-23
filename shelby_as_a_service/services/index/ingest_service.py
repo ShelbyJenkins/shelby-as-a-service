@@ -2,25 +2,26 @@ import os, traceback
 from typing import Iterator
 import yaml, json
 import pinecone
-from services.log_service import Logger
-from services.data_processing.open_api_minifier_service import OpenAPIMinifierService
-from services.data_processing.data_processing_service import CEQTextPreProcessor
-from services.providers.database_service import PineconeService, LocalFileStoreService
 from langchain.schema import Document
 from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUrlLoader
 from langchain.embeddings import OpenAIEmbeddings
 from bs4 import BeautifulSoup
-from models.service_models import ServiceBase, IndexServiceModel
+
+from services.log_service import Logger
+from models.app_base import AppBase
+from models.service_models import IngestServiceModel
+from services.data_processing.open_api_minifier_service import OpenAPIMinifierService
+from services.data_processing.data_processing_service import CEQTextPreProcessor
 
 
-class IndexService(ServiceBase):
+class IngestService(AppBase):
     
-    model_ = IndexServiceModel()
-    required_services_ = [PineconeService, LocalFileStoreService]
+    model_ = IngestServiceModel()
+    required_services_ = []
     
-    def __init__(self, service_config = None, **kwargs):
+    def __init__(self):
         super().__init__()
-        self.setup_config(service_config = service_config, **kwargs)
+        
         # self.deployment_name = deployment_instance.deployment_name
         # self.deployment = deployment_instance
         # self.config = service_model
@@ -35,7 +36,7 @@ class IndexService(ServiceBase):
         # )
         
         # self.secrets = deployment_instance.secrets
-        # if not self.deployment.check_secrets(IndexServiceModel.secrets_):
+        # if not self.deployment.check_secrets(IngestServiceModel.secrets_):
         #     return 
         
         # self.prompt_template_path = "shelby_as_a_service/prompt_templates"
@@ -239,56 +240,6 @@ class IndexService(ServiceBase):
             f"Final index stats: {self.vectorstore.describe_index_stats()}"
         )
 
-    def delete_index(self):
-        self.log.print_and_log(f"Deleting index {self.index_name}")
-        stats = self.vectorstore.describe_index_stats()
-        self.log.print_and_log(stats)
-        pinecone.delete_index(self.index_name)
-        self.log.print_and_log(self.vectorstore.describe_index_stats())
-
-    def clear_index(self):
-        self.log.print_and_log("Deleting all vectors in index.")
-        stats = self.vectorstore.describe_index_stats()
-        self.log.print_and_log(stats)
-        for key in stats["namespaces"]:
-            self.vectorstore.delete(deleteAll="true", namespace=key)
-        self.log.print_and_log(self.vectorstore.describe_index_stats())
-
-    def clear_deployment(self):
-        self.log.print_and_log(
-            f"Clearing namespace aka deployment: {self.deployment_name}"
-        )
-        self.vectorstore.delete(deleteAll="true", namespace=self.deployment_name)
-        self.log.print_and_log(self.vectorstore.describe_index_stats())
-
-    def _clear_data_source(self, data_source):
-        data_source.vectorstore.delete(
-            namespace=self.deployment_name,
-            delete_all=False,
-            filter={"data_source_name": {"$eq": data_source.data_source_name}},
-        )
-
-    def create_index(self):
-        metadata_config = {"indexed": self.config.index_indexed_metadata}
-        # Prepare log message
-        log_message = (
-            f"Creating new index with the following configuration:\n"
-            f" - Index Name: {self.index_name}\n"
-            f" - Dimension: {self.config.index_vectorstore_dimension}\n"
-            f" - Metric: {self.config.index_vectorstore_metric}\n"
-            f" - Pod Type: {self.config.index_vectorstore_pod_type}\n"
-            f" - Metadata Config: {metadata_config}"
-        )
-        # Log the message
-        self.log.print_and_log(log_message)
-
-        pinecone.create_index(
-            name=self.index_name,
-            dimension=self.config.index_vectorstore_dimension,
-            metric=self.config.index_vectorstore_metric,
-            pod_type=self.config.index_vectorstore_pod_type,
-            metadata_config=metadata_config,
-        )
 
 
 class DataSourceConfig:
@@ -296,7 +247,7 @@ class DataSourceConfig:
 
     def __init__(
         self,
-        index_agent: IndexService,
+        index_agent: IngestService,
         data_domain_name,
         domain_description,
         data_source_name,

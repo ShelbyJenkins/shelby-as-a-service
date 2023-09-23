@@ -17,6 +17,24 @@ class AppManager:
                     existing_app_names.append(app)
 
         return existing_app_names
+    
+    @staticmethod
+    def check_for_existing_indexes(app_name):
+        existing_index_names = []
+        config_from_file = AppManager.load_app_file(app_name)
+        
+        index_instances = config_from_file\
+            .get('app_instance', {})\
+            .get('services', {})\
+            .get('index_service', {})\
+            .get('index_instances')
+        
+
+        for index in index_instances:
+            existing_index = index.get('index_name', None)
+            existing_index_names.append(existing_index)
+                
+        return existing_index_names
 
     @staticmethod
     def load_app_file(app_name):
@@ -167,32 +185,42 @@ class AppManager:
         return config
 
     @staticmethod
-    def load_index_model_as_dicts(index_model, config: dict):
-        def merge_attributes(obj, config: dict):
-            for key, default_value in vars(obj).items():
-                config_value = config.get(key) if config else None  # Important check
-                if config_value is None:
-                    continue  # We skip this attribute since the config doesn't have data for it
-                if is_dataclass(default_value):
-                    setattr(obj, key, merge_attributes(default_value, config_value))
-                elif (
-                    isinstance(default_value, list)
-                    and len(default_value) > 0
-                    and is_dataclass(default_value[0])
-                ):
-                    setattr(
-                        obj,
-                        key,
-                        [
-                            merge_attributes(default_value[0], item_config)
-                            for item_config in config_value
-                        ],
-                    )
-                else:
-                    setattr(obj, key, config_value)
-            return obj
+    def load_index_model_as_dicts(index_model, config):
+            
+        def merge_attributes(obj, config):
+            if not config:
+                config = {}
+            
+            # If obj is a list of dataclass instances
+            if isinstance(obj, list) and obj and is_dataclass(obj[0]):
+                obj = obj[0]
+            
+            # Process each attribute of the dataclass instance
+            for key, val in vars(obj).items():
+                config_value = config.get(key)
 
-        return asdict(merge_attributes(index_model, config))
+                # If val is a list of dataclass instances
+                if isinstance(val, list) and val and is_dataclass(val[0]):
+                    item_configs = config_value if isinstance(config_value, list) else [{}]
+                    config[key] = [merge_attributes(val_item, item_config) for val_item, item_config in zip(val, item_configs)]
+                    
+                elif AppManager.check_for_ignored_objects(key):
+                    config[key] = config_value if config_value is not None else val
+
+            return config
+        
+        config = config or {}
+        index_instances = config.get('index_instances', [])
+
+        merged_index_instances = [
+            merge_attributes(index_model.index_instances, instance)
+            for instance in index_instances or [{}]
+        ]
+
+        config['index_instances'] = merged_index_instances
+                                    
+        
+        return config
 
     @staticmethod
     def create_update_env_file(app_name, secrets=None):
