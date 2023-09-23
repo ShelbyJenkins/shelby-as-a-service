@@ -2,6 +2,7 @@ import os
 import json
 from dataclasses import asdict, dataclass, field, is_dataclass
 
+
 class AppManager:
     def __init__(self):
         pass
@@ -18,7 +19,7 @@ class AppManager:
         return existing_app_names
 
     @staticmethod
-    def load_app_file(app_name, class_name = None):
+    def load_app_file(app_name):
         try:
             with open(
                 f"apps/{app_name}/app_config.json",
@@ -29,11 +30,8 @@ class AppManager:
         except json.JSONDecodeError:
             # If the JSON file is empty or invalid, return an empty dictionary (or handle in a way you see fit)
             config_from_file = {}
-        
-        if class_name is None:
-            return config_from_file
-        else:
-            return config_from_file.get(class_name, None)
+
+        return config_from_file
 
     @staticmethod
     def create_app(app_name):
@@ -57,7 +55,7 @@ class AppManager:
         AppManager.create_update_env_file(app_name)
 
     @staticmethod
-    def update_app_json_from_file(app_instance, app_name, update_class_instance = None):
+    def update_app_json_from_file(app_instance, app_name, update_class_instance=None):
         """Populates app_config.py from models.
         If the existing app_config.py has existing values it does not overwrite them.
         """
@@ -77,76 +75,12 @@ class AppManager:
             app_instance, app_instance_config, update_class_instance
         )
 
-        # App instance services
-        if "services" not in app_instance_config:
-            app_instance_config["services"] = {}
-            services_config = {}
-        else:
-            services_config = app_instance_config["services"]
-                
-        for app_instance_required_service in app_instance.required_services_:
-            service_model = app_instance_required_service.model_
-            service_class_name = service_model.service_name_
-
-            # App instance Service
-            if service_class_name not in services_config:
-                service_config = {}
-            else:
-                service_config = services_config[service_class_name]
-                
-            # Special rules for the index
-            if service_class_name == 'index_service':
-                service_config = AppManager.load_index_model_as_dicts(
-                    service_model, service_config
-                )
-            else:
-                service_config = AppManager.load_file_variables_as_dicts(
-                    service_model, service_config, update_class_instance
-                )
-
-            app_instance_config["services"][service_class_name] = service_config
+            
+        app_instance_config = AppManager._load_services(
+            app_instance_config, app_instance.required_services_, update_class_instance
+        )
 
         app_config_file["app_instance"] = app_instance_config
- 
- 
-        # Sprites
-        for sprite_class in app_instance.required_sprites_:
-            
-            sprite_model = sprite_class.model_
-            sprite_name_model = sprite_model.service_name_
-            if sprite_name_model not in app_config_file:
-                sprite_config = {}
-            else:
-                sprite_config = app_config_file[sprite_name_model]
-
-            sprite_config = AppManager.load_file_variables_as_dicts(
-                sprite_model, sprite_config, update_class_instance
-            )
-
-            # Services
-            if "services" not in sprite_config:
-                sprite_config["services"] = {}
-                services_config = {}
-            else:
-                services_config = sprite_config["services"]
-
-            for sprite_class_required_service in sprite_class.required_services_:
-                service_model = sprite_class_required_service.model_
-                service_class_name = service_model.service_name_
-
-                # Service
-                if service_class_name not in services_config:
-                    service_config = {}
-                else:
-                    service_config = services_config[service_class_name]
-
-                service_config = AppManager.load_file_variables_as_dicts(
-                    service_model, service_config, update_class_instance
-                )
-
-                sprite_config["services"][service_class_name] = service_config
-
-            app_config_file[sprite_name_model] = sprite_config
 
         # Save the updated configuration
         with open(
@@ -157,7 +91,49 @@ class AppManager:
             json.dump(app_config_file, file, ensure_ascii=False, indent=4)
 
     @staticmethod
-    def load_file_variables_as_dicts(model_class, config, update_class_instance = None):
+    def _load_services(config, required_services, update_class_instance):
+        # App instance services
+        if "services" not in config:
+            config["services"] = {}
+            services_config = {}
+        else:
+            services_config = config["services"]
+            
+        for required_service in required_services:
+            service_model = required_service.model_
+            service_class_name = service_model.service_name_
+
+            if service_class_name not in services_config:
+                services_config[service_class_name] = {}
+                specific_service_config = {}
+            else:
+                specific_service_config = services_config[service_class_name]
+            
+            # Special rules for the index
+            if service_class_name == "index_service":
+                specific_service_config = AppManager.load_index_model_as_dicts(
+                    service_model, specific_service_config
+                )
+            else:
+                specific_service_config = AppManager.load_file_variables_as_dicts(
+                    service_model, specific_service_config, update_class_instance
+                )
+
+            if hasattr(required_service, 'required_services_') and getattr(required_service, 'required_services_'):
+                specific_service_config = AppManager._load_services(
+                    specific_service_config,
+                    required_service.required_services_,
+                    update_class_instance,
+                )
+
+            services_config[service_class_name] = specific_service_config
+            
+        config['services'] = services_config
+
+        return config
+
+    @staticmethod
+    def load_file_variables_as_dicts(model_class, config, update_class_instance=None):
         """Loads variables and values from models and existing app_config.py.
         Adds variables from models if they don't exist in app_config.py.
         If values exist for variables in app_config.py it uses those.
@@ -168,7 +144,7 @@ class AppManager:
             update_class_instance_name = update_class_instance.service_name_
         else:
             update_class_instance_name = None
-            
+
         if update_class_instance_name == model_class.service_name_:
             for var, val in vars(update_class_instance).items():
                 if AppManager.check_for_ignored_objects(
@@ -187,12 +163,11 @@ class AppManager:
                         config[var] = val
                     else:
                         continue
-            
+
         return config
 
     @staticmethod
     def load_index_model_as_dicts(index_model, config: dict):
-        
         def merge_attributes(obj, config: dict):
             for key, default_value in vars(obj).items():
                 config_value = config.get(key) if config else None  # Important check
@@ -200,8 +175,19 @@ class AppManager:
                     continue  # We skip this attribute since the config doesn't have data for it
                 if is_dataclass(default_value):
                     setattr(obj, key, merge_attributes(default_value, config_value))
-                elif isinstance(default_value, list) and len(default_value) > 0 and is_dataclass(default_value[0]):
-                    setattr(obj, key, [merge_attributes(default_value[0], item_config) for item_config in config_value])
+                elif (
+                    isinstance(default_value, list)
+                    and len(default_value) > 0
+                    and is_dataclass(default_value[0])
+                ):
+                    setattr(
+                        obj,
+                        key,
+                        [
+                            merge_attributes(default_value[0], item_config)
+                            for item_config in config_value
+                        ],
+                    )
                 else:
                     setattr(obj, key, config_value)
             return obj
@@ -235,9 +221,7 @@ class AppManager:
                     if line.startswith("#") or line.strip() == "":
                         continue
                     else:
-                        modified_lines.append(
-                            f"{app_name.upper()}_{line.upper()}"
-                        )
+                        modified_lines.append(f"{app_name.upper()}_{line.upper()}")
 
             with open(dot_env_dest_path, "w", encoding="utf-8") as file:
                 file.writelines(modified_lines)

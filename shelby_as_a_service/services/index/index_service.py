@@ -11,5 +11,3 @@ class IndexService(AppBase):
         """
         """
         super().__init__()
-        self.setup_config()
-        self.setup_services()

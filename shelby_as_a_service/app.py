@@ -8,8 +8,8 @@ from services.index.index_service import IndexService
 class AppInstance(AppBase):
     secrets: Dict[str, str] = {}
     service_name_: str = "app_instance"
-    required_sprites_ = [LocalSprite]
-    required_services_ = [IndexService]
+    # required_sprites_ = [LocalSprite]
+    required_services_ = [IndexService, LocalSprite]
     
     def __init__(self, app_name, enabled_sprites):
         """Instantiates deployment.
@@ -19,8 +19,6 @@ class AppInstance(AppBase):
         self.app_name = app_name
         self.enabled_sprites = enabled_sprites
         self.setup_app_instance(self)
-        self.setup_services()
-        self.setup_sprites()
 
 
 def main():

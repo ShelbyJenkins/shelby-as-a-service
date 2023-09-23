@@ -23,7 +23,7 @@ class CEQAgent(AppBase):
         or by setting variables with **kwargs.
         """
         super().__init__()
-        self.setup_config()
+
         
         # self.config = model
         # if not self.deployment.check_secrets(CEQServiceModel.secrets_):
