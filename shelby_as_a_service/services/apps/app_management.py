@@ -17,24 +17,6 @@ class AppManager:
                     existing_app_names.append(app)
 
         return existing_app_names
-    
-    @staticmethod
-    def check_for_existing_indexes(app_name):
-        existing_index_names = []
-        config_from_file = AppManager.load_app_file(app_name)
-        
-        index_instances = config_from_file\
-            .get('app_instance', {})\
-            .get('services', {})\
-            .get('index_service', {})\
-            .get('index_instances')
-        
-
-        for index in index_instances:
-            existing_index = index.get('index_name', None)
-            existing_index_names.append(existing_index)
-                
-        return existing_index_names
 
     @staticmethod
     def load_app_file(app_name):
@@ -93,9 +75,8 @@ class AppManager:
             app_instance, app_instance_config, update_class_instance
         )
 
-            
         app_instance_config = AppManager._load_services(
-            app_instance_config, app_instance.required_services_, update_class_instance
+            app_name, app_instance_config, app_instance.required_services_, update_class_instance
         )
 
         app_config_file["app_instance"] = app_instance_config
@@ -109,14 +90,14 @@ class AppManager:
             json.dump(app_config_file, file, ensure_ascii=False, indent=4)
 
     @staticmethod
-    def _load_services(config, required_services, update_class_instance):
+    def _load_services(app_name, config, required_services, update_class_instance):
         # App instance services
         if "services" not in config:
             config["services"] = {}
             services_config = {}
         else:
             services_config = config["services"]
-            
+
         for required_service in required_services:
             service_model = required_service.model_
             service_class_name = service_model.service_name_
@@ -126,27 +107,37 @@ class AppManager:
                 specific_service_config = {}
             else:
                 specific_service_config = services_config[service_class_name]
-            
+
             # Special rules for the index
             if service_class_name == "index_service":
-                specific_service_config = AppManager.load_index_model_as_dicts(
-                    service_model, specific_service_config
+                specific_service_config = AppManager.load_file_variables_as_dicts(
+                    service_model, specific_service_config, update_class_instance
                 )
+                if specific_service_config.get('index_name', None) is None:
+                    specific_service_config['index_name'] = f"{app_name}_index"
+    
+                specific_service_config = AppManager.load_data_domains_as_dicts(
+                    app_name, required_service, specific_service_config, update_class_instance
+                )
+                
             else:
                 specific_service_config = AppManager.load_file_variables_as_dicts(
                     service_model, specific_service_config, update_class_instance
                 )
 
-            if hasattr(required_service, 'required_services_') and getattr(required_service, 'required_services_'):
+            if hasattr(required_service, "required_services_") and getattr(
+                required_service, "required_services_"
+            ):
                 specific_service_config = AppManager._load_services(
+                    app_name,
                     specific_service_config,
                     required_service.required_services_,
                     update_class_instance,
                 )
 
             services_config[service_class_name] = specific_service_config
-            
-        config['services'] = services_config
+
+        config["services"] = services_config
 
         return config
 
@@ -184,43 +175,69 @@ class AppManager:
 
         return config
 
+    # @staticmethod
+    # def load_index_as_dicts(app_name, index_service, index_config, update_class_instance=None):
+    
+    @staticmethod 
+    def load_data_domains_as_dicts(
+        app_name, index_service, index_config, update_class_instance=None
+    ):
+
+        data_domain_service = index_service.data_domain_service_
+        data_domain_model = data_domain_service.model_
+
+        
+        index_data_domains_config = index_config.get("index_data_domains", [])
+        index_data_domains = []
+        for data_domain_config in index_data_domains_config or [{}]:
+            data_domain_config = AppManager._load_services(
+                app_name,
+                data_domain_config,
+                data_domain_service.required_services_,
+                update_class_instance,
+            )
+            data_domain_config = AppManager.load_file_variables_as_dicts(
+                data_domain_model, data_domain_config, update_class_instance
+            )
+            
+            data_domain_config = AppManager.load_data_sources_as_dicts(
+                app_name, data_domain_service, data_domain_config, update_class_instance=None)
+            
+            index_data_domains.append(data_domain_config)
+            
+        index_config["index_data_domains"] = index_data_domains
+        
+        return index_config
+
     @staticmethod
-    def load_index_model_as_dicts(index_model, config):
-            
-        def merge_attributes(obj, config):
-            if not config:
-                config = {}
-            
-            # If obj is a list of dataclass instances
-            if isinstance(obj, list) and obj and is_dataclass(obj[0]):
-                obj = obj[0]
-            
-            # Process each attribute of the dataclass instance
-            for key, val in vars(obj).items():
-                config_value = config.get(key)
-
-                # If val is a list of dataclass instances
-                if isinstance(val, list) and val and is_dataclass(val[0]):
-                    item_configs = config_value if isinstance(config_value, list) else [{}]
-                    config[key] = [merge_attributes(val_item, item_config) for val_item, item_config in zip(val, item_configs)]
-                    
-                elif AppManager.check_for_ignored_objects(key):
-                    config[key] = config_value if config_value is not None else val
-
-            return config
+    def load_data_sources_as_dicts(
+        app_name, data_domain_service, data_domain_config, update_class_instance=None):
         
-        config = config or {}
-        index_instances = config.get('index_instances', [])
-
-        merged_index_instances = [
-            merge_attributes(index_model.index_instances, instance)
-            for instance in index_instances or [{}]
-        ]
-
-        config['index_instances'] = merged_index_instances
-                                    
+        data_source_service = data_domain_service.data_source_service_
+        data_source_model = data_source_service.model_
         
-        return config
+        data_sources_config = data_domain_config.get(
+            "data_domain_sources", []
+        )
+        data_sources = []
+        for data_source_config in data_sources_config or [{}]:
+            data_source_config = AppManager._load_services(
+                app_name,
+                data_source_config,
+                data_source_service.required_services_,
+                update_class_instance,
+            )
+            data_source_config = AppManager.load_file_variables_as_dicts(
+                data_source_model, data_source_config, update_class_instance
+            )
+            data_sources.append(data_source_config)
+            
+        data_domain_config["data_domain_sources"] = data_sources
+
+        return data_domain_config
+
+
+        
 
     @staticmethod
     def create_update_env_file(app_name, secrets=None):

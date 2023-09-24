@@ -7,6 +7,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from models.service_models import CEQServiceModel
 from services.log_service import Logger
 from models.app_base import AppBase
+from services.providers.llm_service import LLMService
 # endregion
 
 
@@ -14,7 +15,7 @@ class CEQAgent(AppBase):
     
     # Overwrite the AppBase model
     model_ = CEQServiceModel()
-    required_services_ = None
+    required_services_ = [LLMService]
     
     def __init__(self):
         """Initialized like any other service from sprites.
@@ -23,23 +24,18 @@ class CEQAgent(AppBase):
         or by setting variables with **kwargs.
         """
         super().__init__()
-
         
-        # self.config = model
-        # if not self.deployment.check_secrets(CEQServiceModel.secrets_):
-        #     return 
+        self.log = Logger(
+            AppBase.deployment_name,
+            "CEQAgent",
+            "ceq_agent.md",
+            level="INFO",
+        )
         
-        # self.log = Logger(
-        #     self.deployment_name,
-        #     "CEQAgent",
-        #     "ceq_agent.md",
-        #     level="INFO",
-        # )
-        # self.data_domains = deployment_instance.local_sprite.index_service.config.deployment_data_domains
-        # self.action_agent = ActionAgent(self)
-        # self.query_agent = QueryAgent(self)
+        self.data_domains = None
+        self.query_agent = QueryAgent(self)
 
-    def request_thread(self, request):
+    def request_thread(self, request, index_service):
         try:
             # ActionAgent determines the workflow
             # workflow = self.action_agent.action_decision(request)

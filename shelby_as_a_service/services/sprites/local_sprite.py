@@ -10,13 +10,15 @@ from models.app_base import AppBase
 from models.service_models import LocalSpriteModel
 from models.local_app_theme import AtYourServiceTheme
 from services.ceq_agent import CEQAgent
+from services.index.index_service import IndexService
+
 
 # endregion
 
 class LocalSprite(AppBase):
     model_ = LocalSpriteModel()
     # required_services_ = [CEQAgent]
-    required_services_ = [CEQAgent]
+    required_services_ = [CEQAgent, IndexService]
 
     def __init__(self):
         """
@@ -32,9 +34,8 @@ class LocalSprite(AppBase):
         
         
         self.existing_app_names_ = AppManager.check_for_existing_apps()
-        self.existing_index_names_ = AppManager.check_for_existing_indexes(self.app_name)
         self.global_components_ = {}
-        self.index_ = None
+        
         
 
     async def _create_interface(self):
@@ -82,7 +83,7 @@ class LocalSprite(AppBase):
                         label="Message",
                     )
                     index_ingest_docs = gr.Button(size="sm", value="ingest_docs")
-                    index_components = self._create_settings_tab(self.app.index_service)
+                    index_components = self._create_settings_tab(self.index_service)
                 with gr.Tab(label="Local File"):
                     source_textbox = gr.Textbox(
                         placeholder="url_source or file path",
@@ -196,7 +197,7 @@ class LocalSprite(AppBase):
     def _create_index_config(self):
         settings_components = []
         
-        index_instance = self.index_.index_instances[0]
+        index_instance = self.index_service
         index_name = index_instance.index_name
         data_domain_instance = index_instance.index_data_domains[0]
         data_domain_name = data_domain_instance.data_domain_name
@@ -232,7 +233,7 @@ class LocalSprite(AppBase):
                 with gr.Tab(label=f'Selected Index: {index_name}'):
                     index_name_dropdown = gr.Dropdown(
                         value=index_name,
-                        choices=self.existing_index_names_,
+                        choices=index_name,
                         label='Index Name',
                         elem_id='index_name',
                         elem_classes='index_service',
@@ -371,18 +372,7 @@ class LocalSprite(AppBase):
                             container=True,
                         )
                         delete_app_btn = gr.Button(size="sm", value="Delete", container=True)
-                with gr.Tab(label='Create New Index'):
-                    make_app_textbox = gr.Textbox(
-                        placeholder="<your_new_index_name>",
-                        container=True,
-                    )
-                    with gr.Row():
-                        delete_app_chk_box = gr.Checkbox(
-                            value=False,
-                            label="Check to confirm",
-                            container=True,
-                        )
-                        make_app_btn = gr.Button(size="sm", value="Create", container=True)
+
             
             # index_name_dropdown.change()
             
@@ -685,7 +675,7 @@ class LocalSprite(AppBase):
         with ThreadPoolExecutor() as executor:
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
-                executor, self.ceq_agent.request_thread, request
+                executor, self.ceq_agent.request_thread, self.index_service, request
             )
             return "", response
 
@@ -694,6 +684,6 @@ class LocalSprite(AppBase):
         gr.Info(message)
 
     def run_sprite(self):
-        self.index_ = self.app.index_service
+        self.index_service.load_index(self)
         asyncio.run(self._create_interface())
 

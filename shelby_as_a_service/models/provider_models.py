@@ -1,7 +1,10 @@
 from dataclasses import dataclass, field
-from enum import Enum, auto
+
 from typing import Dict, List, Optional
+
+@dataclass
 class LLMs:
+    
     gpt_4 = {"model_name": "gpt-4", "tokens_max": 8192, "cost_per_k": 0.06}
 
     gpt_4_32k = {"model_name": "gpt-4-32k", "tokens_max": 32768, "cost_per_k": 0.06}
@@ -13,7 +16,12 @@ class LLMs:
         "tokens_max": 16384,
         "cost_per_k": 0.03,
     }
+    openai_timeout_seconds: float = 180.0
 
+    service_name_: str = 'llm_service'
+    
+    required_variables_: List[str] = field(default_factory=list) 
+    required_secrets_: List[str] = field(default_factory=lambda: ['openai_api_key'])
 
 
 
@@ -56,5 +64,5 @@ class DataBases:
 
         service_name_: str = 'pinecone_service'
         required_variables_: List[str] = field(default_factory=lambda: ['index_name', 'index_env'])
-        required_secrets_: List[str] = field(default_factory=lambda: ['openai_api_key', 'pinecone_api_key'])
+        required_secrets_: List[str] = field(default_factory=lambda: ['pinecone_api_key'])
     

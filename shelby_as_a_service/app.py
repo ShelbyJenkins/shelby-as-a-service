@@ -2,13 +2,12 @@ import argparse
 from typing import Dict
 from models.app_base import AppBase
 from services.sprites.local_sprite import LocalSprite
-from services.index.index_service import IndexService
 
 
 class AppInstance(AppBase):
     secrets: Dict[str, str] = {}
     service_name_: str = "app_instance"
-    required_services_ = [LocalSprite, IndexService]
+    required_services_ = [LocalSprite]
     
     def __init__(self, app_name, enabled_sprites):
         """Instantiates deployment.

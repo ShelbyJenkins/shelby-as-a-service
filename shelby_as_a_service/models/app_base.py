@@ -61,7 +61,7 @@ class AppBase:
         load_dotenv(os.path.join(f"apps/{app_name}/", ".env"))
         
         self.setup_config(AppManager.load_app_file(app_name))
-
+        
 
     def setup_config(self, config=None):
         
@@ -109,42 +109,7 @@ class AppBase:
     
         for key, value in config.items():
             setattr(self, key, value)
-            
-        if getattr(getattr(self, 'model_', None), 'service_name_', None) == "index_service":
-            self.load_index_model_as_dataclasses(self.model_, config)
-    
-    def load_index_model_as_dataclasses(self, index_model, config):
-        
-        def merge_attributes(obj, config):
-            # If obj is a list of dataclass instances
-            if isinstance(obj, list) and obj and is_dataclass(obj[0]):
-                obj = obj[0]
-
-            replacements = {}
-            # Process each attribute of the dataclass instance
-            for key, val in vars(obj).items():
-                config_value = config.get(key)
-
-                # If val is a list of dataclass instances
-                if isinstance(val, list) and val and is_dataclass(val[0]):
-                    item_configs = config_value if isinstance(config_value, list) else [{}]
-                    replacements[key] = [merge_attributes(val_item, item_config) for val_item, item_config in zip(val, item_configs)]
-                
-                elif AppManager.check_for_ignored_objects(key):
-                    if config_value is not None:
-                        replacements[key] = config_value
-
-            return replace(obj, **replacements)
-
-        config = config or {}
-        index_instances_config = config.get('index_instances', [])
-        merged_index_instances = [
-            merge_attributes(index_model.index_instances, instance)
-            for instance in index_instances_config or [{}]
-        ]
-        setattr(self, 'index_instances', merged_index_instances)
-        
-                                    
+                       
     def run_sprites(self):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for sprite_name in self.enabled_sprites:
