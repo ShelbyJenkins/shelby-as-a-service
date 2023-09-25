@@ -3,7 +3,7 @@ import os, asyncio, random
 from concurrent.futures import ThreadPoolExecutor
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
-from services.log_service import Logger
+from services.utils.log_service import Logger
 from models.service_models import SlackSpriteModel
 from services.ceq_agent import CEQAgent
 

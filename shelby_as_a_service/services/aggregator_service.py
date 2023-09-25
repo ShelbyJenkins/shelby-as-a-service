@@ -11,12 +11,12 @@ from dotenv import load_dotenv
 import time
 
 from services.tiny_jmap_library.tiny_jmap_library import TinyJMAPClient
-from services.data_processing_service import TextProcessing
-from services.log_service import Logger
+from services.data_processing.data_processing_service import TextProcessing
+from services.utils.log_service import Logger
 from bs4 import BeautifulSoup
 from langchain.embeddings import OpenAIEmbeddings
 import pinecone
-from models.service_models import PineconeServiceModel
+from models.provider_models import DataBases
 
 # endregion
 
@@ -35,7 +35,7 @@ class Aggregator:
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
         self.service_dir = "shelby_as_a_service/content_aggregator/"
-        self.prompt_path = "shelby_as_a_service/prompt_templates/aggregator/"
+        self.prompt_path = "shelby_as_a_service/models/prompt_templates/aggregator/"
         config_module_path = f"content_aggregator.config"
         self.config = import_module(config_module_path).MonikerAggregatorConfig
         self.vector_db = VectorIndex(self)
@@ -566,10 +566,10 @@ class AggregateEmailNewsletter:
 class VectorIndex:
     def __init__(self, main_ag: Aggregator):
         self.main_ag = main_ag
-        self.index_config = PineconeServiceModel()
+        self.pinecone_config = DataBases.PineconeServiceModel()
 
         pinecone.init(
-            environment=self.index_config.index_env,
+            environment=self.pinecone_config.pinecone_index_env,
             api_key=os.environ.get("PINECONE_API_KEY"),
         )
 
@@ -582,10 +582,10 @@ class VectorIndex:
         self.vectorstore = pinecone.Index(self.main_ag.config.index_name)
 
         self.embedding_retriever = OpenAIEmbeddings(
-            model=self.index_config.index_embedding_model,
+            model=self.pinecone_config.pinecone_embedding_model,
             openai_api_key=os.environ.get("OPENAI_API_KEY"),
-            chunk_size=self.index_config.index_embedding_batch_size,
-            request_timeout=self.index_config.index_openai_timeout_seconds,
+            chunk_size=self.pinecone_config.pinecone_embedding_batch_size,
+            request_timeout=180,
         )
 
     def upsert_email_text(self, content):
@@ -632,7 +632,7 @@ class VectorIndex:
         self.vectorstore.upsert(
             vectors=vectors_to_upsert,
             namespace=self.main_ag.config.index_namespace,
-            batch_size=self.index_config.index_vectorstore_upsert_batch_size,
+            batch_size=self.pinecone_config.pinecone_vectorstore_upsert_batch_size,
             show_progress=True,
         )
 

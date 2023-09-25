@@ -7,7 +7,7 @@ from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUr
 from langchain.embeddings import OpenAIEmbeddings
 from bs4 import BeautifulSoup
 
-from services.log_service import Logger
+from services.utils.log_service import Logger
 from models.app_base import AppBase
 from models.service_models import IngestServiceModel
 from services.data_processing.open_api_minifier_service import OpenAPIMinifierService

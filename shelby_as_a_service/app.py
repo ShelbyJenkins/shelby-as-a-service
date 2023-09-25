@@ -2,7 +2,7 @@ import argparse
 from typing import Dict
 from models.app_base import AppBase
 from services.sprites.local_sprite import LocalSprite
-
+from services.index.index_service import IndexService
 
 class AppInstance(AppBase):
     secrets: Dict[str, str] = {}
@@ -16,6 +16,7 @@ class AppInstance(AppBase):
         super().__init__()
         self.app_name = app_name
         self.enabled_sprites = enabled_sprites
+        self.index_service = IndexService
         self.setup_app_instance(self)
 
 

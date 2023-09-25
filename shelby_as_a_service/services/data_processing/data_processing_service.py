@@ -11,8 +11,8 @@ import spacy
 
 class TextProcessing:
     @staticmethod
-    def tiktoken_len(document):
-        tokenizer = tiktoken.encoding_for_model("text-embedding-ada-002")
+    def tiktoken_len(document, encoding_model = 'text-embedding-ada-002'):
+        tokenizer = tiktoken.encoding_for_model(encoding_model)
         tokens = tokenizer.encode(document, disallowed_special=())
         return len(tokens)
 

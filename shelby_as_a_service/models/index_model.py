@@ -1,7 +1,13 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
-from services.apps.app_management import AppManager
 
+
+@dataclass
+class IngestServiceModel:
+    
+    service_name_: str = 'ingest_service'
+    required_variables_: List[str] = field(default_factory=list) 
+    required_secrets_: List[str] = field(default_factory=list) 
 
 @dataclass
 class DataSourceModel:

@@ -2,7 +2,7 @@ import concurrent.futures
 import os
 from dataclasses import replace, is_dataclass, asdict
 from dotenv import load_dotenv
-from services.apps.app_management import AppManager
+from services.utils.app_management import AppManager
 
 
 class AppBase:
@@ -14,7 +14,8 @@ class AppBase:
     app = None
     app_name = None
     secrets = {}
-
+    total_cost = 0
+    
     def setup_app_instance(self, app):
         app_name = app.app_name
         AppBase.app = app
@@ -60,10 +61,11 @@ class AppBase:
 
         load_dotenv(os.path.join(f"apps/{app_name}/", ".env"))
         
+        app.index_service().load_index()
+        AppBase.index_service = app.index_service
         self.setup_config(AppManager.load_app_file(app_name))
         
-
-    def setup_config(self, config=None):
+    def setup_config(self, config=None, sprite_name = None):
         
         # Main app instance
         if getattr(self, 'service_name_', None) == 'app_instance':
@@ -99,8 +101,7 @@ class AppBase:
                 return None
             for service in self.required_services_:
                 service_name = service.model_.service_name_
-                service_instance = service()
-                service_instance.setup_config(services_config.get(service_name))
+                service_instance = service(services_config.get(service_name), sprite_name)
                 setattr(self, service_name, service_instance)
    
         # Removes services object used to structure the json file
@@ -109,6 +110,9 @@ class AppBase:
     
         for key, value in config.items():
             setattr(self, key, value)
+            
+        if sprite_name:
+            setattr(self, 'sprite_name', sprite_name)
                        
     def run_sprites(self):
         with concurrent.futures.ThreadPoolExecutor() as executor:

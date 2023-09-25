@@ -4,23 +4,22 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import shutil
 import gradio as gr
-from services.log_service import Logger
-from services.apps.app_management import AppManager
 from models.app_base import AppBase
-from models.service_models import LocalSpriteModel
+from services.utils.log_service import Logger
+from services.utils.app_management import AppManager
+from models.sprite_models import LocalSpriteModel
 from models.local_app_theme import AtYourServiceTheme
-from services.ceq_agent import CEQAgent
-from services.index.index_service import IndexService
+from services.agents.ceq_agent import CEQAgent
+
 
 
 # endregion
 
 class LocalSprite(AppBase):
     model_ = LocalSpriteModel()
-    # required_services_ = [CEQAgent]
-    required_services_ = [CEQAgent, IndexService]
+    required_services_ = [CEQAgent]
 
-    def __init__(self):
+    def __init__(self, config, sprite_name):
         """
         """
         super().__init__()
@@ -31,11 +30,10 @@ class LocalSprite(AppBase):
             "local_sprite.md",
             level="INFO",
         )
-        
+        self.setup_config(config, 'local_sprite')
         
         self.existing_app_names_ = AppManager.check_for_existing_apps()
         self.global_components_ = {}
-        
         
 
     async def _create_interface(self):
@@ -83,7 +81,7 @@ class LocalSprite(AppBase):
                         label="Message",
                     )
                     index_ingest_docs = gr.Button(size="sm", value="ingest_docs")
-                    index_components = self._create_settings_tab(self.index_service)
+                    index_components = self._create_settings_tab(self.app.index_service)
                 with gr.Tab(label="Local File"):
                     source_textbox = gr.Textbox(
                         placeholder="url_source or file path",
@@ -675,7 +673,7 @@ class LocalSprite(AppBase):
         with ThreadPoolExecutor() as executor:
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
-                executor, self.ceq_agent.request_thread, self.index_service, request
+                executor, self.ceq_agent.run_context_enriched_query, request
             )
             return "", response
 
@@ -684,6 +682,6 @@ class LocalSprite(AppBase):
         gr.Info(message)
 
     def run_sprite(self):
-        self.index_service.load_index(self)
+        
         asyncio.run(self._create_interface())
 
