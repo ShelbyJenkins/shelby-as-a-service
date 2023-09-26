@@ -11,40 +11,50 @@ from services.providers.embedding_service import OpenAIEmbeddingService
 from services.providers.database_service import DatabaseService
 from services.agents.action_agent import ActionAgent
 from services.data_processing.data_processing_service import TextProcessing
+
 # endregion
 
 
 class CEQAgent(AppBase):
-    
-    # Overwrite the AppBase model
-    model_ = CEQAgentModel()
-    required_services_ = [LLMService, OpenAIEmbeddingService, DatabaseService, ActionAgent]
-    action_agent = None
-    llm_service = None
-    embedding_service = None
-    database_service = None
-    
-    def __init__(self, config, sprite_name):
-        """Initialized like any other service from sprites.
-        However, non-sprite services have the option to also load as modules:
-        They can take a config from a config dict service_config, 
-        or by setting variables with **kwargs.
-        """
-        super().__init__()
-        self.setup_config(config, sprite_name)
-        
-        
-        # Temporary
-        self.openai_embedding.set_embedding_model(self.query_embedding_model)
-        self.embedding_service = self.openai_embedding
-        
-        self.llm_service.set_llm_model(self.main_prompt_llm_model, self.max_response_tokens)
-     
-        # I think this is long term solution
-        self.database_service = self.database_service.initialize_database()
-        
+    query_embedding_model: str = "text-embedding-ada-002"
+    data_domain_constraints_enabled: bool = False
+    data_domain_constraints_llm_model: str = "gpt-4"
+    data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
+    keyword_generator_enabled: bool = False
+    keyword_generator_llm_model: str = "gpt-4"
+    doc_relevancy_check_enabled: bool = False
+    doc_relevancy_check_llm_model: str = "gpt-4"
+    docs_to_retrieve: int = 5
+    docs_max_token_length: int = 1200
+    docs_max_total_tokens: int = 3500
+    docs_max_used: int = 5
+    main_prompt_llm_model: str = "gpt-4"
+    max_response_tokens: int = 300
+
+    def __init__(self, config):
+        config = config.get("services", None).get("ceq_agent", None)
+        super().__init__(
+            service_name_="ceq_agent",
+            required_variables_=["docs_to_retrieve"],
+            config=config,
+        )
+
+        # self.database_service = DatabaseService(config)
+        # self.llm_service = LLMService(config)
+        # self.action_agent = ActionAgent(config)
+        # self.embedding_service = OpenAIEmbeddingService(config)
+
+        # # Temporary
+        # self.openai_embedding.set_embedding_model(self.query_embedding_model)
+        # self.embedding_service = self.openai_embedding
+
+        # self.llm_service.set_llm_model(self.main_prompt_llm_model, self.max_response_tokens)
+
+        # # I think this is long term solution
+        # self.database_service = self.database_service.initialize_database()
+
         self.data_domains = None
-        
+
         self.log = Logger(
             AppBase.app_name,
             "CEQAgent",
@@ -54,9 +64,7 @@ class CEQAgent(AppBase):
 
     def doc_handling(self, returned_documents):
         if not returned_documents:
-            self.log.print_and_log(
-                "No supporting documents after initial query!"
-            )
+            self.log.print_and_log("No supporting documents after initial query!")
             return None
 
         returned_documents_list = []
@@ -89,21 +97,18 @@ class CEQAgent(AppBase):
         )
 
         if not parsed_documents:
-            self.log.print_and_log(
-                "No supporting documents after parsing!"
-            )
+            self.log.print_and_log("No supporting documents after parsing!")
             return None
-        
+
         return parsed_documents
-        
+
     def ceq_parse_documents(self, returned_documents=None):
-        
         def _docs_tiktoken_len(documents):
             token_count = 0
             for document in documents:
                 tokens = 0
                 tokens += TextProcessing.tiktoken_len(document["content"])
-                
+
                 token_count += tokens
             return token_count
 
@@ -117,7 +122,6 @@ class CEQAgent(AppBase):
         )
 
         for i, document in enumerate(sorted_documents, start=1):
-                            
             token_count = TextProcessing.tiktoken_len(document["content"])
             if token_count > self.docs_max_total_tokens:
                 sorted_documents.pop(i - 1)
@@ -127,9 +131,7 @@ class CEQAgent(AppBase):
 
         embeddings_tokens = _docs_tiktoken_len(sorted_documents)
 
-        self.log.print_and_log(
-            f"context docs token count: {embeddings_tokens}"
-        )
+        self.log.print_and_log(f"context docs token count: {embeddings_tokens}")
         iterations = 0
         original_documents_count = len(sorted_documents)
         while embeddings_tokens > self.docs_max_total_tokens:
@@ -178,16 +180,10 @@ class CEQAgent(AppBase):
                 sorted_documents.pop(max_token_count_idx)
 
             embeddings_tokens = _docs_tiktoken_len(sorted_documents)
-            self.log.print_and_log(
-                "removed lowest scoring embedding doc ."
-            )
-            self.log.print_and_log(
-                f"context docs token count: {embeddings_tokens}"
-            )
+            self.log.print_and_log("removed lowest scoring embedding doc .")
+            self.log.print_and_log(f"context docs token count: {embeddings_tokens}")
             iterations += 1
-        self.log.print_and_log(
-            f"number of context docs now: {len(sorted_documents)}"
-        )
+        self.log.print_and_log(f"number of context docs now: {len(sorted_documents)}")
         # Same as above but removes based on total count of docs instead of token count.
         while len(sorted_documents) > self.docs_max_used:
             if soft_count > 1:
@@ -211,7 +207,9 @@ class CEQAgent(AppBase):
 
     def ceq_main_prompt_template(self, query, documents=None):
         with open(
-            os.path.join("shelby_as_a_service/models/prompt_templates/", "ceq_main_prompt.yaml"),
+            os.path.join(
+                "shelby_as_a_service/models/prompt_templates/", "ceq_main_prompt.yaml"
+            ),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -239,8 +237,6 @@ class CEQAgent(AppBase):
         # self.log.print_and_log(f"prepared prompt: {json.dumps(prompt_template, indent=4)}")
 
         return prompt_template
-
-
 
     def ceq_append_meta(self, input_text, parsed_documents):
         # Covering LLM doc notations cases
@@ -288,9 +284,7 @@ class CEQAgent(AppBase):
                     answer_obj["documents"].append(document)
                 else:
                     pass
-                    self.log.print_and_log(
-                        f"Document{doc_num} not found in the list."
-                    )
+                    self.log.print_and_log(f"Document{doc_num} not found in the list.")
 
         self.log.print_and_log(f"response with metadata: {answer_obj}")
 
@@ -316,7 +310,9 @@ class CEQAgent(AppBase):
             search_tems = self.embedding_service.get_query_embedding(query)
         self.log.print_and_log("Embeddings retrieved")
 
-        returned_documents = self.database_service.query_index(search_tems, self.docs_to_retrieve, data_domain_name)
+        returned_documents = self.database_service.query_index(
+            search_tems, self.docs_to_retrieve, data_domain_name
+        )
 
         prepared_documents = self.doc_handling(returned_documents)
 
@@ -334,7 +330,7 @@ class CEQAgent(AppBase):
         )
 
         return parsed_response
-    
+
         # except Exception as error:
         #     # Logs error and sends error to sprite
         #     error_message = f"An error occurred while processing request: {error}\n"
@@ -345,4 +341,3 @@ class CEQAgent(AppBase):
         #     print(error_message)
         #     return error_message
         #     # return f"Bot broke. Probably just an API issue. Feel free to try again. Otherwise contact support."
-

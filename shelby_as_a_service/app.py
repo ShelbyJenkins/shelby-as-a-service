@@ -1,23 +1,17 @@
 import argparse
-from typing import Dict
+
 from models.app_base import AppBase
 from services.sprites.local_sprite import LocalSprite
 from services.index.index_service import IndexService
 
-class AppInstance(AppBase):
-    secrets: Dict[str, str] = {}
-    service_name_: str = "app_instance"
-    required_services_ = [LocalSprite]
-    
-    def __init__(self, app_name, enabled_sprites):
-        """Instantiates deployment.
-        super().__init__() initializes AppBase. We then override the base defaults.
-        """
-        super().__init__()
-        self.app_name = app_name
-        self.enabled_sprites = enabled_sprites
-        self.index_service = IndexService
-        self.setup_app_instance(self)
+
+def create_app(app_name):
+
+    AppBase.app_name = app_name
+    config = AppBase.setup_app_instance()
+    AppBase.sprite = LocalSprite(config)
+    AppBase.index_service = IndexService(config)
+    AppBase.sprite.run_sprite()
 
 
 def main():
@@ -61,8 +55,7 @@ def main():
         deployment = AppInstance(args.deployment_name)
         deployment.run_sprites()
     else:
-        deployment = AppInstance(app_name="base", enabled_sprites=['local_sprite'])
-        deployment.run_sprites()
+        deployment = create_app(app_name="base")
 
 
 if __name__ == "__main__":
