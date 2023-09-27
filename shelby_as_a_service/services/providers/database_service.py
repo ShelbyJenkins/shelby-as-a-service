@@ -1,24 +1,44 @@
+from typing import List
 import pinecone
-from models.app_base import AppBase
-from models.database_models import DatabaseServiceModel, LocalFileStoreServiceModel, PineconeServiceModel
+from services.utils.app_base import AppBase
 
+         
 class PineconeService(AppBase):
     
-    model_ = PineconeServiceModel()
-    required_services_ = None
-    index = None
+    index_env: str = 'us-central1-gcp'
     
-    def __init__(self, config, sprite_name):
-        super().__init__()
-        self.setup_config(config, sprite_name)
-        
-    def initialize_pinecone(self):
+    embedding_max_chunk_size: int = 8191
+    embedding_batch_size: int = 100
+    vectorstore_dimension: int = 1536
+    vectorstore_upsert_batch_size: int = 20
+    vectorstore_metric: str = 'cosine'
+    vectorstore_pod_type: str = 'p1'
+    preprocessor_min_length: int = 150
+    #  text_splitter_goal_length: int = 500
+    text_splitter_goal_length: int = 750
+    text_splitter_overlap_percent: int = 15  # In percent
+    
+    indexed_metadata = [
+        'data_domain_name',
+        'data_source_name',
+        'doc_type',
+        'target_type',
+        'date_indexed',
+    ]
+    
+    def __init__(self, config_path=None):
+        super().__init__(
+            service_name_="pinecone_service",
+            required_variables_=["docs_to_retrieve"],
+            required_secrets_=["pinecone_api_key"],
+            config_path=config_path,
+        )
         
         pinecone.init(
             api_key=self.secrets["pinecone_api_key"],
             environment=self.index_env,
         )
-        self.index = pinecone.Index(self.index_service.index_name)
+        self.pinecone_index = pinecone.Index(self.index_service.index_name)
         
     def delete_pinecone_index(self):
         print(f"Deleting index {self.index_name}")
@@ -100,7 +120,7 @@ class PineconeService(AppBase):
         #     }
         
 
-        soft_query_response = self.index.query(
+        soft_query_response = self.pinecone_index.query(
             top_k=docs_to_retrieve,
             include_values=False,
             namespace='tatum',
@@ -108,7 +128,7 @@ class PineconeService(AppBase):
             vector=dense_embedding
 
         )
-        # hard_query_response = self.index.query(
+        # hard_query_response = self.pinecone_index.query(
         #     top_k=docs_to_retrieve,
         #     include_values=False,
         #     namespace=AppBase.app_name,
@@ -145,32 +165,26 @@ class PineconeService(AppBase):
     
 class LocalFileStoreService(AppBase):
     
-    model_ = LocalFileStoreServiceModel()
-    required_services_ = None
     
-
-    def __init__(self, config, sprite_name):
-        super().__init__()
-        self.setup_config(config, sprite_name)
+    def __init__(self, config_path):
+        super().__init__(
+            service_name_="local_filestore_service",
+            required_variables_=["docs_to_retrieve"],
+            config_path=config_path,
+        )
         
 class DatabaseService(AppBase):
     
-    model_ = DatabaseServiceModel()
-    required_services_ = [LocalFileStoreService, PineconeService]
+    default_provider: str = "pinecone_service"
+    available_providers = [PineconeService, LocalFileStoreService]
     
-    pinecone_service = None
-    local_filestore_service = None
-
-    def __init__(self, config, sprite_name):
-        super().__init__()
-        self.setup_config(config, sprite_name)
-        
-    def initialize_database(self):
-        match AppBase.index_service.index_database:
-                case 'pinecone_service':
-                    self.pinecone_service.initialize_pinecone()
-                    return self.pinecone_service
-                case 'local_filestore_service':
-                    return self.local_filestore_service
-                case _:
-                    return None
+    def __init__(self, enabled_provider=None, config_path=None):
+        super().__init__(
+            service_name_="database_service",
+            required_variables_=["docs_to_retrieve"],
+            config_path=config_path,
+        )
+        if enabled_provider is None:
+            enabled_provider = AppBase.index_service.index_database
+        self.provider = self.set_provider(enabled_provider=enabled_provider)
+    

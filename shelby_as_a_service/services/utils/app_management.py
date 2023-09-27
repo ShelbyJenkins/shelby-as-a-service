@@ -235,9 +235,7 @@ class AppManager:
         data_domain_config["data_domain_sources"] = data_sources
 
         return data_domain_config
-
-
-        
+    
 
     @staticmethod
     def create_update_env_file(app_name, secrets=None):

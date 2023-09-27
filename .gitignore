@@ -10,3 +10,4 @@ apps/*
 content_aggregator/
 
 gradio_cached_examples
+mendable/

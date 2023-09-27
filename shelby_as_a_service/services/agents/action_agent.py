@@ -5,15 +5,27 @@ import json, yaml, re
 import openai, pinecone, tiktoken
 from models.agent_models import ActionAgentModel
 from services.utils.log_service import Logger
-from models.app_base import AppBase
+from services.utils.app_base import AppBase
 from services.providers.llm_service import LLMService
 # endregion
 
 class ActionAgent(AppBase):
 
+    # ActionAgent
+    action_llm_model: str = 'gpt-4'
+    # QueryAgent
+    
+    ceq_data_domain_constraints_enabled: bool = False
+    
+    # APIAgent
+    # api_agent_select_operation_id_llm_model: str = 'gpt-4'
+    # api_agent_create_function_llm_model: str = 'gpt-4'
+    # api_agent_populate_function_llm_model: str = 'gpt-4'
+    
+    service_name_: str = 'action_agent'
+    
     # Overwrite the AppBase model
-    model_ = ActionAgentModel()
-    required_services_ = [LLMService]
+   
     
     def __init__(self, config, sprite_name):
         """Initialized like any other service from sprites.
@@ -22,7 +34,7 @@ class ActionAgent(AppBase):
         or by setting variables with **kwargs.
         """
         super().__init__()
-        self.setup_config(config, sprite_name)
+        self.setup_instance_config(config, sprite_name)
         self.log = Logger(
             AppBase.app_name,
             "CEQAgent",

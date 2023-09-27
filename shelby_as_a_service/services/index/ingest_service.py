@@ -8,7 +8,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from bs4 import BeautifulSoup
 
 from services.utils.log_service import Logger
-from models.app_base import AppBase
+from services.utils.app_base import AppBase
 from models.service_models import IngestServiceModel
 from services.data_processing.open_api_minifier_service import OpenAPIMinifierService
 from services.data_processing.data_processing_service import CEQTextPreProcessor

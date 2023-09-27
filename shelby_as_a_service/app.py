@@ -1,17 +1,6 @@
 import argparse
 
-from models.app_base import AppBase
-from services.sprites.local_sprite import LocalSprite
-from services.index.index_service import IndexService
-
-
-def create_app(app_name):
-
-    AppBase.app_name = app_name
-    config = AppBase.setup_app_instance()
-    AppBase.sprite = LocalSprite(config)
-    AppBase.index_service = IndexService(config)
-    AppBase.sprite.run_sprite()
+from services.utils.app_base import AppBase
 
 
 def main():
@@ -55,8 +44,8 @@ def main():
         deployment = AppInstance(args.deployment_name)
         deployment.run_sprites()
     else:
-        deployment = create_app(app_name="base")
-
+        AppBase.setup_app_instance('base')
+        AppBase.sprite.run_sprite()
 
 if __name__ == "__main__":
     main()

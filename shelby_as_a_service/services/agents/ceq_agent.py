@@ -3,20 +3,22 @@ import os
 import traceback
 import json, yaml, re
 import openai, pinecone, tiktoken
-from models.app_base import AppBase
+from services.utils.app_base import AppBase
 from services.utils.log_service import Logger
-from models.agent_models import CEQAgentModel
 from services.providers.llm_service import LLMService
-from services.providers.embedding_service import OpenAIEmbeddingService
+from services.providers.embedding_service import EmbeddingService
 from services.providers.database_service import DatabaseService
-from services.agents.action_agent import ActionAgent
 from services.data_processing.data_processing_service import TextProcessing
 
 # endregion
 
 
 class CEQAgent(AppBase):
+    embedding_provider: str = "openai_embedding"
     query_embedding_model: str = "text-embedding-ada-002"
+    llm_provider: str = "openai_llm"
+    main_prompt_llm_model: str = "gpt-4"
+
     data_domain_constraints_enabled: bool = False
     data_domain_constraints_llm_model: str = "gpt-4"
     data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
@@ -28,32 +30,26 @@ class CEQAgent(AppBase):
     docs_max_token_length: int = 1200
     docs_max_total_tokens: int = 3500
     docs_max_used: int = 5
-    main_prompt_llm_model: str = "gpt-4"
     max_response_tokens: int = 300
 
-    def __init__(self, config):
-        config = config.get("services", None).get("ceq_agent", None)
+    def __init__(self, config_path):
         super().__init__(
             service_name_="ceq_agent",
             required_variables_=["docs_to_retrieve"],
-            config=config,
+            config_path=config_path,
         )
 
-        # self.database_service = DatabaseService(config)
-        # self.llm_service = LLMService(config)
-        # self.action_agent = ActionAgent(config)
-        # self.embedding_service = OpenAIEmbeddingService(config)
+        self.database_service = DatabaseService(config_path=self.config_path)
 
-        # # Temporary
-        # self.openai_embedding.set_embedding_model(self.query_embedding_model)
-        # self.embedding_service = self.openai_embedding
+        self.embedding_service = EmbeddingService(
+            enabled_provider=self.embedding_provider,
+            enabled_model=self.query_embedding_model,
+        )
 
-        # self.llm_service.set_llm_model(self.main_prompt_llm_model, self.max_response_tokens)
-
-        # # I think this is long term solution
-        # self.database_service = self.database_service.initialize_database()
-
-        self.data_domains = None
+        self.llm_service = LLMService(
+            enabled_provider=self.llm_provider,
+            enabled_model=self.main_prompt_llm_model,
+        )
 
         self.log = Logger(
             AppBase.app_name,
