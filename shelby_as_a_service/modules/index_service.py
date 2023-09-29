@@ -1,6 +1,5 @@
-from services.utils.app_base import AppBase
+from app import AppBase
 from typing import List, Optional
-from services.utils.app_management import AppManager
 
 class DataSourceService(AppBase):
     
@@ -16,10 +15,10 @@ class DataSourceService(AppBase):
     retrieval_enabled: bool = True
     service_name_="data_source_instance"
 
-    def __init__(self, config):
+    def __init__(self, app: AppBase, data_source_config):
         """ """
-        AppBase.setup_service_from_config(self, config)
-
+        app.config_manager.set_config(self, data_source_config)
+        
 class DataDomainService(AppBase):
     
     data_source_service_ = DataSourceService
@@ -33,39 +32,35 @@ class DataDomainService(AppBase):
     
     service_name_ = "data_domain_instance"
     
-    def __init__(self, config):
+    def __init__(self, app: AppBase, data_domain_config):
         """ """
-        AppBase.setup_service_from_config(self, config)
-        data_domain_sources_config = config.get(
+        self.app = app
+        app.config_manager.set_config(self, data_domain_config)
+        data_domain_sources_config = self.config.get(
             "data_domain_sources", []
         )
         
         data_domain_sources = []
         for data_source_config in data_domain_sources_config or [{}]:
-            data_source_service = DataSourceService(data_source_config)
+            data_source_service = DataSourceService(app, data_source_config)
             data_domain_sources.append(data_source_service)
 
         setattr(self, "data_domain_sources", data_domain_sources)
 
 class IndexService(AppBase):
     
-    index_name: Optional[str] = None
-    index_database: Optional[str] = 'pinecone_service'
+    default_index_database: Optional[str] = 'pinecone_service'
     data_domain_service_ = DataDomainService
     
-    def __init__(self, config_path):
+    def __init__(self, app: AppBase):
         """ """
-        super().__init__(
-            service_name_="index_service",
-            required_variables_=['index_name'],
-            config_path=config_path,
-        )
-        
-        index_data_domains_config = (self.config.get("index_data_domains", []))
+        self.app = app
+        app.config_manager.setup_service_config(self)
+        index_data_domains_config = self.config.get("index_data_domains", [])
 
         index_data_domains = []
         for data_domain_config in index_data_domains_config or [{}]:
-            data_domain_service = DataDomainService(data_domain_config)
+            data_domain_service = DataDomainService(app, data_domain_config)
             index_data_domains.append(data_domain_service)
 
         setattr(self, "index_data_domains", index_data_domains)

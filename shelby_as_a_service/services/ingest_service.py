@@ -7,11 +7,10 @@ from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUr
 from langchain.embeddings import OpenAIEmbeddings
 from bs4 import BeautifulSoup
 
-from services.utils.log_service import Logger
-from services.utils.app_base import AppBase
-from models.service_models import IngestServiceModel
-from services.data_processing.open_api_minifier_service import OpenAPIMinifierService
-from services.data_processing.data_processing_service import CEQTextPreProcessor
+from modules.utils.log_service import Logger
+from shelby_as_a_service.modules.app_base import AppBase
+from modules.data_processing.open_api_minifier_service import OpenAPIMinifierService
+from modules.data_processing.data_processing_service import CEQTextPreProcessor
 
 
 class IngestService(AppBase):

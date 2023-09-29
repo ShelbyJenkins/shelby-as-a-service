@@ -3,22 +3,19 @@ import os
 import traceback
 import json, yaml, re
 import openai, pinecone, tiktoken
-from services.utils.app_base import AppBase
-from services.utils.log_service import Logger
-from services.providers.llm_service import LLMService
-from services.providers.embedding_service import EmbeddingService
-from services.providers.database_service import DatabaseService
-from services.data_processing.data_processing_service import TextProcessing
+from agents.agent_base import AgentBase
+from services.llm_service import LLMService
+from services.embedding_service import EmbeddingService
+from services.database_service import DatabaseService
+from modules.data_processing.data_processing_service import TextProcessing
 
 # endregion
 
 
-class CEQAgent(AppBase):
-    embedding_provider: str = "openai_embedding"
-    query_embedding_model: str = "text-embedding-ada-002"
-    llm_provider: str = "openai_llm"
-    main_prompt_llm_model: str = "gpt-4"
+class CEQAgent(AgentBase):
 
+    agent_name = "ceq_agent"
+    
     data_domain_constraints_enabled: bool = False
     data_domain_constraints_llm_model: str = "gpt-4"
     data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
@@ -30,33 +27,18 @@ class CEQAgent(AppBase):
     docs_max_token_length: int = 1200
     docs_max_total_tokens: int = 3500
     docs_max_used: int = 5
-    max_response_tokens: int = 300
+    
 
-    def __init__(self, config_path):
-        super().__init__(
-            service_name_="ceq_agent",
-            required_variables_=["docs_to_retrieve"],
-            config_path=config_path,
-        )
+    def __init__(self, parent_sprite=None):
+        super().__init__(parent_sprite=parent_sprite)
+        AgentBase.config_manager.setup_service_config(self)
+   
 
-        self.database_service = DatabaseService(config_path=self.config_path)
+        self.llm_service = LLMService(self)
+        
+        self.embedding_service = EmbeddingService(self)
 
-        self.embedding_service = EmbeddingService(
-            enabled_provider=self.embedding_provider,
-            enabled_model=self.query_embedding_model,
-        )
-
-        self.llm_service = LLMService(
-            enabled_provider=self.llm_provider,
-            enabled_model=self.main_prompt_llm_model,
-        )
-
-        self.log = Logger(
-            AppBase.app_name,
-            "CEQAgent",
-            "ceq_agent.md",
-            level="INFO",
-        )
+        self.database_service = DatabaseService(self)
 
     def doc_handling(self, returned_documents):
         if not returned_documents:
@@ -318,7 +300,7 @@ class CEQAgent(AppBase):
             prompt = self.ceq_main_prompt_template(query, prepared_documents)
 
         self.log.print_and_log("Sending prompt to LLM")
-        llm_response = self.llm_service.create(prompt)
+        llm_response = self.llm_service.create_chat(prompt)
 
         parsed_response = self.ceq_append_meta(llm_response, prepared_documents)
         self.log.print_and_log(

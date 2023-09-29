@@ -5,7 +5,7 @@ import json, yaml, re
 import openai, pinecone, tiktoken
 from models.agent_models import ActionAgentModel
 from services.utils.log_service import Logger
-from services.utils.app_base import AppBase
+from utils.app_base import AppBase
 from services.providers.llm_service import LLMService
 # endregion
 

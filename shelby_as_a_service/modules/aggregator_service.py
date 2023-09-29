@@ -89,9 +89,9 @@ class Aggregator:
     def calculate_cost(self):
         prompt_cost = 0.03 * (self.total_prompt_tokens / 1000)
         completion_cost = 0.06 * (self.total_completion_tokens / 1000)
-        total_cost = prompt_cost + completion_cost
-        # total_cost = math.ceil(total_cost * 100) / 100
-        return total_cost
+        total_cost_ = prompt_cost + completion_cost
+        # total_cost_ = math.ceil(total_cost_ * 100) / 100
+        return total_cost_
 
     @staticmethod
     def split_with_regex(text):

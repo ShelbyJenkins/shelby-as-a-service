@@ -1,12 +1,15 @@
 from typing import List
 import pinecone
-from services.utils.app_base import AppBase
+from services.service_base import ServiceBase
 
          
-class PineconeService(AppBase):
+class PineconeDatabase(ServiceBase):
+    
+    provider_name: str = "pinecone_service"
+    model_type: str = "openai_llm_model"
+    required_secrets=["pinecone_api_key"]
     
     index_env: str = 'us-central1-gcp'
-    
     embedding_max_chunk_size: int = 8191
     embedding_batch_size: int = 100
     vectorstore_dimension: int = 1536
@@ -17,7 +20,6 @@ class PineconeService(AppBase):
     #  text_splitter_goal_length: int = 500
     text_splitter_goal_length: int = 750
     text_splitter_overlap_percent: int = 15  # In percent
-    
     indexed_metadata = [
         'data_domain_name',
         'data_source_name',
@@ -25,20 +27,16 @@ class PineconeService(AppBase):
         'target_type',
         'date_indexed',
     ]
-    
-    def __init__(self, config_path=None):
-        super().__init__(
-            service_name_="pinecone_service",
-            required_variables_=["docs_to_retrieve"],
-            required_secrets_=["pinecone_api_key"],
-            config_path=config_path,
-        )
+
+    def __init__(self, parent_service):
+        super().__init__(parent_service=parent_service)
+        ServiceBase.config_manager.setup_service_config(self)
         
         pinecone.init(
-            api_key=self.secrets["pinecone_api_key"],
+            api_key=self.app.secrets["pinecone_api_key"],
             environment=self.index_env,
         )
-        self.pinecone_index = pinecone.Index(self.index_service.index_name)
+        self.pinecone_index = pinecone.Index(self.index.index_name)
         
     def delete_pinecone_index(self):
         print(f"Deleting index {self.index_name}")
@@ -163,28 +161,27 @@ class PineconeService(AppBase):
 
         return returned_documents
     
-class LocalFileStoreService(AppBase):
-    
-    
-    def __init__(self, config_path):
-        super().__init__(
-            service_name_="local_filestore_service",
-            required_variables_=["docs_to_retrieve"],
-            config_path=config_path,
-        )
+class LocalFileStoreDatabase(ServiceBase):
+    provider_name: str = "local_filestore_database"
+
+    def __init__(self, parent_service):
+        super().__init__(parent_service=parent_service)
+        ServiceBase.config_manager.setup_service_config(self)
+
         
-class DatabaseService(AppBase):
-    
-    default_provider: str = "pinecone_service"
-    available_providers = [PineconeService, LocalFileStoreService]
-    
-    def __init__(self, enabled_provider=None, config_path=None):
-        super().__init__(
-            service_name_="database_service",
-            required_variables_=["docs_to_retrieve"],
-            config_path=config_path,
-        )
-        if enabled_provider is None:
-            enabled_provider = AppBase.index_service.index_database
-        self.provider = self.set_provider(enabled_provider=enabled_provider)
+class DatabaseService(ServiceBase):
+    service_name: str = "database_service"
+    provider_type: str = "database_provider"
+    available_providers: List[str] = ["pinecone_database", "local_filestore_database"]
+
+    default_provider: str = "pinecone_database"
+    max_response_tokens: int = 300
+
+    def __init__(self, parent_agent=None):
+        super().__init__(parent_agent=parent_agent)
+        ServiceBase.config_manager.setup_service_config(self)
+
+        self.pinecone_database = PineconeDatabase(self)
+        self.pinecone_database = LocalFileStoreDatabase(self)
+
     
