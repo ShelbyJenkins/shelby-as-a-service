@@ -14,23 +14,25 @@ class OpenAIEmbedding(ServiceBase):
         cost_per_k: float
 
     provider_name: str = "openai_embedding"
-    model_type: str = "openai_embedding_model"
-    available_models = [OpenAIEmbeddingModel("text-embedding-ada-002", 8192, 0.0001)]
-    required_secrets = ["openai_api_key"]
-    
+    type_model: str = "openai_embedding_model"
+    available_models: List[OpenAIEmbeddingModel] = [
+        OpenAIEmbeddingModel("text-embedding-ada-002", 8192, 0.0001)
+    ]
+    required_secrets: List[str] = ["openai_api_key"]
+
     default_model: str = "text-embedding-ada-002"
     openai_timeout_seconds: float = 180.0
 
     def __init__(self, parent_service):
         super().__init__(parent_service=parent_service)
-        ServiceBase.config_manager.setup_service_config(self)
+        self.app.config_manager.setup_service_config(self)
 
-    def _get_query_embedding_from_provider(self, query, model_name=None):
-        model = self.get_model(self.model_type, model_name=model_name)
+    def _get_query_embedding(self, query, model_name=None):
+        model = self.get_model(self.type_model, model_name=model_name)
 
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
-            openai_api_key=self.secrets["openai_api_key"],
+            openai_api_key=self.app.secrets["openai_api_key"],
             model=model.model_name,
             request_timeout=self.openai_timeout_seconds,
         )
@@ -40,7 +42,6 @@ class OpenAIEmbedding(ServiceBase):
 
     def calculate_cost(self, query, model):
         token_count = TextProcessing.tiktoken_len(query, model.model_name)
-        self.calculate_cost(token_count)
 
         # Convert numbers to Decimal
         cost_per_k_decimal = Decimal(model.cost_per_k)
@@ -53,11 +54,11 @@ class OpenAIEmbedding(ServiceBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
         # Ensure total_cost_ is a Decimal as well; if it's not already, convert it
-        if not isinstance(self.total_cost_, Decimal):
-            self.total_cost_ = Decimal(self.total_cost_)
+        if not isinstance(self.app.total_cost, Decimal):
+            self.app.total_cost = Decimal(self.app.total_cost)
 
-        self.total_cost_ += request_cost
-        print(f"Total cost: ${format(self.total_cost_, 'f')}")
+        self.app.total_cost += request_cost
+        print(f"Total cost: ${format(self.app.total_cost, 'f')}")
 
 
 class EmbeddingService(ServiceBase):
@@ -68,9 +69,9 @@ class EmbeddingService(ServiceBase):
 
     def __init__(self, parent_agent=None):
         super().__init__(parent_agent=parent_agent)
-        ServiceBase.config_manager.setup_service_config(self)
+        self.app.config_manager.setup_service_config(self)
 
-        self.openai_llm = OpenAIEmbedding(self)
+        self.openai_embedding = OpenAIEmbedding(self)
 
     def get_query_embedding(self, query, provider_name=None, model_name=None):
         provider = self.get_provider(self.provider_type, provider_name=provider_name)

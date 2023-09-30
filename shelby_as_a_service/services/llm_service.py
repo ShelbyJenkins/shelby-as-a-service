@@ -1,6 +1,6 @@
 from decimal import Decimal
 from dataclasses import dataclass
-from typing import List
+from typing import List, Any
 import openai
 from services.service_base import ServiceBase
 
@@ -13,23 +13,29 @@ class OpenAILLM(ServiceBase):
         cost_per_k: float
 
     provider_name: str = "openai_llm"
-    model_type: str = "openai_llm_model"
-    available_models = [
+    ui_model_names: List[str] = [
+        "gpt-4",
+        "gpt-4-32k",
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k",
+    ]
+
+    type_model: str = "openai_llm_model"
+    available_models: List[OpenAILLMModel] = [
         OpenAILLMModel("gpt-4", 8192, 0.06),
         OpenAILLMModel("gpt-4-32k", 32768, 0.06),
         OpenAILLMModel("gpt-3.5-turbo", 4096, 0.03),
         OpenAILLMModel("gpt-3.5-turbo-16k", 16384, 0.03),
     ]
-    required_secrets = ["openai_api_key"]
-    
+    required_secrets: List[str] = ["openai_api_key"]
+
     default_model: str = "gpt-3.5-turbo"
     openai_timeout_seconds: float = 180.0
-    max_response_tokens = 300
+    max_response_tokens: int = 300
 
     def __init__(self, parent_service):
         super().__init__(parent_service=parent_service)
-        ServiceBase.config_manager.setup_service_config(self)
-        
+        self.app.config_manager.setup_service_config(self)
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
@@ -68,7 +74,7 @@ class OpenAILLM(ServiceBase):
         print(f"Total cost: ${format(self.total_cost_, 'f')}")
 
     def _create_chat(self, prompt, model_name=None):
-        model = self.get_model(self.model_type, model_name=model_name)
+        model = self.get_model(self.type_model, model_name=model_name)
 
         response = openai.ChatCompletion.create(
             api_key=self.app.secrets["openai_api_key"],
@@ -83,9 +89,8 @@ class OpenAILLM(ServiceBase):
         return prompt_response
 
     def _create_streaming_chat(self, prompt, model_name=None):
-        model = self.get_model(self.model_type, model_name=model_name)
+        model = self.get_model(self.type_model, model_name=model_name)
 
-        partial_message = [[prompt[1]['content'], 'test']]
         stream = openai.ChatCompletion.create(
             api_key=self.app.secrets["openai_api_key"],
             model=model.model_name,
@@ -97,8 +102,11 @@ class OpenAILLM(ServiceBase):
         # partial_message[-1][1] = ""
         partial_message = ""
         for chunk in stream:
-            if len(chunk["choices"][0]["delta"]["content"]) != 0:
-                partial_message += chunk["choices"][0]["delta"]["content"]
+            delta_content = (
+                chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+            )
+            if len(delta_content) != 0:
+                partial_message += delta_content
                 yield partial_message
 
 
@@ -106,13 +114,14 @@ class LLMService(ServiceBase):
     service_name: str = "llm_service"
     provider_type: str = "llm_provider"
     available_providers: List[str] = ["openai_llm"]
+    ui_provider_names: List[Any] = [OpenAILLM.provider_name]
 
     default_provider: str = "openai_llm"
     max_response_tokens: int = 300
 
-    def __init__(self, parent_agent=None):
+    def __init__(self, parent_agent):
         super().__init__(parent_agent=parent_agent)
-        ServiceBase.config_manager.setup_service_config(self)
+        self.app.config_manager.setup_service_config(self)
 
         self.openai_llm = OpenAILLM(self)
 

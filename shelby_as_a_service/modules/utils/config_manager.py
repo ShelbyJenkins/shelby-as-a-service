@@ -2,48 +2,54 @@ import os
 import json
 from dataclasses import is_dataclass
 from dotenv import load_dotenv
-from app import AppBase
 
 
-            
+app_config_path: str = "app_instance"
+index_config_path: str = "index"
+sprite_config_path: str = "services"  # Change to sprites
+agent_config_path: str = "services"  # Change to agents
+service_config_path: str = "services"  # Change to services
+provider_config_path: str = "services"  # Change to providers
+
+
 def setup_service_config(instance):
     config_path = get_config_path(instance)
     config = get_config(instance, config_path)
     set_config(instance, config)
     set_secrets(instance)
-        
+
 
 def get_config_path(instance):
     """Builds path to the service settings in the config file"""
-    
-    base_path = [AppBase.app_config_path]
-    
+
+    base_path = [app_config_path]
+
     if instance.__class__.__name__ == "IndexService":
-        base_path.append(AppBase.index_config_path)
+        base_path.append(index_config_path)
         return base_path
-        
-    base_path.append(AppBase.sprite_config_path)
-    if (sprite_name := getattr(instance, "sprite_name", None)):
+
+    base_path.append(sprite_config_path)
+    if sprite_name := getattr(instance, "sprite_name", None):
         base_path.append(sprite_name)
         return base_path
-    
-    base_path.extend([instance.parent_sprite.sprite_name, AppBase.agent_config_path])
-    if (agent_name := getattr(instance, "agent_name", None)):
+
+    base_path.extend([instance.parent_sprite.sprite_name, agent_config_path])
+    if agent_name := getattr(instance, "agent_name", None):
         base_path.append(agent_name)
         return base_path
-    
-    base_path.extend([instance.parent_agent.agent_name, AppBase.service_config_path])
-    if (service_name := getattr(instance, "service_name", None)):
+
+    base_path.extend([instance.parent_agent.agent_name, service_config_path])
+    if service_name := getattr(instance, "service_name", None):
         base_path.append(service_name)
         return base_path
-    
-    base_path.extend([instance.parent_service.service_name, AppBase.provider_config_path])
-    if (provider_name := getattr(instance, "provider_name", None)):
+
+    base_path.extend([instance.parent_service.service_name, provider_config_path])
+    if provider_name := getattr(instance, "provider_name", None):
         base_path.append(provider_name)
         return base_path
-    
+
     return None
-    
+
 
 def get_config(instance, config_path):
     # Create a copy of the base config, and path to the config
@@ -53,8 +59,9 @@ def get_config(instance, config_path):
         if config is None:
             config = None
             break
-        
+
     return config
+
 
 def set_config(instance, config):
     # from_file overwrites class vars from file
@@ -69,8 +76,9 @@ def set_config(instance, config):
             setattr(instance, key, value)
         else:
             config.pop(key)
-    
+
     instance.config = config
+
 
 def set_secrets(instance):
     if hasattr(instance, "required_secrets") and instance.required_secrets:
@@ -80,7 +88,6 @@ def set_secrets(instance):
 
             instance.app.secrets[secret] = env_secret
             instance.app.required_secrets.append(secret)
-
 
 
 def update_app_json_from_file(app_instance, app_name, update_class_instance=None):
@@ -104,7 +111,10 @@ def update_app_json_from_file(app_instance, app_name, update_class_instance=None
     )
 
     app_instance_config = _load_services(
-        app_name, app_instance_config, app_instance.required_services_, update_class_instance
+        app_name,
+        app_instance_config,
+        app_instance.required_services_,
+        update_class_instance,
     )
 
     app_config_file["app_instance"] = app_instance_config
@@ -116,6 +126,7 @@ def update_app_json_from_file(app_instance, app_name, update_class_instance=None
         encoding="utf-8",
     ) as file:
         json.dump(app_config_file, file, ensure_ascii=False, indent=4)
+
 
 def _load_services(app_name, config, required_services, update_class_instance):
     # App instance services
@@ -140,13 +151,16 @@ def _load_services(app_name, config, required_services, update_class_instance):
             specific_service_config = load_file_variables_as_dicts(
                 service_model, specific_service_config, update_class_instance
             )
-            if specific_service_config.get('index_name', None) is None:
-                specific_service_config['index_name'] = f"{app_name}_index"
+            if specific_service_config.get("index_name", None) is None:
+                specific_service_config["index_name"] = f"{app_name}_index"
 
             specific_service_config = load_data_domains_as_dicts(
-                app_name, required_service, specific_service_config, update_class_instance
+                app_name,
+                required_service,
+                specific_service_config,
+                update_class_instance,
             )
-            
+
         else:
             specific_service_config = load_file_variables_as_dicts(
                 service_model, specific_service_config, update_class_instance
@@ -168,6 +182,7 @@ def _load_services(app_name, config, required_services, update_class_instance):
 
     return config
 
+
 def load_file_variables_as_dicts(model_class, config, update_class_instance=None):
     """Loads variables and values from models and existing app_config.py.
     Adds variables from models if they don't exist in app_config.py.
@@ -182,33 +197,28 @@ def load_file_variables_as_dicts(model_class, config, update_class_instance=None
 
     if update_class_instance_name == model_class.service_name_:
         for var, val in vars(update_class_instance).items():
-            if check_for_ignored_objects(
-                var
-            ) and check_for_ignored_objects(val):
+            if check_for_ignored_objects(var) and check_for_ignored_objects(val):
                 if val not in [None, ""]:
                     config[var] = val
                 else:
                     continue
     else:
         for var, val in vars(model_class).items():
-            if check_for_ignored_objects(
-                var
-            ) and check_for_ignored_objects(val):
+            if check_for_ignored_objects(var) and check_for_ignored_objects(val):
                 if config.get(var) in [None, ""]:
                     config[var] = val
                 else:
                     continue
 
     return config
- 
+
+
 def load_data_domains_as_dicts(
     app_name, index_service, index_config, update_class_instance=None
 ):
-
     data_domain_service = index_service.data_domain_service_
     data_domain_model = data_domain_service.model_
 
-    
     index_data_domains_config = index_config.get("index_data_domains", [])
     index_data_domains = []
     for data_domain_config in index_data_domains_config or [{}]:
@@ -221,25 +231,28 @@ def load_data_domains_as_dicts(
         data_domain_config = load_file_variables_as_dicts(
             data_domain_model, data_domain_config, update_class_instance
         )
-        
+
         data_domain_config = load_data_sources_as_dicts(
-            app_name, data_domain_service, data_domain_config, update_class_instance=None)
-        
+            app_name,
+            data_domain_service,
+            data_domain_config,
+            update_class_instance=None,
+        )
+
         index_data_domains.append(data_domain_config)
-        
+
     index_config["index_data_domains"] = index_data_domains
-    
+
     return index_config
 
+
 def load_data_sources_as_dicts(
-    app_name, data_domain_service, data_domain_config, update_class_instance=None):
-    
+    app_name, data_domain_service, data_domain_config, update_class_instance=None
+):
     data_source_service = data_domain_service.data_source_service_
     data_source_model = data_source_service.model_
-    
-    data_sources_config = data_domain_config.get(
-        "data_domain_sources", []
-    )
+
+    data_sources_config = data_domain_config.get("data_domain_sources", [])
     data_sources = []
     for data_source_config in data_sources_config or [{}]:
         data_source_config = _load_services(
@@ -252,10 +265,11 @@ def load_data_sources_as_dicts(
             data_source_model, data_source_config, update_class_instance
         )
         data_sources.append(data_source_config)
-        
+
     data_domain_config["data_domain_sources"] = data_sources
 
     return data_domain_config
+
 
 def check_for_ignored_objects(variable):
     def has_parent_class_named(obj, class_name):

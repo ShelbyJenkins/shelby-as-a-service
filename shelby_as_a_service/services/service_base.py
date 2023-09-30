@@ -1,10 +1,12 @@
 from typing import Dict, Optional, List
-from app import AppBase
+from pydantic import BaseModel
 
 
-class ServiceBase(AppBase):
+class ServiceBase:
     embedding_provider: str = "openai_embedding"
     query_embedding_model: str = "text-embedding-ada-002"
+    config: Dict[str, str] = {}
+    default_provider: Optional[str] = None
 
     def __init__(self, parent_agent=None, parent_service=None):
         if parent_agent:
@@ -37,14 +39,14 @@ class ServiceBase(AppBase):
         # Then the default
         return getattr(self, self.default_provider, None)
 
-    def get_model(self, model_type, model_name=None):
+    def get_model(self, type_model, model_name=None):
         """Returns an instance of a model
         First tries the requested model,
         Then tries the parent_agent's,
         Then uses default"""
         # Tries the requested model
+        available_models = getattr(self, "available_models", [])
         if model_name:
-            available_models = getattr(self, "available_models", [])
             model_instance = next(
                 (model for model in available_models if model.model_name == model_name),
                 None,
@@ -52,8 +54,16 @@ class ServiceBase(AppBase):
             if model_instance:
                 return model_instance
         # Then the parent's agent
-        if model := getattr(self.parent_agent, model_type, None):
+        if model := getattr(self.parent_agent, type_model, None):
             if model_instance := getattr(self, model, None):
                 return model_instance
         # Then the default
-        return getattr(self, self.default_model, None)
+
+        return next(
+            (
+                model
+                for model in available_models
+                if model.model_name == self.default_model
+            ),
+            None,
+        )

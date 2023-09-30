@@ -2,42 +2,41 @@ from typing import List
 import pinecone
 from services.service_base import ServiceBase
 
-         
+
 class PineconeDatabase(ServiceBase):
-    
     provider_name: str = "pinecone_service"
-    model_type: str = "openai_llm_model"
-    required_secrets=["pinecone_api_key"]
-    
-    index_env: str = 'us-central1-gcp'
+
+    required_secrets: List[str] = ["pinecone_api_key"]
+
+    index_env: str = "us-central1-gcp"
     embedding_max_chunk_size: int = 8191
     embedding_batch_size: int = 100
     vectorstore_dimension: int = 1536
     vectorstore_upsert_batch_size: int = 20
-    vectorstore_metric: str = 'cosine'
-    vectorstore_pod_type: str = 'p1'
+    vectorstore_metric: str = "cosine"
+    vectorstore_pod_type: str = "p1"
     preprocessor_min_length: int = 150
     #  text_splitter_goal_length: int = 500
     text_splitter_goal_length: int = 750
     text_splitter_overlap_percent: int = 15  # In percent
-    indexed_metadata = [
-        'data_domain_name',
-        'data_source_name',
-        'doc_type',
-        'target_type',
-        'date_indexed',
+    indexed_metadata: List[str] = [
+        "data_domain_name",
+        "data_source_name",
+        "doc_type",
+        "target_type",
+        "date_indexed",
     ]
 
     def __init__(self, parent_service):
         super().__init__(parent_service=parent_service)
-        ServiceBase.config_manager.setup_service_config(self)
-        
+        self.app.config_manager.setup_service_config(self)
+
         pinecone.init(
             api_key=self.app.secrets["pinecone_api_key"],
             environment=self.index_env,
         )
         self.pinecone_index = pinecone.Index(self.index.index_name)
-        
+
     def delete_pinecone_index(self):
         print(f"Deleting index {self.index_name}")
         stats = self.vectorstore.describe_index_stats()
@@ -54,9 +53,7 @@ class PineconeDatabase(ServiceBase):
         print(self.vectorstore.describe_index_stats())
 
     def clear_pinecone_deployment(self):
-        print(
-            f"Clearing namespace aka deployment: {self.deployment_name}"
-        )
+        print(f"Clearing namespace aka deployment: {self.deployment_name}")
         self.vectorstore.delete(deleteAll="true", namespace=self.deployment_name)
         print(self.vectorstore.describe_index_stats())
 
@@ -88,8 +85,8 @@ class PineconeDatabase(ServiceBase):
             pod_type=self.config.index_vectorstore_pod_type,
             metadata_config=metadata_config,
         )
-    
-    def query_index(self, dense_embedding, docs_to_retrieve, data_domain_name=None):
+
+    def _query_index(self, dense_embedding, docs_to_retrieve, data_domain_name=None):
         # def query_vectorstore(self, dense_embedding, sparse_embedding, data_domain_name=None):
 
         # if data_domain_name is None:
@@ -116,15 +113,13 @@ class PineconeDatabase(ServiceBase):
         #         "doc_type": {"$eq": "hard"},
         #         "data_domain_name": {"$eq": data_domain_name},
         #     }
-        
 
         soft_query_response = self.pinecone_index.query(
             top_k=docs_to_retrieve,
             include_values=False,
-            namespace='tatum',
+            namespace="personal",
             include_metadata=True,
-            vector=dense_embedding
-
+            vector=dense_embedding,
         )
         # hard_query_response = self.pinecone_index.query(
         #     top_k=docs_to_retrieve,
@@ -160,15 +155,16 @@ class PineconeDatabase(ServiceBase):
         #     returned_documents.append(response)
 
         return returned_documents
-    
+
+
 class LocalFileStoreDatabase(ServiceBase):
     provider_name: str = "local_filestore_database"
 
     def __init__(self, parent_service):
         super().__init__(parent_service=parent_service)
-        ServiceBase.config_manager.setup_service_config(self)
+        self.app.config_manager.setup_service_config(self)
 
-        
+
 class DatabaseService(ServiceBase):
     service_name: str = "database_service"
     provider_type: str = "database_provider"
@@ -179,9 +175,12 @@ class DatabaseService(ServiceBase):
 
     def __init__(self, parent_agent=None):
         super().__init__(parent_agent=parent_agent)
-        ServiceBase.config_manager.setup_service_config(self)
+        self.app.config_manager.setup_service_config(self)
 
         self.pinecone_database = PineconeDatabase(self)
-        self.pinecone_database = LocalFileStoreDatabase(self)
+        self.local_filestore_database = LocalFileStoreDatabase(self)
 
-    
+    def query_index(self, search_terms, docs_to_retrieve=None, data_domain_name=None):
+        provider = self.get_provider(self.provider_type)
+
+        return provider._query_index(search_terms, docs_to_retrieve, data_domain_name)

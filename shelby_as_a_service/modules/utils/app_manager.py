@@ -2,7 +2,46 @@ import os
 import json
 
 
-@staticmethod
+def initialize_app_config(app):
+    app_name = app.app_name
+
+    existing_app_names = check_for_existing_apps()
+
+    if app.app_name not in existing_app_names:
+        if "base" == app.app_name:
+            create_app("base")
+            existing_app_names = check_for_existing_apps()
+        else:
+            # Need to return here with error
+            print(f"app {app.app_name} not found.")
+
+    if "base" == app.app_name:
+        app.config_manager.update_app_json_from_file(app, "base")
+        # In the case of local app we check for a default_local_app
+        app_config = load_app_file(app.app_name)
+        default_settings = (
+            app_config.get("sprites", {}).get("web_sprite", {}).get("optional", {})
+        )
+        if default_settings.get("default_app_enabled") is True:
+            default_local_app_name = default_settings.get(
+                "default_local_app_name", None
+            )
+            if (
+                default_local_app_name is not None
+                and default_local_app_name in existing_app_names
+            ):
+                app_name = default_local_app_name
+            else:
+                print(
+                    f"Default app '{default_local_app_name}' not found. Loading 'base' instead."
+                )
+
+    if app_name != "base":
+        app.config_manager.update_app_json_from_file(app, app_name)
+
+    return app_name
+
+
 def load_app_file(app_name):
     try:
         with open(
@@ -17,7 +56,7 @@ def load_app_file(app_name):
 
     return config_from_file
 
-@staticmethod
+
 def check_for_existing_apps():
     existing_app_names = []
     for app in os.listdir("apps"):
@@ -28,7 +67,7 @@ def check_for_existing_apps():
 
     return existing_app_names
 
-@staticmethod
+
 def create_app(app_name):
     """Creates a new app by copying from the template folder.
     Does not overwrite existing apps.
@@ -47,15 +86,13 @@ def create_app(app_name):
         with open(app_config_dest_path, "w", encoding="utf-8") as file:
             file.write("{}")
 
-    AppManager.create_update_env_file(app_name)
+    create_update_env_file(app_name)
 
-@staticmethod
+
 def create_update_env_file(app_name, secrets=None):
     dir_path = f"apps/{app_name}"
     dot_env_dest_path = os.path.join(dir_path, ".env")
-    dot_env_source_path = (
-        "shelby_as_a_service/models/deployments/template/template.env"
-    )
+    dot_env_source_path = "shelby_as_a_service/models/deployments/template/template.env"
 
     # Helper function to read env file into a dictionary
     def read_env_to_dict(filepath):

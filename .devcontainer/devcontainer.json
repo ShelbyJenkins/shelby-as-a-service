@@ -8,9 +8,10 @@
     "customizations": {
 		"vscode": {
 			"extensions": [
-				"genieai.chatgpt-vscode",
-				"ms-python.python",
-				"github.vscode-pull-request-github"
+				"ms-python.black-formatter",
+				"gitHub.codespaces",
+				"ms-python.mypy-type-checker",
+				"ms-python.python"
 			]
 		}
 	} 

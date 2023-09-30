@@ -7,6 +7,21 @@ from importlib import import_module
 from inspect import isclass
 import json
 
+# @dataclass
+# class ContainerDeploymentModel:
+    
+#     required_variables_ = ['docker_registry', 'docker_username', 'docker_repo']
+#     required_secrets_ = [
+#         'docker_token',
+#         'stackpath_stack_slug',
+#         'stackpath_client_id',
+#         'stackpath_api_client_secret',
+#     ]
+
+#     docker_registry: Optional[str] = None
+#     docker_username: Optional[str] = None
+#     docker_repo: Optional[str] = None
+
 class DeploymentManager:
     def __init__(self):
         pass

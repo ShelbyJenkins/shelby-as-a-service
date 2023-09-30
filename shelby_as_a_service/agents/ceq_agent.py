@@ -3,6 +3,8 @@ import os
 import traceback
 import json, yaml, re
 import openai, pinecone, tiktoken
+from typing import Dict, Optional, List, Any
+
 from agents.agent_base import AgentBase
 from services.llm_service import LLMService
 from services.embedding_service import EmbeddingService
@@ -13,9 +15,11 @@ from modules.data_processing.data_processing_service import TextProcessing
 
 
 class CEQAgent(AgentBase):
-
-    agent_name = "ceq_agent"
-    
+    agent_name: str = "ceq_agent"
+    app: Optional[Any] = None
+    index: Optional[Any] = None
+    llm_provider: str = "openai_llm"
+    llm_model: str = "gpt-4"
     data_domain_constraints_enabled: bool = False
     data_domain_constraints_llm_model: str = "gpt-4"
     data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
@@ -27,15 +31,13 @@ class CEQAgent(AgentBase):
     docs_max_token_length: int = 1200
     docs_max_total_tokens: int = 3500
     docs_max_used: int = 5
-    
 
     def __init__(self, parent_sprite=None):
         super().__init__(parent_sprite=parent_sprite)
-        AgentBase.config_manager.setup_service_config(self)
-   
+        self.app.config_manager.setup_service_config(self)
 
         self.llm_service = LLMService(self)
-        
+
         self.embedding_service = EmbeddingService(self)
 
         self.database_service = DatabaseService(self)
@@ -186,7 +188,7 @@ class CEQAgent(AgentBase):
     def ceq_main_prompt_template(self, query, documents=None):
         with open(
             os.path.join(
-                "shelby_as_a_service/models/prompt_templates/", "ceq_main_prompt.yaml"
+                "shelby_as_a_service/modules/prompt_templates/", "ceq_main_prompt.yaml"
             ),
             "r",
             encoding="utf-8",
@@ -268,7 +270,9 @@ class CEQAgent(AgentBase):
 
         return answer_obj
 
-    def run_context_enriched_query(self, query):
+    def run_context_enriched_query(
+        self, query, stream=False, provider_name=None, model_name=None
+    ):
         # try:
         data_domain_name = None
         if self.data_domain_constraints_enabled:
@@ -283,13 +287,15 @@ class CEQAgent(AgentBase):
             self.log.print_and_log(
                 f"ceq_keyword_generator response: {generated_keywords}"
             )
-            search_tems = self.embedding_service.get_query_embedding(generated_keywords)
+            search_terms = self.embedding_service.get_query_embedding(
+                generated_keywords
+            )
         else:
-            search_tems = self.embedding_service.get_query_embedding(query)
+            search_terms = self.embedding_service.get_query_embedding(query)
         self.log.print_and_log("Embeddings retrieved")
 
         returned_documents = self.database_service.query_index(
-            search_tems, self.docs_to_retrieve, data_domain_name
+            search_terms, self.docs_to_retrieve, data_domain_name
         )
 
         prepared_documents = self.doc_handling(returned_documents)
@@ -300,14 +306,28 @@ class CEQAgent(AgentBase):
             prompt = self.ceq_main_prompt_template(query, prepared_documents)
 
         self.log.print_and_log("Sending prompt to LLM")
-        llm_response = self.llm_service.create_chat(prompt)
+        if stream:
+            yield from self.llm_service.create_streaming_chat(
+                prompt,
+                provider_name=provider_name
+                if provider_name is not None
+                else self.llm_provider,
+                model_name=model_name if model_name is not None else self.llm_model,
+            )
+        else:
+            llm_response = self.llm_service.create_chat(
+                prompt,
+                provider_name=provider_name
+                if provider_name is not None
+                else self.llm_provider,
+                model_name=model_name if model_name is not None else self.llm_model,
+            )
+            parsed_response = self.ceq_append_meta(llm_response, prepared_documents)
+            self.log.print_and_log(
+                f"LLM response with appended metadata: {json.dumps(parsed_response, indent=4)}"
+            )
 
-        parsed_response = self.ceq_append_meta(llm_response, prepared_documents)
-        self.log.print_and_log(
-            f"LLM response with appended metadata: {json.dumps(parsed_response, indent=4)}"
-        )
-
-        return parsed_response
+            return parsed_response
 
         # except Exception as error:
         #     # Logs error and sends error to sprite

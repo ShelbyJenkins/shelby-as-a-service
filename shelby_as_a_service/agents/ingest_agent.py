@@ -14,30 +14,29 @@ from modules.data_processing.data_processing_service import CEQTextPreProcessor
 
 
 class IngestService(AppBase):
-    
     model_ = IngestServiceModel()
     required_services_ = []
-    
+
     def __init__(self):
         super().__init__()
-        
+
         # self.deployment_name = deployment_instance.deployment_name
         # self.deployment = deployment_instance
         # self.config = service_model
         # self.index_env = self.config.index_env
         # self.index_name = self.config.index_name
-        
+
         # self.log = Logger(
         #     self.deployment_name,
         #     f"{self.deployment_name}_index_agent",
         #     f"{self.deployment_name}_index_agent.md",
         #     level="INFO",
         # )
-        
+
         # self.secrets = deployment_instance.secrets
         # if not self.deployment.check_secrets(IngestServiceModel.secrets_):
-        #     return 
-        
+        #     return
+
         # self.prompt_template_path = "shelby_as_a_service/prompt_templates"
         # self.index_dir = f"deployments/{self.deployment_name}/index"
         # # Loads data sources from file
@@ -240,7 +239,6 @@ class IngestService(AppBase):
         )
 
 
-
 class DataSourceConfig:
     ### DataSourceConfig loads all configs for all datasources ###
 
@@ -329,7 +327,7 @@ class DataSourceConfig:
             case "open_api_spec":
                 self.scraper = OpenAPILoader(self)
                 self.content_type = "open_api_spec"
-                
+
             case "local_text":
                 self.scraper = LoadTextFromFile(self)
                 self.content_type = "text"
@@ -417,7 +415,6 @@ class OpenAPILoader:
         return open_api_specs
 
 
-
 class LoadTextFromFile:
     def __init__(self, data_source_config):
         self.config = data_source_config
@@ -436,7 +433,7 @@ class LoadTextFromFile:
     #             # Uncomment the line below if you wish to log unsupported file formats
     #             # self.data_source_config.index_agent.log_agent.print_and_log(f"Unsupported file format: {filename}")
     #             continue
-            
+
     #         file_path = os.path.join(self.data_source_config.target_url, filename)
     #         title = os.path.splitext(filename)[0]
     #         with open(file_path, "r", encoding="utf-8") as file:
@@ -450,9 +447,6 @@ class LoadTextFromFile:
 
     #     return text_documents
 
-
-
-
     def load_texts(self):
         """Load text and JSON files and structure them in the desired format."""
         text_documents = []
@@ -460,7 +454,7 @@ class LoadTextFromFile:
 
         for filename in os.listdir(self.data_source_config.target_url):
             file_extension = os.path.splitext(filename)[1]
-            
+
             if file_extension not in allowed_extensions:
                 # Uncomment the line below if you wish to log unsupported file formats
                 # self.data_source_config.index_agent.log_agent.print_and_log(f"Unsupported file format: {filename}")
@@ -476,22 +470,23 @@ class LoadTextFromFile:
                     document_metadata = {
                         "loc": file_path,
                         "source": file_path,
-                        "title": title
+                        "title": title,
                     }
-                    document = Document(page_content=content, metadata=document_metadata)
+                    document = Document(
+                        page_content=content, metadata=document_metadata
+                    )
                 elif file_extension == ".json":
                     content = json.load(file)  # Now content is a dictionary
-                    
+
                     # You might want to adapt the following based on how you wish to represent JSON content
                     document_metadata = {
                         "loc": file_path,
                         "source": file_path,
-                        "title": title
+                        "title": title,
                     }
-                    document = Document(page_content=content['content'], metadata=document_metadata)
+                    document = Document(
+                        page_content=content["content"], metadata=document_metadata
+                    )
                 text_documents.append(document)
 
         return text_documents
-
-
-
