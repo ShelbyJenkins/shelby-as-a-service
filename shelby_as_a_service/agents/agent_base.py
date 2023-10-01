@@ -9,3 +9,4 @@ class AgentBase:
         self.index = self.app.index
         self.parent_sprite = parent_sprite
         self.log = self.app.log
+        self.app_name = self.app.app_name

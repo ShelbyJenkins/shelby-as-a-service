@@ -1,63 +1,57 @@
-import os, traceback
-from typing import Iterator
-import yaml, json
-import pinecone
-from langchain.schema import Document
-from langchain.document_loaders import GitbookLoader, SitemapLoader, RecursiveUrlLoader
-from langchain.embeddings import OpenAIEmbeddings
-from bs4 import BeautifulSoup
+from agents.agent_base import AgentBase
+from typing import Dict, Optional, List, Any
+import modules.utils.config_manager as ConfigManager
+from services.database_service import DatabaseService
+from services.ingest_service import IngestService
+from modules.index.data_model import IndexModel, DataDomainModel, DataSourceModel
 
-from modules.utils.log_service import Logger
-from shelby_as_a_service.modules.app_base import AppBase
-from modules.data_processing.open_api_minifier_service import OpenAPIMinifierService
-from modules.data_processing.data_processing_service import CEQTextPreProcessor
+# from modules.index.data_model import DataModels
+import modules.utils.config_manager as ConfigManager
 
 
-class IngestService(AppBase):
-    model_ = IngestServiceModel()
-    required_services_ = []
+class IngestAgent(AgentBase):
+    agent_name: str = "ingest_agent"
+    app: Optional[Any] = None
+    index: Optional[Any] = None
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent_sprite=None):
+        super().__init__(parent_sprite=parent_sprite)
+        ConfigManager.setup_service_config(self)
 
-        # self.deployment_name = deployment_instance.deployment_name
-        # self.deployment = deployment_instance
-        # self.config = service_model
-        # self.index_env = self.config.index_env
-        # self.index_name = self.config.index_name
+        self.database_service = DatabaseService(self)
+        self.ingest_service = IngestService(self)
 
-        # self.log = Logger(
-        #     self.deployment_name,
-        #     f"{self.deployment_name}_index_agent",
-        #     f"{self.deployment_name}_index_agent.md",
-        #     level="INFO",
-        # )
+    def load_single_website(self, state_dict):
+        data_source = DataSourceModel(
+            data_source_name=None,
+            data_source_description=None,
+            data_source_filter_url=None,
+            data_source_ingest_provider="generic_web_scraper",
+            data_source_database_provider="local_filestore_database",
+            data_source_url=state_dict["url_input"],
+        )
+        data_domain = DataDomainModel(
+            data_domain_name="web_agent",
+            data_domain_database_provider="local_filestore_database",
+            data_domain_sources=[data_source],
+        )
+        documents_list = []
+        for data_source in data_domain.data_domain_sources:
+            documents_iterator = self.ingest_service.load(data_source)
+            if documents_iterator is not None:
+                try:
+                    documents_list = list(documents_iterator)
+                except TypeError:
+                    print(f"Error: Object {documents_iterator} is not iterable")
+            else:
+                print("Error: documents_iterator is None")
+            if documents_list:
+                self.database_service.write_documents_to_database(
+                    documents_list, data_domain, data_source
+                )
+                return documents_list
 
-        # self.secrets = deployment_instance.secrets
-        # if not self.deployment.check_secrets(IngestServiceModel.secrets_):
-        #     return
-
-        # self.prompt_template_path = "shelby_as_a_service/prompt_templates"
-        # self.index_dir = f"deployments/{self.deployment_name}/index"
-        # # Loads data sources from file
-        # with open(
-        #     f"deployments/{self.deployment_name}/index_description.yaml",
-        #     "r",
-        #     encoding="utf-8",
-        # ) as stream:
-        #     self.index_description_file = yaml.safe_load(stream)
-
-        # if self.index_description_file["index_name"] != self.index_name:
-        #     # raise ValueError(
-        #     #     "Index name in index_description.yaml does not match index from deployment.env!"
-        #     # )
-        #     self.index_name = self.index_description_file["index_name"]
-
-        # pinecone.init(
-        #     environment=self.index_env,
-        #     api_key=self.secrets["pinecone_api_key"],
-        # )
-
+    def ingest_docs(self):
         # indexes = pinecone.list_indexes()
         # if self.index_name not in indexes:
         #     # create new index
@@ -81,8 +75,6 @@ class IngestService(AppBase):
         #             continue
         #         self.enabled_data_sources.append(data_source)
         #         self.log.print_and_log(f"Will index: {data_source_name}")
-
-    def ingest_docs(self):
         self.log.print_and_log(
             f"Initial index stats: {self.vectorstore.describe_index_stats()}\n"
         )
@@ -237,256 +229,3 @@ class IngestService(AppBase):
         self.log.print_and_log(
             f"Final index stats: {self.vectorstore.describe_index_stats()}"
         )
-
-
-class DataSourceConfig:
-    ### DataSourceConfig loads all configs for all datasources ###
-
-    def __init__(
-        self,
-        index_agent: IngestService,
-        data_domain_name,
-        domain_description,
-        data_source_name,
-        source,
-    ):
-        self.index_agent = index_agent
-        self.vectorstore = index_agent.vectorstore
-        self.config = index_agent.config
-        self.log = index_agent.log
-
-        # From document_sources.yaml
-        self.data_domain_name: str = data_domain_name
-        self.domain_description: str = domain_description
-        self.data_source_name: str = data_source_name
-        self.filter_url: str = source.get("filter_url")
-        self.update_enabled: bool = source.get("update_enabled")
-        self.load_all_paths: bool = source.get("load_all_paths")
-        self.skip_paths: bool = source.get("skip_paths")
-        self.target_url: str = source.get("target_url")
-        self.target_type: str = source.get("target_type")
-        self.doc_type: str = source.get("doc_type")
-        self.api_url_format: str = source.get("api_url_format")
-
-        # Check if any value is None
-        attributes = [
-            self.data_domain_name,
-            self.data_source_name,
-            self.update_enabled,
-            self.target_url,
-            self.target_type,
-            self.doc_type,
-        ]
-        if not all(attr is not None and attr != "" for attr in attributes):
-            raise ValueError("Some required fields are missing or have no value.")
-
-        match self.target_type:
-            case "gitbook":
-                self.scraper = GitbookLoader(
-                    web_page=self.target_url, load_all_paths=self.load_all_paths
-                )
-                self.content_type = "text"
-
-            case "sitemap":
-                # May need to change for specific websites
-                def parse_content_by_id(content):
-                    # Attempt to find element by 'content-container' ID
-                    content_element = content.find(id="content-container")
-                    if not content_element:
-                        # If 'content-container' not found, attempt to find 'content'
-                        content_element = content.find(id="content")
-                    if not content_element:
-                        # If neither found, return an empty string
-                        return ""
-                    # Find all elements with "visibility: hidden" style and class containing "toc"
-                    unwanted_elements = content_element.select(
-                        '[style*="visibility: hidden"], [class*="toc"]'
-                    )
-                    # Remove unwanted elements from content_element
-                    for element in unwanted_elements:
-                        element.decompose()
-                    # Remove header tags
-                    for header in content_element.find_all("header"):
-                        header.decompose()
-                    # Extract text from the remaining content
-                    text = content_element.get_text(separator=" ")
-
-                    return text
-
-                self.scraper = SitemapLoader(
-                    self.target_url,
-                    filter_urls=[self.filter_url],
-                    parsing_function=parse_content_by_id,
-                )
-                self.content_type = "text"
-
-            case "generic":
-                self.scraper = CustomScraper(self)
-                self.content_type = "text"
-
-            case "open_api_spec":
-                self.scraper = OpenAPILoader(self)
-                self.content_type = "open_api_spec"
-
-            case "local_text":
-                self.scraper = LoadTextFromFile(self)
-                self.content_type = "text"
-
-            case _:
-                raise ValueError(f"Invalid target type: {self.target_type}")
-
-        match self.content_type:
-            case "text":
-                self.preprocessor = CEQTextPreProcessor(self)
-            case "open_api_spec":
-                self.preprocessor = OpenAPIMinifierService(self)
-            case _:
-                raise ValueError("Invalid target type: should be text, html, or code.")
-
-        self.embedding_retriever = OpenAIEmbeddings(
-            model=self.config.index_embedding_model,
-            embedding_ctx_length=self.config.index_embedding_max_chunk_size,
-            openai_api_key=self.index_agent.secrets["openai_api_key"],
-            chunk_size=self.config.index_embedding_batch_size,
-            request_timeout=self.config.index_openai_timeout_seconds,
-        )
-
-
-class CustomScraper:
-    ### CustomScraper is a generic web scraper ###
-
-    def __init__(self, data_source_config: DataSourceConfig):
-        self.data_source_config = data_source_config
-        self.load_urls = RecursiveUrlLoader(
-            url=self.data_source_config.target_url, extractor=self.custom_extractor
-        )
-
-    @staticmethod
-    def custom_extractor(html_text: str) -> str:
-        soup = BeautifulSoup(html_text, "html.parser")
-        text_element = soup.find(id="content")
-        if text_element:
-            return text_element.get_text()
-        return ""
-
-    def load(self) -> Iterator[Document]:
-        documents = self.load_urls.load()
-
-        return [
-            Document(page_content=doc.page_content, metadata=doc.metadata)
-            for doc in documents
-        ]
-
-
-class OpenAPILoader:
-    def __init__(self, data_source_config: DataSourceConfig):
-        self.index_agent = data_source_config.index_agent
-        self.config = data_source_config
-        self.data_source_config = data_source_config
-
-    def load(self):
-        open_api_specs = self.load_spec()
-
-        return open_api_specs
-
-    def load_spec(self):
-        """Load YAML or JSON files."""
-        open_api_specs = []
-        file_extension = None
-        for filename in os.listdir(self.data_source_config.target_url):
-            if file_extension is None:
-                if filename.endswith(".yaml"):
-                    file_extension = ".yaml"
-                elif filename.endswith(".json"):
-                    file_extension = ".json"
-                else:
-                    # self.data_source_config.index_agent.log_agent.print_and_log(f"Unsupported file format: {filename}")
-                    continue
-            elif not filename.endswith(file_extension):
-                # self.data_source_config.index_agent.log_agent.print_and_log(f"Inconsistent file formats in directory: {filename}")
-                continue
-            file_path = os.path.join(self.data_source_config.target_url, filename)
-            with open(file_path, "r") as file:
-                if file_extension == ".yaml":
-                    open_api_specs.append(yaml.safe_load(file))
-                elif file_extension == ".json":
-                    open_api_specs.append(json.load(file))
-
-        return open_api_specs
-
-
-class LoadTextFromFile:
-    def __init__(self, data_source_config):
-        self.config = data_source_config
-        self.data_source_config = data_source_config
-
-    def load(self):
-        text_documents = self.load_texts()
-        return text_documents
-
-    # def load_texts(self):
-    #     """Load text files and structure them in the desired format."""
-    #     text_documents = []
-    #     file_extension = ".txt"
-    #     for filename in os.listdir(self.data_source_config.target_url):
-    #         if not filename.endswith(file_extension):
-    #             # Uncomment the line below if you wish to log unsupported file formats
-    #             # self.data_source_config.index_agent.log_agent.print_and_log(f"Unsupported file format: {filename}")
-    #             continue
-
-    #         file_path = os.path.join(self.data_source_config.target_url, filename)
-    #         title = os.path.splitext(filename)[0]
-    #         with open(file_path, "r", encoding="utf-8") as file:
-    #             document_metadata = {
-    #                 "loc": file_path,
-    #                 "source": file_path,
-    #                 "title": title
-    #             }
-    #             document = Document(page_content=file.read(), metadata=document_metadata)
-    #             text_documents.append(document)
-
-    #     return text_documents
-
-    def load_texts(self):
-        """Load text and JSON files and structure them in the desired format."""
-        text_documents = []
-        allowed_extensions = [".txt", ".json"]
-
-        for filename in os.listdir(self.data_source_config.target_url):
-            file_extension = os.path.splitext(filename)[1]
-
-            if file_extension not in allowed_extensions:
-                # Uncomment the line below if you wish to log unsupported file formats
-                # self.data_source_config.index_agent.log_agent.print_and_log(f"Unsupported file format: {filename}")
-                continue
-
-            file_path = os.path.join(self.data_source_config.target_url, filename)
-            title = os.path.splitext(filename)[0]
-
-            with open(file_path, "r", encoding="utf-8") as file:
-                if file_extension == ".txt":
-                    content = file.read()
-                    # You might want to adapt the following based on how you wish to represent JSON content
-                    document_metadata = {
-                        "loc": file_path,
-                        "source": file_path,
-                        "title": title,
-                    }
-                    document = Document(
-                        page_content=content, metadata=document_metadata
-                    )
-                elif file_extension == ".json":
-                    content = json.load(file)  # Now content is a dictionary
-
-                    # You might want to adapt the following based on how you wish to represent JSON content
-                    document_metadata = {
-                        "loc": file_path,
-                        "source": file_path,
-                        "title": title,
-                    }
-                    document = Document(
-                        page_content=content["content"], metadata=document_metadata
-                    )
-                text_documents.append(document)
-
-        return text_documents

@@ -1,12 +1,14 @@
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 from pydantic import BaseModel
 
 
 class ServiceBase:
-    embedding_provider: str = "openai_embedding"
-    query_embedding_model: str = "text-embedding-ada-002"
     config: Dict[str, str] = {}
+
+    provider_type: Optional[str] = None
     default_provider: Optional[str] = None
+    available_providers: Optional[List[Any]] = None
+    current_provider: Optional[Any] = None
 
     def __init__(self, parent_agent=None, parent_service=None):
         if parent_agent:
@@ -21,23 +23,44 @@ class ServiceBase:
         self.index = self.app.index
         self.log = self.app.log
 
-    def get_provider(self, provider_type, provider_name=None):
+    def set_provider(self, new_provider_name=None):
         """Returns an instance of a provider
         First tries the requested provider,
         Then tries the parent_agent's,
         Then uses default"""
-        # Tries the requested provider
-        if provider_name:
-            if provider_instance := getattr(self, provider_name, None):
+
+        def _find_provider(provider_name):
+            if not self.available_providers:
+                return None
+
+            for provider in self.available_providers:
+                if provider.provider_name == provider_name:
+                    # Reuse current provider if name matches.
+                    if provider.provider_name == getattr(
+                        self.current_provider, "provider_name", None
+                    ):
+                        return self.current_provider
+                    else:
+                        self.current_provider = provider(self)
+                        return self.current_provider
+
+        provider_names_to_check = [
+            new_provider_name,  # Tries the requested provider
+            getattr(self.parent_agent, self.provider_type, None)
+            if self.provider_type
+            else None,  # Then the parent's agent
+            getattr(self.default_provider, "provider_name", None)
+            if self.default_provider
+            else None,  # Then the default
+        ]
+
+        for provider_name in provider_names_to_check:
+            if provider_name:
+                provider_instance = _find_provider(provider_name)
                 if provider_instance:
                     return provider_instance
-        # Then the parent's agent
-        if provider := getattr(self.parent_agent, provider_type, None):
-            if provider_instance := getattr(self, provider, None):
-                if provider_instance:
-                    return provider_instance
-        # Then the default
-        return getattr(self, self.default_provider, None)
+
+        return None
 
     def get_model(self, type_model, model_name=None):
         """Returns an instance of a model

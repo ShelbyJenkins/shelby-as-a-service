@@ -4,12 +4,12 @@ import traceback
 import json, yaml, re
 import openai, pinecone, tiktoken
 from typing import Dict, Optional, List, Any
-
+import modules.utils.config_manager as ConfigManager
 from agents.agent_base import AgentBase
 from services.llm_service import LLMService
 from services.embedding_service import EmbeddingService
 from services.database_service import DatabaseService
-from modules.data_processing.data_processing_service import TextProcessing
+import modules.text_processing.text as text
 
 # endregion
 
@@ -34,8 +34,7 @@ class CEQAgent(AgentBase):
 
     def __init__(self, parent_sprite=None):
         super().__init__(parent_sprite=parent_sprite)
-        self.app.config_manager.setup_service_config(self)
-
+        ConfigManager.setup_service_config(self)
         self.llm_service = LLMService(self)
 
         self.embedding_service = EmbeddingService(self)
@@ -87,7 +86,7 @@ class CEQAgent(AgentBase):
             token_count = 0
             for document in documents:
                 tokens = 0
-                tokens += TextProcessing.tiktoken_len(document["content"])
+                tokens += text.tiktoken_len(document["content"])
 
                 token_count += tokens
             return token_count
@@ -102,7 +101,7 @@ class CEQAgent(AgentBase):
         )
 
         for i, document in enumerate(sorted_documents, start=1):
-            token_count = TextProcessing.tiktoken_len(document["content"])
+            token_count = text.tiktoken_len(document["content"])
             if token_count > self.docs_max_total_tokens:
                 sorted_documents.pop(i - 1)
                 continue

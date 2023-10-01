@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List, Any
 import openai
 from services.service_base import ServiceBase
+import modules.utils.config_manager as ConfigManager
 
 
 class OpenAILLM(ServiceBase):
@@ -35,7 +36,7 @@ class OpenAILLM(ServiceBase):
 
     def __init__(self, parent_service):
         super().__init__(parent_service=parent_service)
-        self.app.config_manager.setup_service_config(self)
+        ConfigManager.setup_service_config(self)
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
@@ -121,16 +122,16 @@ class LLMService(ServiceBase):
 
     def __init__(self, parent_agent):
         super().__init__(parent_agent=parent_agent)
-        self.app.config_manager.setup_service_config(self)
+        ConfigManager.setup_service_config(self)
 
         self.openai_llm = OpenAILLM(self)
 
     def create_chat(self, prompt, provider_name=None, model_name=None):
-        provider = self.get_provider(self.provider_type, provider_name=provider_name)
+        provider = self.set_provider(self.provider_type, provider_name=provider_name)
 
         return provider._create_chat(prompt, model_name)
 
     def create_streaming_chat(self, prompt, provider_name=None, model_name=None):
-        provider = self.get_provider(self.provider_type, provider_name=provider_name)
+        provider = self.set_provider(self.provider_type, provider_name=provider_name)
 
         yield from provider._create_streaming_chat(prompt, model_name)

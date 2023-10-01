@@ -24,7 +24,7 @@ def get_config_path(instance):
 
     base_path = [app_config_path]
 
-    if instance.__class__.__name__ == "IndexService":
+    if instance.__class__.__name__ == "IndexModel":
         base_path.append(index_config_path)
         return base_path
 

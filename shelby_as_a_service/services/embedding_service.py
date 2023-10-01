@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from typing import List
 from langchain.embeddings import OpenAIEmbeddings
 from services.service_base import ServiceBase
-from modules.data_processing.data_processing_service import TextProcessing
+import modules.text_processing.text as text
+import modules.utils.config_manager as ConfigManager
 
 
 class OpenAIEmbedding(ServiceBase):
@@ -25,7 +26,7 @@ class OpenAIEmbedding(ServiceBase):
 
     def __init__(self, parent_service):
         super().__init__(parent_service=parent_service)
-        self.app.config_manager.setup_service_config(self)
+        ConfigManager.setup_service_config(self)
 
     def _get_query_embedding(self, query, model_name=None):
         model = self.get_model(self.type_model, model_name=model_name)
@@ -41,7 +42,7 @@ class OpenAIEmbedding(ServiceBase):
         return query_embedding
 
     def calculate_cost(self, query, model):
-        token_count = TextProcessing.tiktoken_len(query, model.model_name)
+        token_count = text.tiktoken_len(query, model.model_name)
 
         # Convert numbers to Decimal
         cost_per_k_decimal = Decimal(model.cost_per_k)
@@ -69,7 +70,7 @@ class EmbeddingService(ServiceBase):
 
     def __init__(self, parent_agent=None):
         super().__init__(parent_agent=parent_agent)
-        self.app.config_manager.setup_service_config(self)
+        ConfigManager.setup_service_config(self)
 
         self.openai_embedding = OpenAIEmbedding(self)
 

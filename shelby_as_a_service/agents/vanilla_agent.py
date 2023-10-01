@@ -7,6 +7,7 @@ from typing import Dict, Optional, List, Any
 from modules.utils.log_service import Logger
 from services.llm_service import LLMService
 from agents.agent_base import AgentBase
+import modules.utils.config_manager as ConfigManager
 
 # endregion
 
@@ -21,23 +22,34 @@ class VanillaChatAgent(AgentBase):
 
     def __init__(self, parent_sprite=None):
         super().__init__(parent_sprite=parent_sprite)
-        self.app.config_manager.setup_service_config(self)
+        ConfigManager.setup_service_config(self)
 
         self.llm_service = LLMService(self)
 
-    def create_streaming_chat(self, query, provider_name=None, model_name=None):
+    def create_streaming_chat(
+        self, query, stream=False, provider_name=None, model_name=None
+    ):
         self.log.print_and_log(f"Running query: {query}")
 
         prompt = self._create_prompt_template(query)
 
         self.log.print_and_log("Sending prompt to LLM")
-        yield from self.llm_service.create_streaming_chat(
-            prompt,
-            provider_name=provider_name
-            if provider_name is not None
-            else self.llm_provider,
-            model_name=model_name if model_name is not None else self.llm_model,
-        )
+        if stream:
+            yield from self.llm_service.create_streaming_chat(
+                prompt,
+                provider_name=provider_name
+                if provider_name is not None
+                else self.llm_provider,
+                model_name=model_name if model_name is not None else self.llm_model,
+            )
+        else:
+            return self.llm_service.create_chat(
+                prompt,
+                provider_name=provider_name
+                if provider_name is not None
+                else self.llm_provider,
+                model_name=model_name if model_name is not None else self.llm_model,
+            )
 
     def _create_prompt_template(self, query):
         with open(
