@@ -1,12 +1,14 @@
-from typing import List, Optional, Dict, Union, Any
+from typing import Any, Dict, List, Optional, Union
+
 import modules.utils.config_manager as ConfigManager
+from modules.utils.get_app import get_app
 from pydantic import BaseModel
 
 # from modules.index.data_loaders import DataLoaders
 
 
 class DataSourceDocumentModel(BaseModel):
-    pass  # Maybe?
+    pass
 
 
 class DataSourceModel(BaseModel):
@@ -57,10 +59,10 @@ class IndexModel:
     # data_domain_service_ = DataDomainService
     config: Dict[str, str] = {}
 
-    def __init__(self, app):
+    def __init__(self):
         """ """
-        self.app = app
-        ConfigManager.setup_service_config(self)
+        # self.app = get_app()
+        # ConfigManager.setup_service_config(self)
         index_data_domains_config = self.config.get("index_data_domains", [])
 
         # index_data_domains = []

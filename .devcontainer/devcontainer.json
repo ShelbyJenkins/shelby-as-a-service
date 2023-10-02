@@ -11,7 +11,8 @@
 				"ms-python.black-formatter",
 				"gitHub.codespaces",
 				"ms-python.mypy-type-checker",
-				"ms-python.python"
+				"ms-python.python",
+				"ms-python.isort"
 			]
 		}
 	} 

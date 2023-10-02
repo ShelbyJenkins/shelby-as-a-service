@@ -2,7 +2,6 @@
 *.env
 shelby-as-a-service.code-workspace
 logs/
-.vscode/
 **/__pycache__/
 .mypy_cache/
 apps/*

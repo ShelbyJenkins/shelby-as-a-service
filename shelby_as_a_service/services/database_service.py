@@ -1,9 +1,11 @@
 import os
-from typing import List, Any
-import pinecone
-from services.service_base import ServiceBase
-import modules.utils.config_manager as ConfigManager
+from typing import Any, List
+
 import modules.text_processing.text as TextProcess
+import modules.utils.config_manager as ConfigManager
+import pinecone
+from modules.utils.get_app import get_app
+from services.service_base import ServiceBase
 
 
 class PineconeDatabase(ServiceBase):
@@ -31,14 +33,15 @@ class PineconeDatabase(ServiceBase):
     ]
 
     def __init__(self, parent_service):
+        self.app = get_app()
         super().__init__(parent_service=parent_service)
         ConfigManager.setup_service_config(self)
-
+        self.index_name = "personal"
         pinecone.init(
             api_key=self.app.secrets["pinecone_api_key"],
             environment=self.index_env,
         )
-        self.pinecone_index = pinecone.Index(self.index.index_name)
+        self.pinecone_index = pinecone.Index(self.index_name)
 
     def delete_pinecone_index(self):
         print(f"Deleting index {self.index_name}")
@@ -164,6 +167,7 @@ class LocalFileStoreDatabase(ServiceBase):
     provider_name: str = "local_filestore_database"
 
     def __init__(self, parent_service):
+        self.app = get_app()
         super().__init__(parent_service=parent_service)
         ConfigManager.setup_service_config(self)
 
@@ -196,6 +200,7 @@ class DatabaseService(ServiceBase):
     available_providers: List[Any] = [PineconeDatabase, LocalFileStoreDatabase]
 
     def __init__(self, parent_agent=None):
+        self.app = get_app()
         super().__init__(parent_agent=parent_agent)
         ConfigManager.setup_service_config(self)
 

@@ -1,0 +1,17 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "shelby_as_a_service",
+            "type": "python",
+            "request": "launch",
+            "program": "/workspaces/shelby-as-a-service/shelby_as_a_service/app.py",
+            // "console": "internalConsole",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

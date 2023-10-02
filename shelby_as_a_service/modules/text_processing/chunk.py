@@ -237,9 +237,7 @@ class DFSTextSplitter:
                 [backwards_overlap_text, text_chunk, forward_overlap_text]
             )
 
-            text_chunk = TextProcessing.remove_starting_whitespace_and_double_newlines(
-                text_chunk
-            )
+            text_chunk = TextProcessing.reduce_excess_whitespace(text_chunk)
             token_count = self.tiktoken_len(text_chunk)
             if token_count > self.max_length:
                 # self.print_and_log(f"chunk token count too big!: {self.tiktoken_len(text_chunk)}")

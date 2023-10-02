@@ -10,6 +10,7 @@ from services.llm_service import LLMService
 from services.embedding_service import EmbeddingService
 from services.database_service import DatabaseService
 import modules.text_processing.text as text
+from modules.utils.get_app import get_app
 
 # endregion
 
@@ -33,7 +34,9 @@ class CEQAgent(AgentBase):
     docs_max_used: int = 5
 
     def __init__(self, parent_sprite=None):
+        self.app = get_app()
         super().__init__(parent_sprite=parent_sprite)
+
         ConfigManager.setup_service_config(self)
         self.llm_service = LLMService(self)
 

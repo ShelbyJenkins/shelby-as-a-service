@@ -1,10 +1,12 @@
-from decimal import Decimal
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import List
-from langchain.embeddings import OpenAIEmbeddings
-from services.service_base import ServiceBase
+
 import modules.text_processing.text as text
 import modules.utils.config_manager as ConfigManager
+from langchain.embeddings import OpenAIEmbeddings
+from modules.utils.get_app import get_app
+from services.service_base import ServiceBase
 
 
 class OpenAIEmbedding(ServiceBase):
@@ -25,6 +27,7 @@ class OpenAIEmbedding(ServiceBase):
     openai_timeout_seconds: float = 180.0
 
     def __init__(self, parent_service):
+        self.app = get_app()
         super().__init__(parent_service=parent_service)
         ConfigManager.setup_service_config(self)
 
@@ -38,10 +41,10 @@ class OpenAIEmbedding(ServiceBase):
             request_timeout=self.openai_timeout_seconds,
         )
         query_embedding = embedding_retriever.embed_query(query)
-        self.calculate_cost(query, model)
+        self._calculate_cost(query, model)
         return query_embedding
 
-    def calculate_cost(self, query, model):
+    def _calculate_cost(self, query, model):
         token_count = text.tiktoken_len(query, model.model_name)
 
         # Convert numbers to Decimal
@@ -69,6 +72,7 @@ class EmbeddingService(ServiceBase):
     default_provider: str = "openai_embedding"
 
     def __init__(self, parent_agent=None):
+        self.app = get_app()
         super().__init__(parent_agent=parent_agent)
         ConfigManager.setup_service_config(self)
 

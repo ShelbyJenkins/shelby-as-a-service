@@ -1,18 +1,41 @@
+import os
 import re
 import string
-from urllib.parse import urlparse
-import shutil
-import os
-import json
 from typing import List
+from urllib.parse import urlparse
+
 import tiktoken
-import spacy
 
 
 def tiktoken_len(document, encoding_model="text-embedding-ada-002"):
     tokenizer = tiktoken.encoding_for_model(encoding_model)
     tokens = tokenizer.encode(document, disallowed_special=())
     return len(tokens)
+
+
+def get_document_content(document):
+    # Check attributes
+    for attr in ["page_content", "content"]:
+        if (document_content := getattr(document, attr, None)) is not None:
+            return document_content
+
+    # Check dictionary keys
+    if isinstance(document, dict):
+        for key in ["page_content", "content"]:
+            if (document_content := document.get(key)) is not None:
+                return document_content
+
+    # Check if document is a string
+    if isinstance(document, str):
+        return document
+
+    return None
+
+
+def clean_text_content(text):
+    text = strip_unwanted_chars(text)
+    text = reduce_excess_whitespace(text)
+    return text
 
 
 def strip_unwanted_chars(text):
@@ -39,7 +62,7 @@ def strip_unwanted_chars(text):
 def reduce_excess_whitespace(text):
     """
     Reduces any sequential occurrences of a specific whitespace character
-    (' \t\n\r\v\f') to just two of those specific whitespaces.
+    (' \t\n\r\v\f') to just one of those specific whitespaces.
 
     Parameters:
         text (str): The input text to be processed.
@@ -58,11 +81,10 @@ def reduce_excess_whitespace(text):
     }
 
     # Replace any sequential occurrences of each whitespace character
-    # greater than 2 with just two.
+    # greater than 2 with just one.
     for char, escape_sequence in whitespace_characters.items():
-        pattern = escape_sequence + "{3,}"
-        replacement = char * 2
-        text = re.sub(pattern, replacement, text)
+        pattern = f"{escape_sequence}{{2,}}"  # Using an f-string to interpolate the escape_sequence
+        text = re.sub(pattern, char, text)
 
     # Remove leading and trailing whitespaces.
     text = text.strip()
@@ -77,14 +99,6 @@ def remove_all_white_space_except_space(text):
     text = re.sub(r" +", " ", text)
     # Remove leading and trailing spaces
     text = text.strip()
-    return text
-
-
-def remove_starting_whitespace_and_double_newlines(text):
-    # Remove all starting whitespace characters (like \n, \r, \t, \f, \v, and ' ')
-    text = re.sub(r"^[\n\r\t\f\v ]+", "", text)
-    # Remove starting consecutive newline characters (\n\n)
-    text = re.sub(r"^\n\n+", "", text)
     return text
 
 

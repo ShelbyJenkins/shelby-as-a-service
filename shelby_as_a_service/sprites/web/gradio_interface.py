@@ -1,9 +1,10 @@
-from typing import Dict, Optional, List, Any
+from typing import Any, Dict, List, Optional
+
 import gradio as gr
-from sprites.web.gradio_themes import AtYourServiceTheme
+import sprites.web.gradio_helpers as helper
 from services.llm_service import LLMService, OpenAILLM
-import modules.utils.config_manager as ConfigManager
-import sprites.web.interface_helpers as help
+from sprites.web.gradio_themes import AtYourServiceTheme
+from sprites.web.vanillm_interface import VanallmInterface
 
 
 class GradioInterface:
@@ -13,116 +14,7 @@ class GradioInterface:
         self.ui = web_sprite.ui
         self.web_sprite = web_sprite
 
-    def create_interface(self):
-        """Creates gradio app."""
-        with gr.Blocks(theme=AtYourServiceTheme()) as local_client:
-            with gr.Tab("Vanillm Chat", elem_id="default-tab"):
-                self.vanillm_ui()
-            with gr.Tab("Web Chat", elem_id="default-tab"):
-                self.web_ui()
-
-            with gr.Tab("Data Chat", elem_id="default-tab"):
-                with gr.Tab("Context Enhanced Querying", elem_id="default-tab"):
-                    self.vanillm_ui()
-                with gr.Tab("Add Data", elem_id="default-tab"):
-                    # self.create_index_config()
-                    with gr.Tab("email", elem_id="default-tab"):
-                        pass
-                    with gr.Tab("local", elem_id="default-tab"):
-                        pass
-                    with gr.Tab("web", elem_id="default-tab"):
-                        pass
-
-            with gr.Tab("Build Bots and Websites", elem_id="default-tab"):
-                self.vanillm_ui()
-
-            with gr.Tab("Config", elem_id="default-tab"):
-                self.vanillm_ui()
-
-            # create_index_ui(self)
-            # create_web_settings_ui(self)
-            local_client.queue()
-            local_client.launch()
-
-    def vanillm_ui(self):
-        group_name = "vanillm"
-        comps = {}
-        comps["group_name"] = gr.State(group_name)  # Stores name of group for later use
-        comps["chat_input"] = gr.State()
-
-        with gr.Tab("Chat", elem_id="default-tab"):
-            with gr.Row():
-                with gr.Column(scale=4):
-                    with gr.Row():
-                        comps["chat_tab_out_text"] = gr.Textbox(
-                            lines=27,
-                            label="out_text",
-                            show_label=False,
-                            interactive=False,
-                            elem_id=f"{group_name}_chat_tab_out_text",
-                        )
-                    with gr.Row():
-                        comps["chat_tab_in_text"] = gr.Textbox(
-                            label="in_text",
-                            show_label=False,
-                            placeholder="Send a message",
-                            elem_id=f"{group_name}_chat_tab_in_text",
-                        )
-                    with gr.Row():
-                        comps["chat_tab_generate_button"] = gr.Button(
-                            "Generate", variant="primary"
-                        )
-                with gr.Column():
-                    comps["chat_llm_provider"] = gr.Dropdown(
-                        choices=LLMService.ui_provider_names,
-                        value=LLMService.ui_provider_names[0],
-                        label="LLM Provider",
-                    )
-                    comps["chat_llm_model"] = gr.Dropdown(
-                        choices=OpenAILLM.ui_model_names,
-                        value=OpenAILLM.ui_model_names[0],
-                        label="LLM Model",
-                    )
-
-        comps_state = {k: gr.State(None) for k in comps.keys()}
-        group = {}
-        group["comps"] = comps
-        group["comps_state"] = comps_state
-        self.ui[group_name] = group
-
-        self.vanillm_event_handlers(group_name)
-
-    def vanillm_event_handlers(self, group_name):
-        gr.on(
-            triggers=[
-                self.ui[group_name]["comps"]["chat_tab_generate_button"].click,
-                self.ui[group_name]["comps"]["chat_tab_in_text"].submit,
-            ],
-            fn=lambda *comp_vals: comp_vals,
-            inputs=list(self.ui[group_name]["comps"].values()),
-            outputs=list(self.ui[group_name]["comps_state"].values()),
-        ).then(
-            fn=lambda x: (x, ""),
-            inputs=self.ui[group_name]["comps"]["chat_tab_in_text"],
-            outputs=[
-                self.ui[group_name]["comps_state"]["chat_input"],
-                self.ui[group_name]["comps"]["chat_tab_in_text"],
-            ],
-        ).then(
-            fn=self.web_sprite.run_chat,
-            inputs=list(self.ui[group_name]["comps_state"].values()),
-            outputs=self.ui[group_name]["comps"]["chat_tab_out_text"],
-        )
-
     def web_ui(self):
-        group_name = "web_agent"
-        comps = {}
-        comps["group_name"] = gr.State(group_name)  # Stores name of group for later use
-        comps["chat_input"] = gr.State()
-        comps["url_input"] = gr.State()
-        comps["web_data_added"] = gr.State(False)
-        comps["web_data_content"] = gr.State()
-
         with gr.Tab("Chat", elem_id="default-tab"):
             with gr.Row():
                 with gr.Column(scale=4):
@@ -212,83 +104,6 @@ class GradioInterface:
         self.ui[group_name] = group
 
         self.web_event_handlers(group_name)
-
-    def web_event_handlers(self, group_name):
-        gr.on(
-            triggers=[
-                self.ui[group_name]["comps"]["chat_tab_url_text"].submit,
-                self.ui[group_name]["comps"]["chat_tab_enter_url_button"].click,
-                self.ui[group_name]["comps"]["web_tab_url_text"].submit,
-                self.ui[group_name]["comps"]["web_tab_enter_url_button"].click,
-            ],
-            fn=lambda *comp_vals: comp_vals,
-            inputs=list(self.ui[group_name]["comps"].values()),
-            outputs=list(self.ui[group_name]["comps_state"].values()),
-        ).then(
-            fn=help.check_url_input,
-            inputs=[
-                self.ui[group_name]["comps"]["chat_tab_url_text"],
-                self.ui[group_name]["comps"]["web_tab_url_text"],
-            ],
-            outputs=self.ui[group_name]["comps_state"]["url_input"],
-        ).success(
-            fn=lambda *comps_state: self.web_sprite.web_agent.load_single_website(
-                self.ui, *comps_state
-            ),
-            inputs=list(self.ui[group_name]["comps_state"].values()),
-            outputs=[
-                self.ui[group_name]["comps"]["web_data_text_out"],
-                self.ui[group_name]["comps_state"]["web_data_content"],
-            ],
-        ).success(
-            fn=lambda: [gr.update(value=""), gr.update(value="")],
-            outputs=[
-                self.ui[group_name]["comps"]["chat_tab_url_text"],
-                self.ui[group_name]["comps"]["web_tab_url_text"],
-            ],
-        ).then(
-            fn=lambda: [
-                gr.update(visible=False),
-                gr.update(visible=False),
-                gr.update(visible=True),
-                gr.update(visible=True),
-            ],
-            outputs=[
-                self.ui[group_name]["comps"]["chat_tab_url_text"],
-                self.ui[group_name]["comps"]["chat_tab_enter_url_button"],
-                self.ui[group_name]["comps"]["chat_tab_in_text"],
-                self.ui[group_name]["comps"]["chat_tab_generate_button"],
-            ],
-        ).then(
-            fn=lambda: gr.State(True),
-            outputs=self.ui[group_name]["comps"]["web_data_added"],
-        )
-
-        gr.on(
-            triggers=[
-                self.ui[group_name]["comps"]["chat_tab_generate_button"].click,
-                self.ui[group_name]["comps"]["chat_tab_in_text"].submit,
-            ],
-            fn=help.check_for_web_data,
-            inputs=self.ui[group_name]["comps"]["web_data_added"],
-        ).success(
-            fn=lambda *comp_vals: comp_vals,
-            inputs=list(self.ui[group_name]["comps"].values()),
-            outputs=list(self.ui[group_name]["comps_state"].values()),
-        ).then(
-            fn=lambda x: (x, ""),
-            inputs=self.ui[group_name]["comps"]["chat_tab_in_text"],
-            outputs=[
-                self.ui[group_name]["comps_state"]["chat_input"],
-                self.ui[group_name]["comps"]["chat_tab_in_text"],
-            ],
-        ).then(
-            fn=lambda *comps_state: self.web_sprite.web_agent.run_chat(
-                self.ui, *comps_state
-            ),
-            inputs=list(self.ui[group_name]["comps_state"].values()),
-            outputs=self.ui[group_name]["comps"]["chat_tab_out_text"],
-        )
 
     def create_index_config(self):
         settings_components = []

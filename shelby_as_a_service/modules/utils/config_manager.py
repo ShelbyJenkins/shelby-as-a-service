@@ -1,8 +1,8 @@
-import os
 import json
+import os
 from dataclasses import is_dataclass
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 
 app_config_path: str = "app_instance"
 index_config_path: str = "index"
@@ -13,6 +13,9 @@ provider_config_path: str = "services"  # Change to providers
 
 
 def setup_service_config(instance):
+    instance.index = instance.app.index
+    instance.log = instance.app.log
+    instance.app_name = instance.app.app_name
     config_path = get_config_path(instance)
     config = get_config(instance, config_path)
     set_config(instance, config)

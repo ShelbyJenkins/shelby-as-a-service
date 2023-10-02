@@ -1,12 +1,12 @@
-from agents.agent_base import AgentBase
-from typing import Dict, Optional, List, Any
-import modules.utils.config_manager as ConfigManager
-from services.database_service import DatabaseService
-from services.ingest_service import IngestService
-from modules.index.data_model import IndexModel, DataDomainModel, DataSourceModel
+from typing import Any, Dict, List, Optional
 
 # from modules.index.data_model import DataModels
 import modules.utils.config_manager as ConfigManager
+from agents.agent_base import AgentBase
+from modules.index.data_model import DataDomainModel, DataSourceModel, IndexModel
+from modules.utils.get_app import get_app
+from services.database_service import DatabaseService
+from services.ingest_service import IngestService
 
 
 class IngestAgent(AgentBase):
@@ -15,20 +15,21 @@ class IngestAgent(AgentBase):
     index: Optional[Any] = None
 
     def __init__(self, parent_sprite=None):
+        self.app = get_app()
         super().__init__(parent_sprite=parent_sprite)
         ConfigManager.setup_service_config(self)
 
         self.database_service = DatabaseService(self)
         self.ingest_service = IngestService(self)
 
-    def load_single_website(self, state_dict):
+    def load_single_website(self, comps_state):
         data_source = DataSourceModel(
             data_source_name=None,
             data_source_description=None,
             data_source_filter_url=None,
             data_source_ingest_provider="generic_web_scraper",
             data_source_database_provider="local_filestore_database",
-            data_source_url=state_dict["url_input"],
+            data_source_url=comps_state["url_input"],
         )
         data_domain = DataDomainModel(
             data_domain_name="web_agent",

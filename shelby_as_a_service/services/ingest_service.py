@@ -1,26 +1,29 @@
-from typing import List, Any
+import json
+import os
+import traceback
+from typing import Any, Iterator, List
 
-from services.service_base import ServiceBase
-import os, traceback
-from typing import Iterator
-import yaml, json
-import pinecone
-from langchain.schema import Document
-from langchain.document_loaders import (
-    WebBaseLoader,
-    RecursiveUrlLoader,
-    GitbookLoader,
-    SitemapLoader,
-)
-from bs4 import BeautifulSoup
-import modules.utils.config_manager as ConfigManager
 import modules.text_processing.text as TextProcess
+import modules.utils.config_manager as ConfigManager
+import pinecone
+import yaml
+from bs4 import BeautifulSoup
+from langchain.document_loaders import (
+    GitbookLoader,
+    RecursiveUrlLoader,
+    SitemapLoader,
+    WebBaseLoader,
+)
+from langchain.schema import Document
+from modules.utils.get_app import get_app
+from services.service_base import ServiceBase
 
 
 class GenericRecursiveWebScraper(ServiceBase):
     provider_name: str = "generic_recursive_web_scraper"
 
     def __init__(self, parent_service):
+        self.app = get_app()
         super().__init__(parent_service=parent_service)
         ConfigManager.setup_service_config(self)
 
@@ -45,23 +48,17 @@ class GenericWebScraper(ServiceBase):
     provider_name: str = "generic_web_scraper"
 
     def __init__(self, parent_service):
+        self.app = get_app()
         super().__init__(parent_service=parent_service)
         ConfigManager.setup_service_config(self)
 
     def _load(self, url) -> Iterator[Document]:
         documents = WebBaseLoader(web_path=url).load()
         for document in documents:
-            document.page_content = TextProcess.strip_unwanted_chars(
+            document.page_content = TextProcess.clean_text_content(
                 document.page_content
             )
-            document.page_content = TextProcess.reduce_excess_whitespace(
-                document.page_content
-            )
-            document.page_content = (
-                TextProcess.remove_starting_whitespace_and_double_newlines(
-                    document.page_content
-                )
-            )
+
         return (
             Document(page_content=doc.page_content, metadata=doc.metadata)
             for doc in documents
@@ -195,6 +192,7 @@ class IngestService(ServiceBase):
     ]
 
     def __init__(self, parent_agent=None):
+        self.app = get_app()
         super().__init__(parent_agent=parent_agent)
         ConfigManager.setup_service_config(self)
 

@@ -1,30 +1,27 @@
 # region
-
-from typing import Any, Optional
+import json
+from typing import Any, Dict, List, Optional
 
 import modules.prompt_templates as PromptTemplates
-import modules.text_processing.text as text
 import modules.utils.config_manager as ConfigManager
 from agents.agent_base import AgentBase
-from agents.ingest_agent import IngestAgent
 from modules.utils.get_app import get_app
 from services.llm_service import LLMService
 
 # endregion
 
 
-class WebAgent(AgentBase):
-    agent_name: str = "web_agent"
-    default_prompt_template_path: str = "web_prompt.yaml"
-    app: Optional[Any] = None
-    index: Optional[Any] = None
+class VanillaLLM(AgentBase):
+    agent_name: str = "vanillallm_agent"
+    default_prompt_template_path: str = "vanillallm_prompt.yaml"
+
+    llm_provider: str = "openai_llm"
+    llm_model: str = "gpt-4"
 
     def __init__(self, parent_sprite=None):
         self.app = get_app()
         super().__init__(parent_sprite=parent_sprite)
         ConfigManager.setup_service_config(self)
-
-        self.ingest_agent = IngestAgent(parent_sprite)
 
         self.llm_service = LLMService(self)
 
@@ -73,12 +70,3 @@ class WebAgent(AgentBase):
             provider_name=provider_name,
             model_name=model_name,
         )
-
-    def load_single_website(self, comps_state):
-        documents = self.ingest_agent.load_single_website(comps_state)
-        output = ""
-        if documents:
-            for document in documents:
-                output += document.page_content
-            return [output, output]
-        return None

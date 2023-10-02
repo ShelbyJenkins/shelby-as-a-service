@@ -1,4 +1,5 @@
-from typing import Dict, Optional, List, Any
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
 
 
@@ -29,15 +30,15 @@ class ServiceBase:
         Then tries the parent_agent's,
         Then uses default"""
 
-        def _find_provider(provider_name):
+        def _find_provider(check_provider_name):
             if not self.available_providers:
                 return None
 
             for provider in self.available_providers:
-                if provider.provider_name == provider_name:
+                if provider.provider_name == check_provider_name:
                     # Reuse current provider if name matches.
                     if provider.provider_name == getattr(
-                        self.current_provider, "provider_name", None
+                        self.current_provider, "check_provider_name", None
                     ):
                         return self.current_provider
                     else:
@@ -54,9 +55,9 @@ class ServiceBase:
             else None,  # Then the default
         ]
 
-        for provider_name in provider_names_to_check:
-            if provider_name:
-                provider_instance = _find_provider(provider_name)
+        for check_provider_name in provider_names_to_check:
+            if check_provider_name:
+                provider_instance = _find_provider(check_provider_name)
                 if provider_instance:
                     return provider_instance
 
