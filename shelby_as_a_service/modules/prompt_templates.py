@@ -4,7 +4,10 @@ import modules.text_processing.text as TextProcess
 import yaml
 
 
-def create_openai_prompt(query: str, prompt_template: str, documents=None) -> list:
+def create_openai_prompt(
+    query, prompt_template_dir, prompt_template_path, documents=None
+) -> list:
+    prompt_template = load_prompt_template(prompt_template_dir, prompt_template_path)
     document_string = create_document_string(documents)
     if document_string:
         user_content = "Documents: " + document_string + " Query: " + query
@@ -27,9 +30,9 @@ def create_document_string(documents=None):
     content_strs = []
 
     for i, doc in enumerate(documents):
-        if document_number := getattr(doc, "doc_num"):
+        if document_number := getattr(doc, "doc_num", None):
             doc_num = document_number
-        elif document_number := doc.get("doc_num"):
+        elif document_number := doc.get("doc_num", None):
             doc_num = document_number
         else:
             doc_num = i
@@ -41,13 +44,9 @@ def create_document_string(documents=None):
     return " ".join(content_strs)
 
 
-def load_prompt_template(default_prompt_template_path, user_prompt_template_path=None):
-    if user_prompt_template_path:
-        template_path = user_prompt_template_path
-    else:
-        template_path = default_prompt_template_path
+def load_prompt_template(prompt_template_dir, prompt_template_path):
     with open(
-        os.path.join("shelby_as_a_service/modules/prompt_templates/", template_path),
+        os.path.join(prompt_template_dir, prompt_template_path),
         "r",
         encoding="utf-8",
     ) as stream:

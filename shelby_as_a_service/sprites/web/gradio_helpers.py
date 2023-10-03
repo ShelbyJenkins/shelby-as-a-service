@@ -1,104 +1,42 @@
 from time import sleep
-from urllib.parse import urlparse
 
 import gradio as gr
 
 
-class GRHelper:
-    def __init__(self, web_sprite):
-        self.web_sprite = web_sprite
-        self.ui = web_sprite.ui
+def list_available(class_model):
+    if available_providers := getattr(class_model, "available_providers", None):
+        return [provider.provider_name for provider in available_providers]
+    if available_models := getattr(class_model, "available_models", None):
+        return [modes.model_name for modes in available_models]
+    if available_agents := getattr(class_model, "available_agents", None):
+        return [agent.ui_name for agent in available_agents]
+    return None
 
-    def run_chat(self, *comps_state):
-        comps_state = GRHelper.comp_values_to_dict(self.ui, *comps_state)
-        documents = None
-        match comps_state["chat_tab_agent_radios"]:
-            case 0:
-                agent = self.web_sprite.vanillallm_agent
-            case 1:
-                agent = self.web_sprite.web_agent
-                documents = comps_state["web_data_content"]
-            case 2:
-                agent = self.web_sprite.ceq_agent
-            case _:
-                raise gr.Error("No value for chat_tab_agent_radios!")
 
-        if comps_state.get("stream_chat", False):
-            yield from agent.create_streaming_chat(
-                query=comps_state["input_chat_textbox"],
-                user_prompt_template_path=None,
-                documents=documents,
-                provider_name=comps_state["chat_llm_provider"],
-                model_name=comps_state["chat_llm_model"],
-            )
-        else:
-            return agent.create_chat(
-                query=comps_state["input_chat_textbox"],
-                user_prompt_template_path=None,
-                document=documents,
-                provider_name=comps_state["chat_llm_provider"],
-                model_name=comps_state["chat_llm_model"],
-            )
+def dropdown_default_value(class_model):
+    choices = list_available(class_model)
+    if choices:
+        return choices[0]
+    return None
 
-    def get_spend(self):
-        req = f"Request price: ${round(self.web_sprite.app.last_request_cost, 4)}"
-        self.web_sprite.app.last_request_cost = 0
-        tot = f"Total spend: ${round(self.web_sprite.app.total_cost, 4)}"
-        return [req, tot]
 
-    def load_single_website(self, *comps_state):
-        comps_state = GRHelper.comp_values_to_dict(self.ui, *comps_state)
+def dropdown_choices(class_model):
+    choices = list_available(class_model)
+    if choices:
+        return choices
+    return None
 
-        return self.web_sprite.web_agent.load_single_website(comps_state)
 
-    @staticmethod
-    def list_available(class_model):
-        if available_providers := getattr(class_model, "available_providers"):
-            return [provider.provider_name for provider in available_providers]
-        if available_models := getattr(class_model, "available_models"):
-            return [modes.model_name for modes in available_models]
-        return None
+def check_for_web_data(web_data_added):
+    if web_data_added:
+        return True
+    raise gr.Error("No valid web data found!")
 
-    @staticmethod
-    def dropdown_default_value(class_model):
-        choices = GRHelper.list_available(class_model)
-        if choices:
-            return choices[0]
-        return None
 
-    @staticmethod
-    def dropdown_choices(class_model):
-        choices = GRHelper.list_available(class_model)
-        if choices:
-            return choices
-        return None
-
-    @staticmethod
-    def check_url_input(web_tab_url_text):
-        def is_valid_url(url):
-            try:
-                result = urlparse(url)
-                return all([result.scheme, result.netloc])
-            except ValueError:
-                return False
-
-        web_tab_valid = is_valid_url(web_tab_url_text)
-        if web_tab_valid:
-            return web_tab_url_text
-        else:
-            raise gr.Error("Please enter valid URL")
-
-    @staticmethod
-    def check_for_web_data(web_data_added):
-        if web_data_added:
-            return True
-        raise gr.Error("No valid web data found!")
-
-    @staticmethod
-    def comp_values_to_dict(ui, *values):
-        group_name = values[0]
-        comps_keys = ui[group_name]["comps"].keys()
-        return {k: v for k, v in zip(comps_keys, values)}
+def comp_values_to_dict(ui, *values):
+    group_name = values[0]
+    comps_keys = ui[group_name]["comps"].keys()
+    return {k: v for k, v in zip(comps_keys, values)}
 
 
 # # Interface functions

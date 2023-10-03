@@ -15,7 +15,6 @@ from langchain.document_loaders import (
     WebBaseLoader,
 )
 from langchain.schema import Document
-from modules.utils.get_app import get_app
 from services.service_base import ServiceBase
 
 
@@ -23,9 +22,7 @@ class GenericRecursiveWebScraper(ServiceBase):
     provider_name: str = "generic_recursive_web_scraper"
 
     def __init__(self, parent_service):
-        self.app = get_app()
         super().__init__(parent_service=parent_service)
-        ConfigManager.setup_service_config(self)
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:
@@ -48,9 +45,7 @@ class GenericWebScraper(ServiceBase):
     provider_name: str = "generic_web_scraper"
 
     def __init__(self, parent_service):
-        self.app = get_app()
         super().__init__(parent_service=parent_service)
-        ConfigManager.setup_service_config(self)
 
     def _load(self, url) -> Iterator[Document]:
         documents = WebBaseLoader(web_path=url).load()
@@ -192,14 +187,12 @@ class IngestService(ServiceBase):
     ]
 
     def __init__(self, parent_agent=None):
-        self.app = get_app()
         super().__init__(parent_agent=parent_agent)
-        ConfigManager.setup_service_config(self)
 
-        self.current_provider = self.set_provider()
+        self.current_provider = self.get_provider()
 
     def load(self, data_source):
-        provider = self.set_provider(data_source.data_source_ingest_provider)
+        provider = self.get_provider(data_source.data_source_ingest_provider)
         if provider:
             return provider._load(data_source.data_source_url)
         else:

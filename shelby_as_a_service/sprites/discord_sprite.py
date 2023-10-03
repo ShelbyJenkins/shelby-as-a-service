@@ -33,6 +33,8 @@ class DiscordSprite:
     required_services_ = [CEQAgent]
     
     def __init__(self, deployment_instance, sprite_model, service_classes):
+        """ """
+        super().__init__()
         self.deployment = deployment_instance
         self.config = sprite_model
         self.services = service_classes

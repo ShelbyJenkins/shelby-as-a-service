@@ -1,30 +1,31 @@
 from typing import Any, Dict, List, Optional
 
+from app_base import AppBase
 from pydantic import BaseModel
 
 
-class ServiceBase:
+class ServiceBase(AppBase):
     config: Dict[str, str] = {}
 
     provider_type: Optional[str] = None
     default_provider: Optional[str] = None
     available_providers: Optional[List[Any]] = None
     current_provider: Optional[Any] = None
+    default_model: Optional[str] = None
 
     def __init__(self, parent_agent=None, parent_service=None):
+        self.app = AppBase.get_app()
+        self.log = self.app.log
         if parent_agent:
-            self.app = parent_agent.app
             self.parent_sprite = parent_agent.parent_sprite
             self.parent_agent = parent_agent
         if parent_service:
             self.parent_sprite = parent_service.parent_agent.parent_sprite
             self.parent_agent = parent_service.parent_agent
-            self.app = self.parent_agent.app
             self.parent_service = parent_service
-        self.index = self.app.index
-        self.log = self.app.log
+        AppBase.setup_service_config(self)
 
-    def set_provider(self, new_provider_name=None):
+    def get_provider(self, new_provider_name=None):
         """Returns an instance of a provider
         First tries the requested provider,
         Then tries the parent_agent's,

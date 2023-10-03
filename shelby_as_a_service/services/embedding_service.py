@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import List
+from typing import Any, List
 
 import modules.text_processing.text as text
 import modules.utils.config_manager as ConfigManager
 from langchain.embeddings import OpenAIEmbeddings
-from modules.utils.get_app import get_app
 from services.service_base import ServiceBase
 
 
@@ -27,9 +26,7 @@ class OpenAIEmbedding(ServiceBase):
     openai_timeout_seconds: float = 180.0
 
     def __init__(self, parent_service):
-        self.app = get_app()
         super().__init__(parent_service=parent_service)
-        ConfigManager.setup_service_config(self)
 
     def _get_query_embedding(self, query, model_name=None):
         model = self.get_model(self.type_model, model_name=model_name)
@@ -42,6 +39,7 @@ class OpenAIEmbedding(ServiceBase):
         )
         query_embedding = embedding_retriever.embed_query(query)
         self._calculate_cost(query, model)
+        self.log.print_and_log("Embeddings retrieved")
         return query_embedding
 
     def _calculate_cost(self, query, model):
@@ -68,17 +66,16 @@ class OpenAIEmbedding(ServiceBase):
 class EmbeddingService(ServiceBase):
     service_name: str = "embedding_service"
     provider_type: str = "embedding_provider"
-    available_providers: List[str] = ["openai_embedding"]
-    default_provider: str = "openai_embedding"
+    available_providers: List[Any] = [OpenAIEmbedding]
+    default_provider: Any = OpenAIEmbedding
 
     def __init__(self, parent_agent=None):
-        self.app = get_app()
         super().__init__(parent_agent=parent_agent)
-        ConfigManager.setup_service_config(self)
 
         self.openai_embedding = OpenAIEmbedding(self)
 
     def get_query_embedding(self, query, provider_name=None, model_name=None):
-        provider = self.get_provider(self.provider_type, provider_name=provider_name)
-
-        return provider._get_query_embedding(query, model_name=model_name)
+        provider = self.get_provider(new_provider_name=provider_name)
+        if provider:
+            return provider._get_query_embedding(query, model_name=model_name)
+        return None

@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 
-import modules.utils.config_manager as ConfigManager
-from modules.utils.get_app import get_app
+from app_base import AppBase
 from pydantic import BaseModel
 
 # from modules.index.data_loaders import DataLoaders
@@ -26,6 +25,8 @@ class DataSourceModel(BaseModel):
 
     # def __init__(self):
     #     """ """
+    # self.app = AppBase.get_app()
+    # AppBase.setup_service_config(self)
 
     #     self.app = app
     #     ConfigManager.setup_service_config(self)
@@ -41,6 +42,8 @@ class DataDomainModel(BaseModel):
 
     # def __init__(self):
     #     """ """
+    # self.app = AppBase.get_app()
+    # AppBase.setup_service_config(self)
 
     #     self.app = app
     #     ConfigManager.setup_service_config(self)
@@ -54,20 +57,20 @@ class DataDomainModel(BaseModel):
     #     setattr(self, "data_domain_sources", data_domain_sources)
 
 
-class IndexModel:
+class IndexModel(BaseModel):
     default_index_database: Optional[str] = "pinecone_database"
     # data_domain_service_ = DataDomainService
     config: Dict[str, str] = {}
 
-    def __init__(self):
-        """ """
-        # self.app = get_app()
-        # ConfigManager.setup_service_config(self)
-        index_data_domains_config = self.config.get("index_data_domains", [])
+    # def __init__(self):
+    #     """ """
+    # self.app = AppBase.get_app()
+    # AppBase.setup_service_config(self)
+    # index_data_domains_config = self.config.get("index_data_domains", [])
 
-        # index_data_domains = []
-        # for data_domain_config in index_data_domains_config or [{}]:
-        #     data_domain_service = DataDomainModel(app, data_domain_config)
-        #     index_data_domains.append(data_domain_service)
+    # index_data_domains = []
+    # for data_domain_config in index_data_domains_config or [{}]:
+    #     data_domain_service = DataDomainModel(app, data_domain_config)
+    #     index_data_domains.append(data_domain_service)
 
-        # setattr(self, "index_data_domains", index_data_domains)
+    # setattr(self, "index_data_domains", index_data_domains)

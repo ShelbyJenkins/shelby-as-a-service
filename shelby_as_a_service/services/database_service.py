@@ -4,7 +4,6 @@ from typing import Any, List
 import modules.text_processing.text as TextProcess
 import modules.utils.config_manager as ConfigManager
 import pinecone
-from modules.utils.get_app import get_app
 from services.service_base import ServiceBase
 
 
@@ -33,10 +32,9 @@ class PineconeDatabase(ServiceBase):
     ]
 
     def __init__(self, parent_service):
-        self.app = get_app()
         super().__init__(parent_service=parent_service)
-        ConfigManager.setup_service_config(self)
-        self.index_name = "personal"
+
+        self.index_name = "shelby-as-a-service"
         pinecone.init(
             api_key=self.app.secrets["pinecone_api_key"],
             environment=self.index_env,
@@ -92,9 +90,7 @@ class PineconeDatabase(ServiceBase):
             metadata_config=metadata_config,
         )
 
-    def _query_index(self, dense_embedding, docs_to_retrieve, data_domain_name=None):
-        # def query_vectorstore(self, dense_embedding, sparse_embedding, data_domain_name=None):
-
+    def _query_index(self, dense_embedding, docs_to_retrieve, namespace=None):
         # if data_domain_name is None:
         #     data_domain_names = []
         #     for field, _ in self.data_domains.items():
@@ -123,7 +119,7 @@ class PineconeDatabase(ServiceBase):
         soft_query_response = self.pinecone_index.query(
             top_k=docs_to_retrieve,
             include_values=False,
-            namespace="personal",
+            # namespace="tatum",
             include_metadata=True,
             vector=dense_embedding,
         )
@@ -167,9 +163,7 @@ class LocalFileStoreDatabase(ServiceBase):
     provider_name: str = "local_filestore_database"
 
     def __init__(self, parent_service):
-        self.app = get_app()
         super().__init__(parent_service=parent_service)
-        ConfigManager.setup_service_config(self)
 
     def _write_documents_to_database(self, documents, data_domain, data_source):
         data_domain_name_file_path = os.path.join(
@@ -200,11 +194,9 @@ class DatabaseService(ServiceBase):
     available_providers: List[Any] = [PineconeDatabase, LocalFileStoreDatabase]
 
     def __init__(self, parent_agent=None):
-        self.app = get_app()
         super().__init__(parent_agent=parent_agent)
-        ConfigManager.setup_service_config(self)
 
-        self.current_provider = self.set_provider()
+        self.current_provider = self.get_provider()
 
     def query_index(
         self,
@@ -213,7 +205,7 @@ class DatabaseService(ServiceBase):
         data_domain_name=None,
         database_provider=None,
     ):
-        provider = self.set_provider(database_provider)
+        provider = self.get_provider(database_provider)
         if provider:
             return provider._query_index(
                 search_terms, docs_to_retrieve, data_domain_name
@@ -227,7 +219,7 @@ class DatabaseService(ServiceBase):
         data_domain,
         data_source,
     ):
-        provider = self.set_provider(data_source.data_source_database_provider)
+        provider = self.get_provider(data_source.data_source_database_provider)
         if provider:
             return provider._write_documents_to_database(
                 documents, data_domain, data_source

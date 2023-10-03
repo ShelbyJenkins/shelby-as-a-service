@@ -6,7 +6,6 @@ import modules.prompt_templates as PromptTemplates
 import modules.text_processing.text as TextProcess
 import modules.utils.config_manager as ConfigManager
 import openai
-from modules.utils.get_app import get_app
 from services.service_base import ServiceBase
 
 
@@ -39,9 +38,7 @@ class OpenAILLM(ServiceBase):
     max_response_tokens: int = 300
 
     def __init__(self, parent_service=None):
-        self.app = get_app()
         super().__init__(parent_service=parent_service)
-        ConfigManager.setup_service_config(self)
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
@@ -134,11 +131,11 @@ class OpenAILLM(ServiceBase):
         )
 
     def _create_streaming_chat(
-        self, query, prompt_template=None, documents=None, model_name=None
+        self, query, prompt_template_path=None, documents=None, model_name=None
     ):
         prompt, model, request_token_count = self._prep_chat(
             query=query,
-            prompt_template=prompt_template,
+            prompt_template_path=prompt_template_path,
             documents=documents,
             model_name=model_name,
         )
@@ -182,12 +179,17 @@ class OpenAILLM(ServiceBase):
                     model=model,
                 )
 
-    def _prep_chat(self, query, prompt_template=None, documents=None, model_name=None):
+    def _prep_chat(
+        self, query, prompt_template_path=None, documents=None, model_name=None
+    ):
         model = self.get_model(self.type_model, model_name=model_name)
-        if not prompt_template:
-            prompt_template = "Answer in peace my friend."
+        if not prompt_template_path:
+            prompt_template_path = "Answer in peace my friend."
         prompt = PromptTemplates.create_openai_prompt(
-            query=query, prompt_template=prompt_template, documents=documents
+            query=query,
+            prompt_template_dir=self.prompt_template_dir,
+            prompt_template_path=prompt_template_path,
+            documents=documents,
         )
 
         result = ""
@@ -204,27 +206,25 @@ class LLMService(ServiceBase):
     provider_type: str = "llm_provider"
     available_providers: List[Any] = [OpenAILLM]
 
-    default_provider: str = "openai_llm"
+    default_provider: Any = OpenAILLM
     max_response_tokens: int = 300
 
     def __init__(self, parent_agent):
-        self.app = get_app()
         super().__init__(parent_agent=parent_agent)
-        ConfigManager.setup_service_config(self)
 
     def create_streaming_chat(
         self,
         query,
-        prompt_template=None,
+        prompt_template_path=None,
         documents=None,
         provider_name=None,
         model_name=None,
     ):
-        provider = self.set_provider(new_provider_name=provider_name)
+        provider = self.get_provider(new_provider_name=provider_name)
         if provider:
             yield from provider._create_streaming_chat(
                 query=query,
-                prompt_template=prompt_template,
+                prompt_template_path=prompt_template_path,
                 documents=documents,
                 model_name=model_name,
             )
@@ -232,16 +232,16 @@ class LLMService(ServiceBase):
     def create_chat(
         self,
         query,
-        prompt_template=None,
+        prompt_template_path=None,
         documents=None,
         provider_name=None,
         model_name=None,
     ):
-        provider = self.set_provider(new_provider_name=provider_name)
+        provider = self.get_provider(new_provider_name=provider_name)
         if provider:
             return provider._create_chat(
                 query=query,
-                prompt_template=prompt_template,
+                prompt_template_path=prompt_template_path,
                 documents=documents,
                 model_name=model_name,
             )

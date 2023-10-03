@@ -1,6 +1,6 @@
 import argparse
 
-from modules.utils.get_app import get_app
+from app_base import AppBase
 
 
 def main():
@@ -22,7 +22,7 @@ def main():
         app_name = "base"
 
     print(f"app.py is being run as: {app_name}")
-    app = get_app(app_name)
+    app = AppBase.get_app(app_name)
     app.setup_app()
     app.run_sprites()
 

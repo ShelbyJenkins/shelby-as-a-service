@@ -1,48 +1,127 @@
 # region
-import os
+import json
+import re
 import traceback
-import json, yaml, re
-import openai, pinecone, tiktoken
-from typing import Dict, Optional, List, Any
-import modules.utils.config_manager as ConfigManager
-from agents.agent_base import AgentBase
-from services.llm_service import LLMService
-from services.embedding_service import EmbeddingService
-from services.database_service import DatabaseService
+from typing import Any, Dict, List, Optional
+
 import modules.text_processing.text as text
-from modules.utils.get_app import get_app
+from agents.agent_base import AgentBase
+from services.database_service import DatabaseService
+from services.embedding_service import EmbeddingService
+from services.llm_service import LLMService
 
 # endregion
 
 
 class CEQAgent(AgentBase):
     agent_name: str = "ceq_agent"
-    app: Optional[Any] = None
-    index: Optional[Any] = None
+    ui_name: str = "Shelby Agent"
+    agent_select_status_message: str = "Search index to find docs related to request."
+    default_prompt_template_path: str = "ceq_main_prompt.yaml"
+
     llm_provider: str = "openai_llm"
     llm_model: str = "gpt-4"
+    embedding_provider: str = "openai_embedding"
     data_domain_constraints_enabled: bool = False
-    data_domain_constraints_llm_model: str = "gpt-4"
     data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
     keyword_generator_enabled: bool = False
-    keyword_generator_llm_model: str = "gpt-4"
     doc_relevancy_check_enabled: bool = False
-    doc_relevancy_check_llm_model: str = "gpt-4"
-    docs_to_retrieve: int = 5
+    retrieve_n_docs: int = 5
     docs_max_token_length: int = 1200
-    docs_max_total_tokens: int = 3500
+    docs_max_total_tokens: int = 2500
     docs_max_used: int = 5
 
     def __init__(self, parent_sprite=None):
-        self.app = get_app()
         super().__init__(parent_sprite=parent_sprite)
 
-        ConfigManager.setup_service_config(self)
         self.llm_service = LLMService(self)
-
         self.embedding_service = EmbeddingService(self)
-
         self.database_service = DatabaseService(self)
+        self.user_prompt_template_path: Optional[str] = None
+        self.data_domain_name = None
+
+    def create_streaming_chat(
+        self,
+        query,
+        user_prompt_template_path=None,
+        provider_name=None,
+        model_name=None,
+        **kwargs,
+    ):
+        prompt_template_path, prepared_documents = self.run_context_enriched_query(
+            query, user_prompt_template_path, provider_name, model_name
+        )
+        yield from self.llm_service.create_streaming_chat(
+            query=query,
+            prompt_template_path=prompt_template_path,
+            documents=prepared_documents,
+            provider_name=provider_name,
+            model_name=model_name,
+        )
+
+    def create_chat(
+        self,
+        query,
+        user_prompt_template_path=None,
+        provider_name=None,
+        model_name=None,
+        **kwargs,
+    ):
+        prompt_template_path, prepared_documents = self.run_context_enriched_query(
+            query, user_prompt_template_path, provider_name, model_name
+        )
+        llm_response = self.llm_service.create_chat(
+            query=query,
+            prompt_template_path=prompt_template_path,
+            documents=prepared_documents,
+            provider_name=provider_name,
+            model_name=model_name,
+        )
+        parsed_response = self.ceq_append_meta(llm_response, prepared_documents)
+        self.log.print_and_log(
+            f"LLM response with appended metadata: {json.dumps(parsed_response, indent=4)}"
+        )
+
+        return parsed_response
+
+    def run_context_enriched_query(
+        self, query, user_prompt_template_path=None, provider_name=None, model_name=None
+    ):
+        if user_prompt_template_path:
+            prompt_template_path = user_prompt_template_path
+        else:
+            prompt_template_path = self.default_prompt_template_path
+        query = query
+
+        # try:
+
+        # if self.data_domain_constraints_enabled:
+        # self.data_domain_name, response = self.select_data_domain(query)
+        #     if response:
+        #         return response
+        # self.log.print_and_log(f"Running query: {query}")
+        query_to_embed = query
+        # if self.keyword_generator_enabled:
+        #     query_to_embed = self.action_agent.keyword_generator(query)
+        #     self.log.print_and_log(
+        #         f"ceq_keyword_generator response: {query_to_embed}"
+        #     )
+
+        query_embedding = self.embedding_service.get_query_embedding(query_to_embed)
+
+        returned_documents = self.database_service.query_index(
+            query_embedding, self.retrieve_n_docs, self.data_domain_name
+        )
+
+        prepared_documents = self.doc_handling(returned_documents)
+
+        if not prepared_documents:
+            raise ValueError(
+                "No supporting documents found. Currently we don't support queries without supporting context."
+            )
+
+        self.log.print_and_log("Sending prompt to LLM")
+        return prompt_template_path, prepared_documents
 
     def doc_handling(self, returned_documents):
         if not returned_documents:
@@ -187,39 +266,6 @@ class CEQAgent(AgentBase):
 
         return sorted_documents
 
-    def ceq_main_prompt_template(self, query, documents=None):
-        with open(
-            os.path.join(
-                "shelby_as_a_service/modules/prompt_templates/", "ceq_main_prompt.yaml"
-            ),
-            "r",
-            encoding="utf-8",
-        ) as stream:
-            # Load the YAML data and print the result
-            prompt_template = yaml.safe_load(stream)
-
-        # Loop over documents and append them to each other and then adds the query
-        if documents:
-            content_strs = []
-            for doc in documents:
-                doc_num = doc["doc_num"]
-                content_strs.append(f"{doc['content']} doc_num: [{doc_num}]")
-                documents_str = " ".join(content_strs)
-            prompt_message = "Query: " + query + " Documents: " + documents_str
-        else:
-            prompt_message = "Query: " + query
-
-        # Loop over the list of dictionaries in data['prompt_template']
-        for role in prompt_template:
-            if role["role"] == "user":  # If the 'role' is 'user'
-                role[
-                    "content"
-                ] = prompt_message  # Replace the 'content' with 'prompt_message'
-
-        # self.log.print_and_log(f"prepared prompt: {json.dumps(prompt_template, indent=4)}")
-
-        return prompt_template
-
     def ceq_append_meta(self, input_text, parsed_documents):
         # Covering LLM doc notations cases
         # The modified pattern now includes optional opening parentheses or brackets before "Document"
@@ -271,73 +317,3 @@ class CEQAgent(AgentBase):
         self.log.print_and_log(f"response with metadata: {answer_obj}")
 
         return answer_obj
-
-    def run_context_enriched_query(
-        self, query, stream=False, provider_name=None, model_name=None
-    ):
-        # try:
-        data_domain_name = None
-        if self.data_domain_constraints_enabled:
-            data_domain_name, response = self.select_data_domain(query)
-            if response is not None:
-                return response
-
-        self.log.print_and_log(f"Running query: {query}")
-
-        if self.keyword_generator_enabled:
-            generated_keywords = self.action_agent.keyword_generator(query)
-            self.log.print_and_log(
-                f"ceq_keyword_generator response: {generated_keywords}"
-            )
-            search_terms = self.embedding_service.get_query_embedding(
-                generated_keywords
-            )
-        else:
-            search_terms = self.embedding_service.get_query_embedding(query)
-        self.log.print_and_log("Embeddings retrieved")
-
-        returned_documents = self.database_service.query_index(
-            search_terms, self.docs_to_retrieve, data_domain_name
-        )
-
-        prepared_documents = self.doc_handling(returned_documents)
-
-        if not prepared_documents:
-            return "No supporting documents found. Currently we don't support queries without supporting context."
-        else:
-            prompt = self.ceq_main_prompt_template(query, prepared_documents)
-
-        self.log.print_and_log("Sending prompt to LLM")
-        if stream:
-            yield from self.llm_service.create_streaming_chat(
-                prompt,
-                provider_name=provider_name
-                if provider_name is not None
-                else self.llm_provider,
-                model_name=model_name if model_name is not None else self.llm_model,
-            )
-        else:
-            llm_response = self.llm_service.create_chat(
-                prompt,
-                provider_name=provider_name
-                if provider_name is not None
-                else self.llm_provider,
-                model_name=model_name if model_name is not None else self.llm_model,
-            )
-            parsed_response = self.ceq_append_meta(llm_response, prepared_documents)
-            self.log.print_and_log(
-                f"LLM response with appended metadata: {json.dumps(parsed_response, indent=4)}"
-            )
-
-            return parsed_response
-
-        # except Exception as error:
-        #     # Logs error and sends error to sprite
-        #     error_message = f"An error occurred while processing request: {error}\n"
-        #     error_message += "Traceback (most recent call last):\n"
-        #     error_message += traceback.format_exc()
-
-        #     self.log.print_and_log(error_message)
-        #     print(error_message)
-        #     return error_message
-        #     # return f"Bot broke. Probably just an API issue. Feel free to try again. Otherwise contact support."

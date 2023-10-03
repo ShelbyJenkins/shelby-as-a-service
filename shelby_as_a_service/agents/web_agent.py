@@ -1,13 +1,14 @@
 # region
 
 from typing import Any, Optional
+from urllib.parse import urlparse, urlunparse
 
+import gradio as gr
 import modules.prompt_templates as PromptTemplates
 import modules.text_processing.text as text
 import modules.utils.config_manager as ConfigManager
 from agents.agent_base import AgentBase
 from agents.ingest_agent import IngestAgent
-from modules.utils.get_app import get_app
 from services.llm_service import LLMService
 
 # endregion
@@ -15,14 +16,16 @@ from services.llm_service import LLMService
 
 class WebAgent(AgentBase):
     agent_name: str = "web_agent"
+    ui_name: str = "URL Agent"
+    agent_select_status_message: str = (
+        "Load a URL Data Tab, and we'll access it and use it to generate a response."
+    )
     default_prompt_template_path: str = "web_prompt.yaml"
     app: Optional[Any] = None
     index: Optional[Any] = None
 
     def __init__(self, parent_sprite=None):
-        self.app = get_app()
         super().__init__(parent_sprite=parent_sprite)
-        ConfigManager.setup_service_config(self)
 
         self.ingest_agent = IngestAgent(parent_sprite)
 
@@ -38,14 +41,15 @@ class WebAgent(AgentBase):
     ):
         self.log.print_and_log(f"Running query: {query}")
 
-        prompt_template = PromptTemplates.load_prompt_template(
-            self.default_prompt_template_path, user_prompt_template_path
-        )
+        if user_prompt_template_path:
+            prompt_template_path = user_prompt_template_path
+        else:
+            prompt_template_path = self.default_prompt_template_path
 
         self.log.print_and_log("Sending prompt to LLM")
         yield from self.llm_service.create_streaming_chat(
             query=query,
-            prompt_template=prompt_template,
+            prompt_template_path=prompt_template_path,
             documents=documents,
             provider_name=provider_name,
             model_name=model_name,
@@ -61,24 +65,33 @@ class WebAgent(AgentBase):
     ):
         self.log.print_and_log(f"Running query: {query}")
 
-        prompt_template = PromptTemplates.load_prompt_template(
-            self.default_prompt_template_path, user_prompt_template_path
-        )
+        if user_prompt_template_path:
+            prompt_template_path = user_prompt_template_path
+        else:
+            prompt_template_path = self.default_prompt_template_path
 
         self.log.print_and_log("Sending prompt to LLM")
         return self.llm_service.create_streaming_chat(
             query=query,
-            prompt_template=prompt_template,
+            prompt_template_path=prompt_template_path,
             documents=documents,
             provider_name=provider_name,
             model_name=model_name,
         )
 
     def load_single_website(self, comps_state):
-        documents = self.ingest_agent.load_single_website(comps_state)
-        output = ""
-        if documents:
-            for document in documents:
-                output += document.page_content
-            return [output, output]
-        return None
+        if web_tab_url_text := comps_state.get("web_tab_url_text", None):
+            try:
+                parsed_url = urlparse(web_tab_url_text)
+                complete_url = urlunparse(parsed_url)
+                documents = self.ingest_agent.load_single_website(complete_url)
+                output = ""
+                if documents:
+                    for document in documents:
+                        if content := text.get_document_content(document):
+                            output += content
+                    return [output, output]
+
+            except ValueError:
+                pass
+        raise gr.Error("Bad value for web_tab_url_text!")
