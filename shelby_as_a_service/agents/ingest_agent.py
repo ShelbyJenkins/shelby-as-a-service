@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 # from modules.index.data_model import DataModels
 import modules.utils.config_manager as ConfigManager
 from agents.agent_base import AgentBase
-from modules.index.data_model import DataDomainModel, DataSourceModel, IndexModel
+from modules.index.index_model import DataDomainModel, DataSourceModel, IndexModel
 from services.database_service import DatabaseService
 from services.ingest_service import IngestService
 

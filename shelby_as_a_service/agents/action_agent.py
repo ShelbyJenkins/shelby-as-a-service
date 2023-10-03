@@ -1,36 +1,41 @@
 # region
+import json
 import os
+import re
 import traceback
-import json, yaml, re
-import openai, pinecone, tiktoken
+
+import openai
+import pinecone
+import tiktoken
+import yaml
 from models.agent_models import ActionAgentModel
+from services.providers.llm_service import LLMService
 from services.utils.log_service import Logger
 from utils.app_base import AppBase
-from services.providers.llm_service import LLMService
+
 # endregion
 
-class ActionAgent(AppBase):
 
+class ActionAgent(AppBase):
     # ActionAgent
-    action_llm_model: str = 'gpt-4'
+    action_llm_model: str = "gpt-4"
     # QueryAgent
-    
+
     ceq_data_domain_constraints_enabled: bool = False
-    
+
     # APIAgent
     # api_agent_select_operation_id_llm_model: str = 'gpt-4'
     # api_agent_create_function_llm_model: str = 'gpt-4'
     # api_agent_populate_function_llm_model: str = 'gpt-4'
-    
-    service_name_: str = 'action_agent'
-    
+
+    service_name_: str = "action_agent"
+
     # Overwrite the AppBase model
-   
-    
+
     def __init__(self, config, sprite_name):
         """Initialized like any other service from sprites.
         However, non-sprite services have the option to also load as modules:
-        They can take a config from a config dict service_config, 
+        They can take a config from a config dict service_config,
         or by setting variables with **kwargs.
         """
         super().__init__()
@@ -46,7 +51,9 @@ class ActionAgent(AppBase):
         # Chooses workflow
         # Currently disabled
         with open(
-            os.path.join("shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"),
+            os.path.join(
+                "shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"
+            ),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -89,7 +96,9 @@ class ActionAgent(AppBase):
         # Chooses topic
         # If no matching topic found, returns 0.
         with open(
-            os.path.join("shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"),
+            os.path.join(
+                "shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"
+            ),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -159,9 +168,7 @@ class ActionAgent(AppBase):
             for key, _ in self.data_domains.items():
                 data_domain_name = key
         else:
-            data_domain_name = self.action_agent.data_domain_decision(
-                query
-            )
+            data_domain_name = self.action_agent.data_domain_decision(query)
 
         # If no domain found message is sent to sprite
         if data_domain_name == 0:
@@ -175,7 +182,9 @@ class ActionAgent(AppBase):
 
     def keyword_generator(self, query):
         with open(
-            os.path.join("shelby_as_service/prompt_templates/", "ceq_keyword_generator.yaml"),
+            os.path.join(
+                "shelby_as_service/prompt_templates/", "ceq_keyword_generator.yaml"
+            ),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -201,8 +210,15 @@ class ActionAgent(AppBase):
         generated_keywords = f"query: {query}, keywords: {keyword_generator_response}"
 
         return generated_keywords
-    
-    def doc_relevancy_check(self, query, documents=None):
+
+    @staticmethod
+    def doc_relevancy_check(query, documents):
+        returned_documents_list = []
+        for returned_doc in documents:
+            returned_documents_list.append(returned_doc["url"])
+        self.log.print_and_log(
+            f"{len(documents)} documents returned from vectorstore: {returned_documents_list}"
+        )
         with open(
             os.path.join("shelby_as_service/prompt_templates/", "ceq_doc_check.yaml"),
             "r",
@@ -263,5 +279,14 @@ class ActionAgent(AppBase):
             # Subtract 1 to get the correct index in the list
             # Access the document from the list using the index
             relevant_documents.append(documents[doc_num - 1])
+
+        for returned_doc in relevant_documents:
+            returned_documents_list.append(returned_doc["url"])
+        self.log.print_and_log(
+            f"{len(relevant_documents)} documents returned from doc_check: {returned_documents_list}"
+        )
+        if not relevant_documents:
+            self.log.print_and_log("No supporting documents after doc_relevancy_check!")
+            return None
 
         return relevant_documents

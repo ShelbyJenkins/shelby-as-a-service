@@ -194,13 +194,13 @@ class ChatUI:
                         )
                 with gr.Column():
                     self.comps["tbd_settings1"] = gr.Dropdown(
-                        choices=GRHelper.dropdown_default_value(LLMService),
-                        value=GRHelper.dropdown_choices(OpenAILLM),
+                        choices=GRHelper.dropdown_choices(OpenAILLM),
+                        value=GRHelper.dropdown_default_value(LLMService),
                         label="tbd_settings1",
                     )
                     self.comps["tbd_settings2"] = gr.Dropdown(
-                        choices=GRHelper.dropdown_default_value(LLMService),
-                        value=GRHelper.dropdown_choices(OpenAILLM),
+                        choices=GRHelper.dropdown_choices(OpenAILLM),
+                        value=GRHelper.dropdown_default_value(LLMService),
                         label="tbd_settings2",
                     )
 

@@ -1,15 +1,15 @@
-from time import sleep
+from typing import Any, Dict, List, Optional
 
 import gradio as gr
 
 
-def list_available(class_model):
+def list_available(class_model) -> Optional[List[Any]]:
     if available_providers := getattr(class_model, "available_providers", None):
         return [provider.provider_name for provider in available_providers]
     if available_models := getattr(class_model, "available_models", None):
         return [modes.model_name for modes in available_models]
     if available_agents := getattr(class_model, "available_agents", None):
-        return [agent.ui_name for agent in available_agents]
+        return [agent.agent_ui_name for agent in available_agents]
     return None
 
 
@@ -33,7 +33,7 @@ def check_for_web_data(web_data_added):
     raise gr.Error("No valid web data found!")
 
 
-def comp_values_to_dict(ui, *values):
+def comp_values_to_dict(ui, *values) -> Dict[str, Any]:
     group_name = values[0]
     comps_keys = ui[group_name]["comps"].keys()
     return {k: v for k, v in zip(comps_keys, values)}

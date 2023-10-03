@@ -1,17 +1,17 @@
 import concurrent.futures
 import os
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type, Union
 
-import modules.utils.app_manager as AppManager
-import modules.utils.config_manager as ConfigManager
 from dotenv import load_dotenv
+from modules.utils.app_manager import AppManager
+from modules.utils.config_manager import ConfigManager
 from modules.utils.log_service import Logger
+from pydantic import Field
 
 
 class AppInstance:
-    app_manager: Any = AppManager
-    config_manager: Any = ConfigManager
+    app_name: str
 
     config: Dict[str, str] = {}
     secrets: Dict[str, str] = {}
@@ -20,29 +20,25 @@ class AppInstance:
     last_request_cost: Decimal = Decimal("0")
 
     def __init__(self, app_name):
-        # self.app_name = AppManager.initialize_app_config(app_name)
         self.app_name = app_name
+        self.log = Logger(app_name=app_name)
 
-        self.log = Logger(
-            self.app_name,
-            self.app_name,
-            f"{self.app_name}.md",
-            level="INFO",
-        )
+    def setup_app(self) -> "AppInstance":
+        # self.app_name = AppManager.initialize_app_config(app_name)
 
         load_dotenv(os.path.join(f"apps/{self.app_name}/", ".env"))
         self.config = AppManager.load_app_file(self.app_name)
         self.local_index_dir = f"apps/{self.app_name}/index"
-
-    def setup_app(self):
-        from modules.index.data_model import IndexModel
+        from modules.index.index_model import IndexModel
 
         # Index needs to init first
         self.index = IndexModel()
 
+        from sprites.discord_sprite import DiscordSprite
         from sprites.web.web_sprite import WebSprite
 
-        self.web_sprite = WebSprite()
+        # self.web_sprite = WebSprite()
+        self.discord_sprite = DiscordSprite()
 
         # Check secrets
         for secret in self.required_secrets:
@@ -52,7 +48,7 @@ class AppInstance:
         return self
 
     def run_sprites(self):
-        self.web_sprite.run_sprite()
+        self.discord_sprite.run_sprite()
         # with concurrent.futures.ThreadPoolExecutor() as executor:
         # for sprite_name in self.enabled_sprites:
         #     sprite = getattr(self, sprite_name)
@@ -60,19 +56,23 @@ class AppInstance:
 
 
 class AppBase:
-    _instance: Optional[AppInstance] = None
+    _instance: AppInstance
+
+    app_manager: Type[AppManager] = AppManager
+    config_manager: Type[ConfigManager] = ConfigManager
 
     prompt_template_dir: str = "shelby_as_a_service/modules/prompt_templates"
+
     app_config_path: str = "app_instance"
-    index_config_path: str = "index"
-    sprite_config_path: str = "services"  # Change to sprites
-    agent_config_path: str = "services"  # Change to agents
-    service_config_path: str = "services"  # Change to services
-    provider_config_path: str = "services"  # Change to providers
+    index_config_path: List[str] = ["app_instance", "index"]
+    sprite_config_path: str = "services"
+    agent_config_path: str = "services"
+    service_config_path: str = "services"
+    provider_config_path: str = "services"
 
     @classmethod
     def get_app(cls, app_name: Optional[str] = None) -> AppInstance:
-        if cls._instance is None:
+        if getattr(cls, "_instance", None) is None:
             if app_name is None:
                 raise ValueError(
                     "AppInstance must be initialized with an app_name before it can be used without it."
@@ -82,22 +82,18 @@ class AppBase:
 
     @staticmethod
     def setup_service_config(instance):
+        instance.log = instance.app.log
         instance.index = instance.app.index
         instance.app_name = instance.app.app_name
         config_path = AppBase.get_config_path(instance)
         config = AppBase.get_config(instance, config_path)
         AppBase.set_config(instance, config)
-        AppBase.set_secrets(instance)
 
     @staticmethod
-    def get_config_path(instance):
+    def get_config_path(instance) -> Optional[List[str]]:
         """Builds path to the service settings in the config file"""
 
         base_path = [AppBase.app_config_path]
-
-        if instance.__class__.__name__ == "IndexModel":
-            base_path.append(AppBase.index_config_path)
-            return base_path
 
         base_path.append(AppBase.sprite_config_path)
         if sprite_name := getattr(instance, "sprite_name", None):
@@ -128,14 +124,26 @@ class AppBase:
         return None
 
     @staticmethod
-    def get_config(instance, config_path):
-        # Create a copy of the base config, and path to the config
-        config = instance.app.config.copy()
-        for path in config_path:
-            config = config.get(path, None)
-            if config is None:
-                config = None
-                break
+    def get_config(
+        instance, config_path=None, input_config=None
+    ) -> Optional[Dict[str, Any]]:
+        config = None
+        if config_path is None and input_config is None:
+            if instance.__class__.__name__ == "IndexModel":
+                config_path = AppBase.index_config_path
+            else:
+                return None
+        if config_path and input_config is None:
+            # Create a copy of the base config, and path to the config
+            config = instance.app.config.copy()
+            for path in config_path:
+                config = config.get(path, None)
+                if config is None:
+                    config = None
+                    break
+        elif input_config and config_path is None:
+            config = input_config
+
         return config
 
     @staticmethod
@@ -157,8 +165,6 @@ class AppBase:
 
         instance.config = config
 
-    @staticmethod
-    def set_secrets(instance):
         if hasattr(instance, "required_secrets") and instance.required_secrets:
             for secret in instance.required_secrets:
                 secret_str = f"{instance.app.app_name}_{secret}".upper()

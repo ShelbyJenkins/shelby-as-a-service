@@ -1,21 +1,25 @@
-import os
 import logging
+import os
 import threading
+from typing import Any, Optional
+
+from pydantic import BaseModel, validator
 
 
 class Logger:
-    def __init__(self, deployment_name, logger_name, log_file, level="INFO"):
-        self.log_file = log_file
-        self.level = level
-        self.lock = threading.Lock()
-        self.log_dir = f"apps/{deployment_name}/logs"
-        os.makedirs(self.log_dir, exist_ok=True)
-        self.log_file_path = os.path.join(self.log_dir, log_file)
-        self.logger = logging.getLogger(logger_name)
-        self.formatter = logging.Formatter(
-            "%(levelname)s: %(asctime)s %(message)s", datefmt="%Y/%m/%d %I:%M:%S %p"
-        )
-        self.clear_and_set_handler(overwrite=True)
+    level: str = "INFO"
+
+    formatter = logging.Formatter(
+        "%(levelname)s: %(asctime)s %(message)s", datefmt="%Y/%m/%d %I:%M:%S %p"
+    )
+
+    def __init__(self, app_name) -> None:
+        if app_name is None:
+            raise ValueError("app_name must be set to create the default log_file_path")
+        log_dir = f"apps/{app_name}/logs"
+        os.makedirs(log_dir, exist_ok=True)
+        self.log_file_path = os.path.join(log_dir, f"{app_name}.md")
+        self.logger = logging.getLogger(app_name)
 
     def clear_and_set_handler(self, overwrite=False):
         # If the logger has handlers, remove them
@@ -23,13 +27,9 @@ class Logger:
             self.logger.handlers.clear()
 
         if overwrite is True:
-            fileHandler = logging.FileHandler(
-                os.path.join(self.log_dir, self.log_file), mode="w"
-            )
+            fileHandler = logging.FileHandler(self.log_file_path, mode="w")
         else:
-            fileHandler = logging.FileHandler(
-                os.path.join(self.log_dir, self.log_file), mode="a"
-            )
+            fileHandler = logging.FileHandler(self.log_file_path, mode="a")
 
         logging_level = logging._nameToLevel.get(self.level.upper(), logging.INFO)
         fileHandler.setFormatter(self.formatter)
@@ -50,7 +50,7 @@ class Logger:
             print(f"An error occurred while logging: {error}")
 
     def print_and_log_gradio(self, message):
-        with self.lock:
+        with threading.Lock():
             try:
                 print(message)
                 self.write_message_top(message)
@@ -77,6 +77,6 @@ class Logger:
             file.write(formatted_message + "\n" + content)
 
     def read_logs(self):
-        with self.lock:
+        with threading.Lock():
             with open(self.log_file_path, "r", encoding="utf-8") as file:
                 return file.read()

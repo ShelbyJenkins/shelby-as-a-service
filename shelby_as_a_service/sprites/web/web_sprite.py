@@ -1,7 +1,7 @@
 # region
 
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
 import modules.utils.config_manager as ConfigManager
@@ -18,9 +18,8 @@ from sprites.web.gradio_themes import AtYourServiceTheme
 
 class WebSprite(SpriteBase):
     sprite_name: str = "web_sprite"
+    available_agents: List[Type] = [VanillaLLM, WebAgent, CEQAgent]
 
-    ui: Dict[Any, Any] = {}
-    available_agents: List[Any] = [VanillaLLM, WebAgent, CEQAgent]
     # default_deployment_enabled: bool = True
     # default_local_deployment_name: Optional[str] = None
     local_message_start: str = "Running request... relax, chill, and vibe a minute."
@@ -30,8 +29,7 @@ class WebSprite(SpriteBase):
         """ """
         super().__init__()
 
-        self.ceq_agent = CEQAgent(self)
-        # self.comps = {}
+        self.ui = {}
 
     def create_interface(self):
         """Creates gradio app."""
@@ -61,40 +59,44 @@ class WebSprite(SpriteBase):
             local_client.queue()
             local_client.launch()
 
-    def run_chat(self, *comps_state):
-        comps_state = GRHelper.comp_values_to_dict(self.ui, *comps_state)
+    def run_chat(
+        self, *comps_state
+    ) -> Union[Generator[List[str], None, None], List[str]]:
+        ui_state = GRHelper.comp_values_to_dict(self.ui, *comps_state)
         documents = None
 
-        agent = self.get_selected_agent(comps_state["chat_tab_agent_dropdown"])
+        agent = self.get_selected_agent(ui_state["chat_tab_agent_dropdown"])
         if agent is None:
             raise gr.Error("Bad value for chat_tab_agent_dropdown!")
         if agent.agent_name == "web_agent":
-            if content := comps_state["web_data_content"]:
+            if content := ui_state["web_data_content"]:
                 documents = content
             else:
                 raise gr.Error("Bad value for web_data_content!")
         # try:
-        if comps_state.get("stream_chat", False):
+        if ui_state.get("stream_chat", False):
             yield from agent.create_streaming_chat(
-                query=comps_state["input_chat_textbox"],
+                query=ui_state["input_chat_textbox"],
                 user_prompt_template_path=None,
                 documents=documents,
-                provider_name=comps_state["chat_llm_provider"],
-                model_name=comps_state["chat_llm_model"],
+                llm_provider=ui_state["chat_llm_provider"],
+                llm_model=ui_state["chat_llm_model"],
             )
+            return None
         else:
             return agent.create_chat(
-                query=comps_state["input_chat_textbox"],
+                query=ui_state["input_chat_textbox"],
                 user_prompt_template_path=None,
                 document=documents,
-                provider_name=comps_state["chat_llm_provider"],
-                model_name=comps_state["chat_llm_model"],
+                llm_provider=ui_state["chat_llm_provider"],
+                llm_model=ui_state["chat_llm_model"],
             )
+
         # except Exception as e:
         #     print(f"An error occurred: {str(e)}")
         #     raise gr.Error(f"Error: {e}") from e
 
-    def load_single_website(self, *comps_state):
+    def load_single_website(self, *comps_state) -> List[str]:
         comps_state = GRHelper.comp_values_to_dict(self.ui, *comps_state)
 
         return WebAgent(self).load_single_website(comps_state)

@@ -1,6 +1,6 @@
 # region
 
-from typing import Any, Optional
+from typing import Any, Generator, List, Optional
 from urllib.parse import urlparse, urlunparse
 
 import gradio as gr
@@ -16,13 +16,14 @@ from services.llm_service import LLMService
 
 class WebAgent(AgentBase):
     agent_name: str = "web_agent"
-    ui_name: str = "URL Agent"
+    agent_ui_name: str = "URL Agent"
     agent_select_status_message: str = (
         "Load a URL Data Tab, and we'll access it and use it to generate a response."
     )
     default_prompt_template_path: str = "web_prompt.yaml"
     app: Optional[Any] = None
     index: Optional[Any] = None
+    database_provider: str = "local_filestore_database"
 
     def __init__(self, parent_sprite=None):
         super().__init__(parent_sprite=parent_sprite)
@@ -36,9 +37,9 @@ class WebAgent(AgentBase):
         query,
         user_prompt_template_path=None,
         documents=None,
-        provider_name=None,
-        model_name=None,
-    ):
+        llm_provider=None,
+        llm_model=None,
+    ) -> Generator[List[str], None, None]:
         self.log.print_and_log(f"Running query: {query}")
 
         if user_prompt_template_path:
@@ -51,8 +52,8 @@ class WebAgent(AgentBase):
             query=query,
             prompt_template_path=prompt_template_path,
             documents=documents,
-            provider_name=provider_name,
-            model_name=model_name,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
 
     def create_chat(
@@ -60,9 +61,9 @@ class WebAgent(AgentBase):
         query,
         user_prompt_template_path=None,
         documents=None,
-        provider_name=None,
-        model_name=None,
-    ):
+        llm_provider=None,
+        llm_model=None,
+    ) -> Optional[str]:
         self.log.print_and_log(f"Running query: {query}")
 
         if user_prompt_template_path:
@@ -71,12 +72,12 @@ class WebAgent(AgentBase):
             prompt_template_path = self.default_prompt_template_path
 
         self.log.print_and_log("Sending prompt to LLM")
-        return self.llm_service.create_streaming_chat(
+        return self.llm_service.create_chat(
             query=query,
             prompt_template_path=prompt_template_path,
             documents=documents,
-            provider_name=provider_name,
-            model_name=model_name,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
 
     def load_single_website(self, comps_state):

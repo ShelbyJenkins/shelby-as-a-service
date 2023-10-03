@@ -2,9 +2,11 @@
 import json
 import re
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import modules.text_processing.text as text
+
+# from agents.action_agent import ActionAgent
 from agents.agent_base import AgentBase
 from services.database_service import DatabaseService
 from services.embedding_service import EmbeddingService
@@ -15,13 +17,18 @@ from services.llm_service import LLMService
 
 class CEQAgent(AgentBase):
     agent_name: str = "ceq_agent"
-    ui_name: str = "Shelby Agent"
+    agent_ui_name: str = "Shelby Agent"
     agent_select_status_message: str = "Search index to find docs related to request."
     default_prompt_template_path: str = "ceq_main_prompt.yaml"
 
+    # data_domain_name: str = "base"
+    data_domain_name: Optional[str] = None
+    index_name: str = "base"
     llm_provider: str = "openai_llm"
     llm_model: str = "gpt-4"
     embedding_provider: str = "openai_embedding"
+    database_provider: str = "pinecone_database"
+
     data_domain_constraints_enabled: bool = False
     data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
     keyword_generator_enabled: bool = False
@@ -37,45 +44,48 @@ class CEQAgent(AgentBase):
         self.llm_service = LLMService(self)
         self.embedding_service = EmbeddingService(self)
         self.database_service = DatabaseService(self)
-        self.user_prompt_template_path: Optional[str] = None
-        self.data_domain_name = None
+        self.user_prompt_template_path = None
 
     def create_streaming_chat(
         self,
         query,
-        user_prompt_template_path=None,
-        provider_name=None,
-        model_name=None,
+        user_prompt_template_path: Optional[str] = None,
+        llm_provider=None,
+        llm_model=None,
         **kwargs,
-    ):
+    ) -> Generator[List[str], None, None]:
         prompt_template_path, prepared_documents = self.run_context_enriched_query(
-            query, user_prompt_template_path, provider_name, model_name
+            query, user_prompt_template_path
         )
+        if llm_model:
+            self.llm_model = llm_model
         yield from self.llm_service.create_streaming_chat(
             query=query,
             prompt_template_path=prompt_template_path,
             documents=prepared_documents,
-            provider_name=provider_name,
-            model_name=model_name,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
 
     def create_chat(
         self,
         query,
         user_prompt_template_path=None,
-        provider_name=None,
-        model_name=None,
+        llm_provider=None,
+        llm_model=None,
         **kwargs,
-    ):
+    ) -> Optional[Dict[str, str]]:
         prompt_template_path, prepared_documents = self.run_context_enriched_query(
-            query, user_prompt_template_path, provider_name, model_name
+            query, user_prompt_template_path
         )
+        if llm_model:
+            self.llm_model = llm_model
         llm_response = self.llm_service.create_chat(
             query=query,
             prompt_template_path=prompt_template_path,
             documents=prepared_documents,
-            provider_name=provider_name,
-            model_name=model_name,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
         parsed_response = self.ceq_append_meta(llm_response, prepared_documents)
         self.log.print_and_log(
@@ -85,8 +95,8 @@ class CEQAgent(AgentBase):
         return parsed_response
 
     def run_context_enriched_query(
-        self, query, user_prompt_template_path=None, provider_name=None, model_name=None
-    ):
+        self, query, user_prompt_template_path=None
+    ) -> Tuple[str, List[Any]]:
         if user_prompt_template_path:
             prompt_template_path = user_prompt_template_path
         else:
@@ -113,55 +123,25 @@ class CEQAgent(AgentBase):
             query_embedding, self.retrieve_n_docs, self.data_domain_name
         )
 
-        prepared_documents = self.doc_handling(returned_documents)
+        # if self.doc_relevancy_check_enabled:
+        #     if (
+        #         returned_documents := (
+        #             ActionAgent.doc_relevancy_check(query, returned_documents)
+        #         )
+        #     ) is None:
+        #         raise ValueError(
+        #         "No supporting documents found. Currently we don't support queries without supporting context."
+        #     )
 
-        if not prepared_documents:
+        parsed_documents = self.ceq_parse_documents(returned_documents)
+
+        if not parsed_documents:
             raise ValueError(
                 "No supporting documents found. Currently we don't support queries without supporting context."
             )
 
         self.log.print_and_log("Sending prompt to LLM")
-        return prompt_template_path, prepared_documents
-
-    def doc_handling(self, returned_documents):
-        if not returned_documents:
-            self.log.print_and_log("No supporting documents after initial query!")
-            return None
-
-        returned_documents_list = []
-        for returned_doc in returned_documents:
-            returned_documents_list.append(returned_doc["url"])
-        self.log.print_and_log(
-            f"{len(returned_documents)} documents returned from vectorstore: {returned_documents_list}"
-        )
-
-        if self.doc_relevancy_check_enabled:
-            returned_documents = self.doc_relevancy_check(query, returned_documents)
-            if not returned_documents:
-                self.log.print_and_log(
-                    "No supporting documents after doc_relevancy_check!"
-                )
-                return None
-            returned_documents_list = []
-            for returned_doc in returned_documents:
-                returned_documents_list.append(returned_doc["url"])
-            self.log.print_and_log(
-                f"{len(returned_documents)} documents returned from doc_check: {returned_documents_list}"
-            )
-
-        parsed_documents = self.ceq_parse_documents(returned_documents)
-        final_documents_list = []
-        for parsed_document in parsed_documents:
-            final_documents_list.append(parsed_document["url"])
-        self.log.print_and_log(
-            f"{len(parsed_documents)} documents returned after parsing: {final_documents_list}"
-        )
-
-        if not parsed_documents:
-            self.log.print_and_log("No supporting documents after parsing!")
-            return None
-
-        return parsed_documents
+        return prompt_template_path, parsed_documents
 
     def ceq_parse_documents(self, returned_documents=None):
         def _docs_tiktoken_len(documents):
@@ -172,6 +152,10 @@ class CEQAgent(AgentBase):
 
                 token_count += tokens
             return token_count
+
+        if not returned_documents:
+            self.log.print_and_log("No supporting documents after initial query!")
+            return None
 
         # Count the number of 'hard' and 'soft' documents
         hard_count = sum(1 for doc in returned_documents if doc["doc_type"] == "hard")
@@ -216,7 +200,7 @@ class CEQAgent(AgentBase):
                 else:
                     hard_count -= 1
                 sorted_documents.pop(max_token_count_idx)
-                break
+                # break ?
             # Remove the lowest scoring 'soft' document if there is more than one,
             elif soft_count > 1:
                 for idx, document in reversed(list(enumerate(sorted_documents))):
@@ -264,9 +248,20 @@ class CEQAgent(AgentBase):
         for i, document in enumerate(sorted_documents, start=1):
             document["doc_num"] = i
 
+        final_documents_list = []
+        for parsed_document in sorted_documents:
+            final_documents_list.append(parsed_document["url"])
+        self.log.print_and_log(
+            f"{len(sorted_documents)} documents returned after parsing: {final_documents_list}"
+        )
+
+        if not sorted_documents:
+            self.log.print_and_log("No supporting documents after parsing!")
+            return None
+
         return sorted_documents
 
-    def ceq_append_meta(self, input_text, parsed_documents):
+    def ceq_append_meta(self, input_text, parsed_documents) -> Dict[str, str]:
         # Covering LLM doc notations cases
         # The modified pattern now includes optional opening parentheses or brackets before "Document"
         # and optional closing parentheses or brackets after the number
@@ -282,7 +277,7 @@ class CEQAgent(AgentBase):
             self.log.print_and_log("No supporting docs.")
             answer_obj = {
                 "answer_text": input_text,
-                "llm": self.main_prompt_llm_model,
+                "llm": self.llm_model,
                 "documents": [],
             }
             return answer_obj
@@ -291,7 +286,7 @@ class CEQAgent(AgentBase):
         # Formatted text has all mutations of documents n replaced with [n]
         answer_obj = {
             "answer_text": formatted_text,
-            "llm": self.main_prompt_llm_model,
+            "llm": self.llm_model,
             "documents": [],
         }
 

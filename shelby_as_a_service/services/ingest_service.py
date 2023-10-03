@@ -1,7 +1,7 @@
 import json
 import os
 import traceback
-from typing import Any, Iterator, List
+from typing import Any, Iterator, List, Type
 
 import modules.text_processing.text as TextProcess
 import modules.utils.config_manager as ConfigManager
@@ -15,6 +15,7 @@ from langchain.document_loaders import (
     WebBaseLoader,
 )
 from langchain.schema import Document
+from pydantic import Field
 from services.service_base import ServiceBase
 
 
@@ -176,20 +177,18 @@ class GenericWebScraper(ServiceBase):
 
 class IngestService(ServiceBase):
     service_name: str = "ingest_service"
-
+    service_ui_name: str = "ingest_service"
     provider_type: str = "ingest_provider"
-    default_provider: Any = GenericWebScraper
-    available_providers: List[Any] = [
+    available_providers: List[Type] = [
         GenericWebScraper,
         GenericRecursiveWebScraper,
         # OpenAPILoader,
         # LoadTextFromFile,
     ]
+    default_provider: Type = GenericWebScraper
 
     def __init__(self, parent_agent=None):
         super().__init__(parent_agent=parent_agent)
-
-        self.current_provider = self.get_provider()
 
     def load(self, data_source):
         provider = self.get_provider(data_source.data_source_ingest_provider)

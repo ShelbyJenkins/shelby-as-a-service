@@ -1,6 +1,6 @@
 # region
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 import modules.prompt_templates as PromptTemplates
 from agents.agent_base import AgentBase
@@ -11,7 +11,7 @@ from services.llm_service import LLMService
 
 class VanillaLLM(AgentBase):
     agent_name: str = "vanillallm_agent"
-    ui_name: str = "VanillaLLM Agent"
+    agent_ui_name: str = "VanillaLLM Agent"
     agent_select_status_message: str = "EZPZ"
     default_prompt_template_path: str = "vanillallm_prompt.yaml"
 
@@ -28,9 +28,9 @@ class VanillaLLM(AgentBase):
         query,
         user_prompt_template_path=None,
         documents=None,
-        provider_name=None,
-        model_name=None,
-    ):
+        llm_provider=None,
+        llm_model=None,
+    ) -> Generator[List[str], None, None]:
         self.log.print_and_log(f"Running query: {query}")
         if user_prompt_template_path:
             prompt_template_path = user_prompt_template_path
@@ -42,8 +42,8 @@ class VanillaLLM(AgentBase):
             query=query,
             prompt_template_path=prompt_template_path,
             documents=documents,
-            provider_name=provider_name,
-            model_name=model_name,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
 
     def create_chat(
@@ -51,9 +51,9 @@ class VanillaLLM(AgentBase):
         query,
         user_prompt_template_path=None,
         documents=None,
-        provider_name=None,
-        model_name=None,
-    ):
+        llm_provider=None,
+        llm_model=None,
+    ) -> Optional[str]:
         self.log.print_and_log(f"Running query: {query}")
         if user_prompt_template_path:
             prompt_template_path = user_prompt_template_path
@@ -61,10 +61,10 @@ class VanillaLLM(AgentBase):
             prompt_template_path = self.default_prompt_template_path
 
         self.log.print_and_log("Sending prompt to LLM")
-        return self.llm_service.create_streaming_chat(
+        return self.llm_service.create_chat(
             query=query,
             prompt_template_path=prompt_template_path,
             documents=documents,
-            provider_name=provider_name,
-            model_name=model_name,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
