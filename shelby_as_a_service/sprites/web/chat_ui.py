@@ -7,14 +7,15 @@ from services.llm_service import LLMService, OpenAILLM
 
 
 class ChatUI:
-    group_name = "chat_ui"
+    GROUP_NAME = "chat_ui"
+
     comps: Dict[str, Any] = {}
     comps_state: Dict[str, Any] = {}
 
     def __init__(self, web_sprite):
         self.web_sprite = web_sprite
 
-        self.comps["group_name"] = gr.State(self.group_name)
+        self.comps["GROUP_NAME"] = gr.State(self.GROUP_NAME)
         self.comps["input_chat_textbox"] = gr.State()
         self.comps["stream_chat"] = gr.State(True)
         self.comps["url_input"] = gr.State()
@@ -30,7 +31,7 @@ class ChatUI:
                             label="out_text",
                             show_label=False,
                             interactive=False,
-                            elem_id=f"{self.group_name}_chat_tab_out_text",
+                            elem_id=f"{self.GROUP_NAME}_chat_tab_out_text",
                         )
                     with gr.Row():
                         self.comps["chat_tab_in_text"] = gr.Textbox(
@@ -38,7 +39,7 @@ class ChatUI:
                             max_lines=3,
                             show_label=False,
                             placeholder="Send a message",
-                            elem_id=f"{self.group_name}_chat_tab_in_text",
+                            elem_id=f"{self.GROUP_NAME}_chat_tab_in_text",
                         )
                     with gr.Row():
                         self.comps["chat_tab_agent_dropdown"] = gr.Dropdown(
@@ -63,7 +64,7 @@ class ChatUI:
                                 max_lines=1,
                                 show_label=False,
                                 placeholder="...status",
-                                elem_id=f"{self.group_name}_chat_tab_status_text",
+                                elem_id=f"{self.GROUP_NAME}_chat_tab_status_text",
                             )
                         with gr.Row():
                             self.comps["chat_tab_stop_button"] = gr.Button(
@@ -175,7 +176,7 @@ class ChatUI:
                         max_lines=1,
                         lines=1,
                         placeholder="Enter URL",
-                        elem_id=f"{self.group_name}_web_tab_url_text",
+                        elem_id=f"{self.GROUP_NAME}_web_tab_url_text",
                     )
                 with gr.Row(variant="compact"):
                     with gr.Column():
@@ -190,7 +191,7 @@ class ChatUI:
                             label="web_data_text_out",
                             show_label=False,
                             interactive=False,
-                            elem_id=f"{self.group_name}_web_data_text_out",
+                            elem_id=f"{self.GROUP_NAME}_web_data_text_out",
                         )
                 with gr.Column():
                     self.comps["tbd_settings1"] = gr.Dropdown(
@@ -213,7 +214,7 @@ class ChatUI:
                             label="history",
                             show_label=False,
                             interactive=False,
-                            elem_id=f"{self.group_name}_history",
+                            elem_id=f"{self.GROUP_NAME}_history",
                             value="tbd",
                         )
         with gr.Tab("Prompt Templates", elem_id="default-tab"):
@@ -225,7 +226,7 @@ class ChatUI:
                             label="prompt_templates",
                             show_label=False,
                             interactive=False,
-                            elem_id=f"{self.group_name}_prompt_templates",
+                            elem_id=f"{self.GROUP_NAME}_prompt_templates",
                             value="tbd",
                         )
         with gr.Tab("Help", elem_id="default-tab"):
@@ -237,7 +238,7 @@ class ChatUI:
                             label="help",
                             show_label=False,
                             interactive=False,
-                            elem_id=f"{self.group_name}_help",
+                            elem_id=f"{self.GROUP_NAME}_help",
                             value="tbd",
                         )
 

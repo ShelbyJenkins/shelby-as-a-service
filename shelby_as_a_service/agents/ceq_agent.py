@@ -8,19 +8,16 @@ import modules.text_processing.text as text
 
 # from agents.action_agent import ActionAgent
 from agents.agent_base import AgentBase
+from app_base import AppBase
+from pydantic import BaseModel
 from services.database_service import DatabaseService
 from services.embedding_service import EmbeddingService
 from services.llm_service import LLMService
 
+
 # endregion
-
-
-class CEQAgent(AgentBase):
-    agent_name: str = "ceq_agent"
-    agent_ui_name: str = "Shelby Agent"
+class AgentConfig(BaseModel):
     agent_select_status_message: str = "Search index to find docs related to request."
-    default_prompt_template_path: str = "ceq_main_prompt.yaml"
-
     # data_domain_name: str = "base"
     data_domain_name: Optional[str] = None
     index_name: str = "base"
@@ -38,8 +35,17 @@ class CEQAgent(AgentBase):
     docs_max_total_tokens: int = 2500
     docs_max_used: int = 5
 
-    def __init__(self, parent_sprite=None):
-        super().__init__(parent_sprite=parent_sprite)
+
+class CEQAgent(AgentBase):
+    AGENT_NAME: str = "ceq_agent"
+    AGENT_UI_NAME: str = "Shelby Agent"
+    DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
+
+    def __init__(self, parent_class=None):
+        super().__init__(parent_class=parent_class)
+        self.config = AppBase.load_service_config(
+            class_instance=self, config_class=AgentConfig
+        )
 
         self.llm_service = LLMService(self)
         self.embedding_service = EmbeddingService(self)
@@ -100,7 +106,7 @@ class CEQAgent(AgentBase):
         if user_prompt_template_path:
             prompt_template_path = user_prompt_template_path
         else:
-            prompt_template_path = self.default_prompt_template_path
+            prompt_template_path = self.DEFAULT_PROMPT_TEMPLATE_PATH
         query = query
 
         # try:

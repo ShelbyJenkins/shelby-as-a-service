@@ -13,13 +13,15 @@ class Logger:
         "%(levelname)s: %(asctime)s %(message)s", datefmt="%Y/%m/%d %I:%M:%S %p"
     )
 
-    def __init__(self, app_name) -> None:
-        if app_name is None:
-            raise ValueError("app_name must be set to create the default log_file_path")
-        log_dir = f"apps/{app_name}/logs"
+    def __init__(self, logger_name) -> None:
+        if logger_name is None:
+            raise ValueError(
+                "logger_name must be set to create the default log_file_path"
+            )
+        log_dir = f"apps/{logger_name}/logs"
         os.makedirs(log_dir, exist_ok=True)
-        self.log_file_path = os.path.join(log_dir, f"{app_name}.md")
-        self.logger = logging.getLogger(app_name)
+        self.log_file_path = os.path.join(log_dir, f"{logger_name}.md")
+        self.logger = logging.getLogger(logger_name)
 
     def clear_and_set_handler(self, overwrite=False):
         # If the logger has handlers, remove them

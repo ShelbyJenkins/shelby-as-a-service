@@ -57,6 +57,7 @@ class DataDomainModel(AppBase):
 
 
 class IndexModel(AppBase):
+    CLASS_CONFIG_TYPE: str = "services"
     name_model: str = "index_model"
     index_data_domains: List[DataDomainModel]
     default_index_database: Optional[str] = "pinecone_database"
@@ -65,7 +66,6 @@ class IndexModel(AppBase):
     def __init__(self):
         """ """
         self.app = AppBase.get_app()
-        self.app_name = self.app.app_name
         config = AppBase.get_config(self)
         AppBase.set_config(self, config)
         index_data_domains_config = self.config.get("index_data_domains", [])

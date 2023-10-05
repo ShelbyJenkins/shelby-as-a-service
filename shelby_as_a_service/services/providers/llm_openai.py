@@ -1,47 +1,55 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict, Generator, List, Optional, Type
+from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 
 import modules.prompt_templates as PromptTemplates
 import modules.text_processing.text as TextProcess
 import openai
+from app_base import AppBase
 from pydantic import BaseModel
 from services.providers.provider_base import ProviderBase
 
 
+class ProviderConfig(BaseModel):
+    openai_timeout_seconds: float = 180.0
+    max_response_tokens: int = 300
+
+
 class OpenAILLM(ProviderBase):
+    config: ProviderConfig
+
     class OpenAILLMModel(BaseModel):
-        model_name: str
-        tokens_max: int
-        cost_per_k: float
+        MODEL_NAME: str
+        TOKENS_MAX: int
+        COST_PER_K: float
 
-    required_secrets: List[str] = ["openai_api_key"]
+    REQUIRED_SECRETS: List[str] = ["openai_api_key"]
 
-    provider_name: str = "openai_llm"
-    provider_ui_name: str = "openai_llm"
+    PROVIDER_NAME: str = "openai_llm"
+    PROVIDER_UI_NAME: str = "openai_llm"
 
-    ui_model_names = [
+    UI_MODEL_NAMES = [
         "gpt-4",
         "gpt-4-32k",
         "gpt-3.5-turbo",
         "gpt-3.5-turbo-16k",
     ]
-    type_model: str = "openai_llm_model"
-    available_models: List[OpenAILLMModel] = [
-        OpenAILLMModel(model_name="gpt-4", tokens_max=8192, cost_per_k=0.06),
-        OpenAILLMModel(model_name="gpt-4-32k", tokens_max=32768, cost_per_k=0.06),
-        OpenAILLMModel(model_name="gpt-3.5-turbo", tokens_max=4096, cost_per_k=0.03),
+    DEFAULT_MODEL: str = "gpt-3.5-turbo"
+    TYPE_MODEL: str = "openai_llm_model"
+    AVAILABLE_MODELS: List[OpenAILLMModel] = [
+        OpenAILLMModel(MODEL_NAME="gpt-4", TOKENS_MAX=8192, COST_PER_K=0.06),
+        OpenAILLMModel(MODEL_NAME="gpt-4-32k", TOKENS_MAX=32768, COST_PER_K=0.06),
+        OpenAILLMModel(MODEL_NAME="gpt-3.5-turbo", TOKENS_MAX=4096, COST_PER_K=0.03),
         OpenAILLMModel(
-            model_name="gpt-3.5-turbo-16k", tokens_max=16384, cost_per_k=0.03
+            MODEL_NAME="gpt-3.5-turbo-16k", TOKENS_MAX=16384, COST_PER_K=0.03
         ),
     ]
-    default_model: str = "gpt-3.5-turbo"
 
-    openai_timeout_seconds: float = 180.0
-    max_response_tokens: int = 300
-
-    def __init__(self, parent_service=None):
-        super().__init__(parent_service=parent_service)
+    def __init__(self, parent_class=None):
+        super().__init__(parent_class=parent_class)
+        self.config = AppBase.load_service_config(
+            class_instance=self, config_class=ProviderConfig
+        )
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
@@ -67,11 +75,11 @@ class OpenAILLM(ProviderBase):
 
     def _calculate_cost(self, token_count, model):
         # Convert numbers to Decimal
-        cost_per_k_decimal = Decimal(model.cost_per_k)
+        COST_PER_K_decimal = Decimal(model.COST_PER_K)
         token_count_decimal = Decimal(token_count)
 
         # Perform the calculation using Decimal objects
-        request_cost = cost_per_k_decimal * (token_count_decimal / 1000)
+        request_cost = COST_PER_K_decimal * (token_count_decimal / 1000)
 
         # If you still wish to round (even though Decimal is precise), you can do so
         request_cost = round(request_cost, 10)
@@ -84,11 +92,11 @@ class OpenAILLM(ProviderBase):
 
     def _calculate_cost_streaming(self, total_token_count, model):
         # Convert numbers to Decimal
-        cost_per_k_decimal = Decimal(model.cost_per_k)
+        COST_PER_K_decimal = Decimal(model.COST_PER_K)
         token_count_decimal = Decimal(total_token_count)
 
         # Perform the calculation using Decimal objects
-        request_cost = cost_per_k_decimal * (token_count_decimal / 1000)
+        request_cost = COST_PER_K_decimal * (token_count_decimal / 1000)
 
         # If you still wish to round (even though Decimal is precise), you can do so
         request_cost = round(request_cost, 10)
@@ -109,9 +117,9 @@ class OpenAILLM(ProviderBase):
         )
         response = openai.ChatCompletion.create(
             api_key=self.app.secrets["openai_api_key"],
-            model=model.model_name,
+            model=model.MODEL_NAME,
             messages=prompt,
-            max_tokens=self.max_response_tokens,
+            max_tokens=self.config.max_response_tokens,
         )
 
         (
@@ -144,9 +152,9 @@ class OpenAILLM(ProviderBase):
 
         stream = openai.ChatCompletion.create(
             api_key=self.app.secrets["openai_api_key"],
-            model=model.model_name,
+            model=model.MODEL_NAME,
             messages=prompt,
-            max_tokens=self.max_response_tokens,
+            max_tokens=self.config.max_response_tokens,
             stream=True,
         )
 
@@ -161,7 +169,7 @@ class OpenAILLM(ProviderBase):
             )
             if len(delta_content) != 0:
                 chunk_token_count = TextProcess.tiktoken_len(
-                    delta_content, model.model_name
+                    delta_content, model.MODEL_NAME
                 )
                 response_token_count += chunk_token_count
                 response_token_string = f"Response token count: {response_token_count}"
@@ -184,15 +192,14 @@ class OpenAILLM(ProviderBase):
 
     def _prep_chat(
         self, query, prompt_template_path=None, documents=None, llm_model=None
-    ):
-        model = self.get_model(self.type_model, model_name=llm_model)
+    ) -> Tuple[List[Dict[str, str]], OpenAILLMModel, int]:
+        model = self.get_model(self.TYPE_MODEL, model_name=llm_model)
         if model is None:
             return None, None, None
-        if not prompt_template_path:
-            prompt_template_path = "Answer in peace my friend."
+
         prompt = PromptTemplates.create_openai_prompt(
             query=query,
-            prompt_template_dir=self.prompt_template_dir,
+            prompt_template_dir=self.PROMPT_TEMPLATE_DIR,
             prompt_template_path=prompt_template_path,
             documents=documents,
         )
@@ -203,6 +210,6 @@ class OpenAILLM(ProviderBase):
             content = entry.get("content", "")
             result += f"{role}: {content}\n"
         request_token_count = TextProcess.tiktoken_len(
-            result, encoding_model=model.model_name
+            result, encoding_model=model.MODEL_NAME
         )
         return prompt, model, request_token_count

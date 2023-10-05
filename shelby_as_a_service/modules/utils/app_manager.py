@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Any, Dict
 
 
 class AppManager:
@@ -44,7 +45,7 @@ class AppManager:
         return app_name
 
     @staticmethod
-    def load_app_file(app_name):
+    def load_app_file(app_name) -> Dict[str, Any]:
         try:
             with open(
                 f"apps/{app_name}/app_config.json",
@@ -57,6 +58,16 @@ class AppManager:
             config_from_file = {}
 
         return config_from_file
+
+    @staticmethod
+    def save_app_file(app_name, updated_app_config_dict):
+        # Save the updated configuration
+        with open(
+            f"apps/{app_name}/app_config.json",
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(updated_app_config_dict, file, ensure_ascii=False, indent=4)
 
     @staticmethod
     def check_for_existing_apps():

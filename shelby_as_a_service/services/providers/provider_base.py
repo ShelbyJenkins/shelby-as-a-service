@@ -6,27 +6,32 @@ from pydantic import BaseModel, Field
 
 
 class ProviderBase(AppBase):
+    CLASS_CONFIG_TYPE: str = "services"
+    PROVIDER_NAME: str
+    PROVIDER_UI_NAME: str
+    UI_MODEL_NAMES: Optional[List[str]]
+    TYPE_MODEL: Optional[str]
+    AVAILABLE_MODELS: Optional[List[Type]]
+    DEFAULT_MODEL: BaseModel
+    REQUIRED_SECRETS: Optional[List[str]] = None
+
     app_name: str
     log: Logger
     app: AppInstance
-    required_secrets: Optional[List[str]] = None
+    parent_class: Type
 
-    provider_name: str
-    provider_ui_name: str
-
-    ui_model_names: Optional[List[str]]
-    type_model: Optional[str]
-    available_models: Optional[List[Type]]
-    default_model: Optional[str]
-
-    def __init__(self, parent_service=None):
+    def __init__(self, parent_class=None):
         self.app = AppBase.get_app()
-        self.log = self.app.log
-        if parent_service:
-            self.parent_sprite = parent_service.parent_agent.parent_sprite
-            self.parent_agent = parent_service.parent_agent
-            self.parent_service = parent_service
-        AppBase.setup_service_config(self)
+        if parent_class:
+            self.class_config_path = AppBase.get_config_path(
+                parent_config_path=parent_class.class_config_path,
+                class_config_type=self.CLASS_CONFIG_TYPE,
+                class_name=self.PROVIDER_NAME,
+            )
+            self.log = parent_class.log
+        else:
+            self.class_config_path = None
+            self.log = self.app.log
 
     def get_model(self, type_model, model_name=None):
         """Returns an instance of a model
@@ -34,16 +39,16 @@ class ProviderBase(AppBase):
         Then tries the parent_agent's,
         Then uses default"""
         # Tries the requested model
-        available_models = getattr(self, "available_models", [])
+        available_models = getattr(self, "AVAILABLE_MODELS", [])
         if model_name:
             model_instance = next(
-                (model for model in available_models if model.model_name == model_name),
+                (model for model in available_models if model.MODEL_NAME == model_name),
                 None,
             )
             if model_instance:
                 return model_instance
         # Then the parent's agent
-        if model := getattr(self.parent_agent, type_model, None):
+        if model := getattr(self.parent_class, type_model, None):
             if model_instance := getattr(self, model, None):
                 return model_instance
         # Then the default
@@ -51,7 +56,7 @@ class ProviderBase(AppBase):
             (
                 model
                 for model in available_models
-                if model.model_name == self.default_model
+                if model.MODEL_NAME == self.DEFAULT_MODEL
             ),
             None,
         )

@@ -1,28 +1,28 @@
-from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any, Dict, List, Optional, Type
 
-import modules.prompt_templates as PromptTemplates
-import modules.text_processing.text as TextProcess
-import modules.utils.config_manager as ConfigManager
-import openai
-from modules.utils.log_service import Logger
-from pydantic import Field
+from app_base import AppBase
+from pydantic import BaseModel
 from services.providers.llm_openai import OpenAILLM
 from services.service_base import ServiceBase
 
 
-class LLMService(ServiceBase):
-    service_name: str = "llm_service"
-    service_ui_name: str = "llm_service"
-    provider_type: str = "llm_provider"
-    available_providers: List[Type] = [OpenAILLM]
-    default_provider: Type = OpenAILLM
-
+class ServiceConfig(BaseModel):
+    agent_select_status_message: str = "Search index to find docs related to request."
     max_response_tokens: int = 300
 
-    def __init__(self, parent_agent):
-        super().__init__(parent_agent=parent_agent)
+
+class LLMService(ServiceBase):
+    SERVICE_NAME: str = "llm_service"
+    SERVICE_UI_NAME: str = "llm_service"
+    PROVIDER_TYPE: str = "llm_provider"
+    DEFAULT_PROVIDER: Type = OpenAILLM
+    AVAILABLE_PROVIDERS: List[Type] = [OpenAILLM]
+
+    def __init__(self, parent_class):
+        super().__init__(parent_class=parent_class)
+        self.config = AppBase.load_service_config(
+            class_instance=self, config_class=ServiceConfig
+        )
 
     def create_streaming_chat(
         self,

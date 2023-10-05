@@ -23,7 +23,7 @@ def main():
 
     print(f"app.py is being run as: {app_name}")
     app = AppBase.get_app(app_name)
-    app.setup_app()
+    app.setup_app(app_name)
     app.run_sprites()
 
 

@@ -3,18 +3,31 @@ from typing import Any, Dict, List, Optional
 # from modules.index.data_model import DataModels
 import modules.utils.config_manager as ConfigManager
 from agents.agent_base import AgentBase
+from app_base import AppBase
 from modules.index.index_model import DataDomainModel, DataSourceModel, IndexModel
+from pydantic import BaseModel
 from services.database_service import DatabaseService
 from services.ingest_service import IngestService
 
 
+class AgentConfig(BaseModel):
+    agent_select_status_message: str = (
+        "Load a URL Data Tab, and we'll access it and use it to generate a response."
+    )
+    llm_provider: str = "openai_llm"
+    llm_model: str = "gpt-4"
+    database_provider: str = "local_filestore_database"
+
+
 class IngestAgent(AgentBase):
-    agent_name: str = "ingest_agent"
+    AGENT_NAME: str = "ingest_agent"
+    AGENT_UI_NAME: str = "ingest_agent"
+
     app: Optional[Any] = None
     index: Optional[Any] = None
 
-    def __init__(self, parent_sprite=None):
-        super().__init__(parent_sprite=parent_sprite)
+    def __init__(self, parent_class=None):
+        super().__init__(parent_class=parent_class)
 
         self.database_service = DatabaseService(self)
         self.ingest_service = IngestService(self)

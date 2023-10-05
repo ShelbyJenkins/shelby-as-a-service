@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List
 
 import modules.text_processing.text as TextProcess
 import yaml
@@ -6,7 +7,7 @@ import yaml
 
 def create_openai_prompt(
     query, prompt_template_dir, prompt_template_path, documents=None
-) -> list:
+) -> List[Dict[str, str]]:
     prompt_template = load_prompt_template(prompt_template_dir, prompt_template_path)
     document_string = create_document_string(documents)
     if document_string:
@@ -51,4 +52,8 @@ def load_prompt_template(prompt_template_dir, prompt_template_path):
         encoding="utf-8",
     ) as stream:
         # Load the YAML data and print the result
-        return yaml.safe_load(stream)
+        if prompt_template := (yaml.safe_load(stream)):
+            return prompt_template
+        print("prompt template didn't load")
+
+        return "Answer in peace my friend."
