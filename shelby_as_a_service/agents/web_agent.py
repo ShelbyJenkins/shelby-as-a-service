@@ -9,7 +9,7 @@ import modules.text_processing.text as text
 import modules.utils.config_manager as ConfigManager
 from agents.agent_base import AgentBase
 from agents.ingest_agent import IngestAgent
-from app_base import AppBase
+from app.app_base import AppBase
 from pydantic import BaseModel
 from services.llm_service import LLMService
 

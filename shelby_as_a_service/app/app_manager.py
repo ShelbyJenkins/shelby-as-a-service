@@ -1,73 +1,15 @@
 import json
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Type
 
 
 class AppManager:
     @staticmethod
-    def initialize_app_config(app):
-        app_name = app.app_name
-
+    def check_and_create_base():
         existing_app_names = AppManager.check_for_existing_apps()
-
-        if app.app_name not in existing_app_names:
-            if "base" == app.app_name:
-                AppManager.create_app("base")
-                existing_app_names = AppManager.check_for_existing_apps()
-            else:
-                # Need to return here with error
-                print(f"app {app.app_name} not found.")
-
-        if "base" == app.app_name:
-            app.config_manager.update_app_json_from_file(app, "base")
-            # In the case of local app we check for a default_local_app
-            app_config = AppManager.load_app_file(app.app_name)
-            default_settings = (
-                app_config.get("sprites", {}).get("web_sprite", {}).get("optional", {})
-            )
-            if default_settings.get("default_app_enabled") is True:
-                default_local_app_name = default_settings.get(
-                    "default_local_app_name", None
-                )
-                if (
-                    default_local_app_name is not None
-                    and default_local_app_name in existing_app_names
-                ):
-                    app_name = default_local_app_name
-                else:
-                    print(
-                        f"Default app '{default_local_app_name}' not found. Loading 'base' instead."
-                    )
-
-        if app_name != "base":
-            app.config_manager.update_app_json_from_file(app, app_name)
-
-        return app_name
-
-    @staticmethod
-    def load_app_file(app_name) -> Dict[str, Any]:
-        try:
-            with open(
-                f"apps/{app_name}/app_config.json",
-                "r",
-                encoding="utf-8",
-            ) as stream:
-                config_from_file = json.load(stream)
-        except json.JSONDecodeError:
-            # If the JSON file is empty or invalid, return an empty dictionary (or handle in a way you see fit)
-            config_from_file = {}
-
-        return config_from_file
-
-    @staticmethod
-    def save_app_file(app_name, updated_app_config_dict):
-        # Save the updated configuration
-        with open(
-            f"apps/{app_name}/app_config.json",
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(updated_app_config_dict, file, ensure_ascii=False, indent=4)
+        if "base" not in existing_app_names:
+            AppManager.create_app("base")
+            existing_app_names = AppManager.check_for_existing_apps()
 
     @staticmethod
     def check_for_existing_apps():
@@ -106,7 +48,7 @@ class AppManager:
         dir_path = f"apps/{app_name}"
         dot_env_dest_path = os.path.join(dir_path, ".env")
         dot_env_source_path = (
-            "shelby_as_a_service/models/deployments/template/template.env"
+            "shelby_as_a_service/app/deployments/template/template.env"
         )
 
         # Helper function to read env file into a dictionary
@@ -155,3 +97,53 @@ class AppManager:
         with open(dot_env_dest_path, "w", encoding="utf-8") as file:
             for key, value in existing_env_dict.items():
                 file.write(f"{key}={value}\n")
+
+    @staticmethod
+    def load_web_sprite_default_app():
+        app_name = "base"
+        # In the case of local app we check for a default_local_app
+        app_config = AppManager.load_app_file("base")
+        default_settings = (
+            app_config.get("sprites", {}).get("web_sprite", {}).get("optional", {})
+        )
+        if default_settings.get("default_app_enabled") is True:
+            existing_app_names = AppManager.check_for_existing_apps()
+            default_local_app_name = default_settings.get(
+                "default_local_app_name", None
+            )
+            if (
+                default_local_app_name is not None
+                and default_local_app_name in existing_app_names
+            ):
+                app_name = default_local_app_name
+            else:
+                print(
+                    f'Default app "{default_local_app_name}" not found. Loading "base" instead.'
+                )
+
+        return app_name
+
+    @staticmethod
+    def load_app_file(app_name) -> Dict[str, Any]:
+        try:
+            with open(
+                f"apps/{app_name}/app_config.json",
+                "r",
+                encoding="utf-8",
+            ) as stream:
+                config_from_file = json.load(stream)
+        except json.JSONDecodeError:
+            # If the JSON file is empty or invalid, return an empty dictionary (or handle in a way you see fit)
+            config_from_file = {}
+
+        return config_from_file
+
+    @staticmethod
+    def save_app_file(app_name, updated_app_config_dict):
+        # Save the updated configuration
+        with open(
+            f"apps/{app_name}/app_config.json",
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(updated_app_config_dict, file, ensure_ascii=False, indent=4)

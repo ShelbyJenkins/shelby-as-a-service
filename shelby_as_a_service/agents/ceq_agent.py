@@ -8,7 +8,7 @@ import modules.text_processing.text as text
 
 # from agents.action_agent import ActionAgent
 from agents.agent_base import AgentBase
-from app_base import AppBase
+from app.app_base import AppBase
 from pydantic import BaseModel
 from services.database_service import DatabaseService
 from services.embedding_service import EmbeddingService

@@ -1,33 +1,29 @@
 # region
 import json
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Type
 
 import modules.prompt_templates as PromptTemplates
 from agents.agent_base import AgentBase
-from app_base import AppBase
+from app.app_base import AppBase
 from pydantic import BaseModel
 from services.llm_service import LLMService
 
-
 # endregion
-class AgentConfig(BaseModel):
-    agent_select_status_message: str = "EZPZ"
-    llm_provider: str = "openai_llm"
-    llm_model: str = "gpt-4"
 
 
 class VanillaLLM(AgentBase):
     AGENT_NAME: str = "vanillallm_agent"
     AGENT_UI_NAME: str = "VanillaLLM Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "vanillallm_prompt.yaml"
+    AVAILABLE_SERVICES: List[Type] = [LLMService]
 
-    def __init__(self, parent_class=None):
-        super().__init__(parent_class=parent_class)
-        self.config = AppBase.load_service_config(
-            class_instance=self, config_class=AgentConfig
-        )
+    class AgentConfigModel(BaseModel):
+        agent_select_status_message: str = "EZPZ"
+        llm_provider: str = "openai_llm"
+        llm_model: str = "gpt-4"
 
-        self.llm_service = LLMService(self)
+    def __init__(self):
+        super().__init__()
 
     def create_streaming_chat(
         self,

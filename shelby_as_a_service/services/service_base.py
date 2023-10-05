@@ -1,12 +1,11 @@
 from typing import Any, Dict, List, Optional, Type
 
-from app_base import AppBase, AppInstance
+from app.app_base import AppBase
 from modules.utils.log_service import Logger
 from pydantic import BaseModel, Field
 
 
 class ServiceBase(AppBase):
-    CLASS_CONFIG_TYPE: str = "services"
     SERVICE_NAME: str
     SERVICE_UI_NAME: str
     REQUIRED_SECRETS: Optional[List[str]] = None
@@ -14,24 +13,18 @@ class ServiceBase(AppBase):
     DEFAULT_PROVIDER: Type
     AVAILABLE_PROVIDERS: List[Type]
 
+    CLASS_NAME_TYPE: str = "SERVICE_NAME"
+    CLASS_CONFIG_TYPE: str = "services"
+    CLASS_MODEL_TYPE: str = "ServiceConfigModel"
+    AVAILABLE_CLASS_TYPES: List[str] = ["AVAILABLE_PROVIDERS"]
+
     app_name: str
     log: Logger
-    app: AppInstance
 
     parent_class: Type
 
-    def __init__(self, parent_class=None):
-        self.app = AppBase.get_app()
-        if parent_class:
-            self.class_config_path = AppBase.get_config_path(
-                parent_config_path=parent_class.class_config_path,
-                class_config_type=self.CLASS_CONFIG_TYPE,
-                class_name=self.SERVICE_NAME,
-            )
-            self.log = parent_class.log
-        else:
-            self.class_config_path = None
-            self.log = self.app.log
+    def __init__(self):
+        pass
 
     def get_provider(self, new_provider_name=None):
         """Returns an instance of a provider

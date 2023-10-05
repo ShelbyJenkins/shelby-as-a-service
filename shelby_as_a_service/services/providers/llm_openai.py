@@ -5,26 +5,23 @@ from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 import modules.prompt_templates as PromptTemplates
 import modules.text_processing.text as TextProcess
 import openai
-from app_base import AppBase
+from app.app_base import AppBase
 from pydantic import BaseModel
 from services.providers.provider_base import ProviderBase
 
 
-class ProviderConfig(BaseModel):
-    openai_timeout_seconds: float = 180.0
-    max_response_tokens: int = 300
-
-
 class OpenAILLM(ProviderBase):
-    config: ProviderConfig
+    class ProviderConfigModel(BaseModel):
+        openai_timeout_seconds: float = 180.0
+        max_response_tokens: int = 300
 
     class OpenAILLMModel(BaseModel):
         MODEL_NAME: str
         TOKENS_MAX: int
         COST_PER_K: float
 
+    config: ProviderConfigModel
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
-
     PROVIDER_NAME: str = "openai_llm"
     PROVIDER_UI_NAME: str = "openai_llm"
 
@@ -45,11 +42,8 @@ class OpenAILLM(ProviderBase):
         ),
     ]
 
-    def __init__(self, parent_class=None):
-        super().__init__(parent_class=parent_class)
-        self.config = AppBase.load_service_config(
-            class_instance=self, config_class=ProviderConfig
-        )
+    def __init__(self):
+        super().__init__()
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
@@ -85,10 +79,10 @@ class OpenAILLM(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        self.app.total_cost += request_cost
-        self.app.last_request_cost = request_cost
+        AppBase.total_cost += request_cost
+        AppBase.last_request_cost = request_cost
         print(f"Request cost: ${format(request_cost, 'f')}")
-        print(f"Total cost: ${format(self.app.total_cost, 'f')}")
+        print(f"Total cost: ${format(AppBase.total_cost, 'f')}")
 
     def _calculate_cost_streaming(self, total_token_count, model):
         # Convert numbers to Decimal
@@ -102,9 +96,9 @@ class OpenAILLM(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        self.app.total_cost += request_cost
-        self.app.last_request_cost = request_cost
-        print(f"Total cost: ${format(self.app.total_cost, 'f')}")
+        AppBase.total_cost += request_cost
+        AppBase.last_request_cost = request_cost
+        print(f"Total cost: ${format(AppBase.total_cost, 'f')}")
 
     def _create_chat(
         self, query, prompt_template_path=None, documents=None, llm_model=None
@@ -116,7 +110,7 @@ class OpenAILLM(ProviderBase):
             llm_model=llm_model,
         )
         response = openai.ChatCompletion.create(
-            api_key=self.app.secrets["openai_api_key"],
+            api_key=AppBase.secrets["openai_api_key"],
             model=model.MODEL_NAME,
             messages=prompt,
             max_tokens=self.config.max_response_tokens,
@@ -151,7 +145,7 @@ class OpenAILLM(ProviderBase):
             return None
 
         stream = openai.ChatCompletion.create(
-            api_key=self.app.secrets["openai_api_key"],
+            api_key=AppBase.secrets["openai_api_key"],
             model=model.MODEL_NAME,
             messages=prompt,
             max_tokens=self.config.max_response_tokens,

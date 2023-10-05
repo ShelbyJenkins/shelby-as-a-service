@@ -1,14 +1,9 @@
 from typing import Any, Dict, List, Optional, Type
 
-from app_base import AppBase
+from app.app_base import AppBase
 from pydantic import BaseModel
 from services.providers.llm_openai import OpenAILLM
 from services.service_base import ServiceBase
-
-
-class ServiceConfig(BaseModel):
-    agent_select_status_message: str = "Search index to find docs related to request."
-    max_response_tokens: int = 300
 
 
 class LLMService(ServiceBase):
@@ -18,11 +13,14 @@ class LLMService(ServiceBase):
     DEFAULT_PROVIDER: Type = OpenAILLM
     AVAILABLE_PROVIDERS: List[Type] = [OpenAILLM]
 
-    def __init__(self, parent_class):
-        super().__init__(parent_class=parent_class)
-        self.config = AppBase.load_service_config(
-            class_instance=self, config_class=ServiceConfig
+    class ServiceConfigModel(BaseModel):
+        agent_select_status_message: str = (
+            "Search index to find docs related to request."
         )
+        max_response_tokens: int = 300
+
+    def __init__(self):
+        super().__init__()
 
     def create_streaming_chat(
         self,

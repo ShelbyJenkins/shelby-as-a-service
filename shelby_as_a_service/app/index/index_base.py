@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 
-from app_base import AppBase
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 
 # from modules.index.data_loaders import DataLoaders
 
@@ -35,21 +34,13 @@ class DataDomainModel(BaseModel):
     retrieval_enabled: bool = True
 
 
-class IndexModel(BaseModel):
-    index_name: str = "default_index_name"
-    index_data_domains: List[DataDomainModel] = [DataDomainModel()]
-    default_index_database_provider: str = "local_filestore_database"
+class IndexBase:
+    CLASS_CONFIG_TYPE: str = "index"
 
-    update_enabled: bool = True
-    retrieval_enabled: bool = True
+    class IndexConfigModel(BaseModel):
+        index_name: str = "default_index_name"
+        index_data_domains: List[DataDomainModel] = [DataDomainModel()]
+        default_index_database_provider: str = "local_filestore_database"
 
-
-class IndexService(AppBase):
-    class_config_path = ["app_instance", "index"]
-
-    def __init__(self):
-        """ """
-
-        self.index_instance = AppBase.load_service_config(
-            class_instance=self, config_class=IndexModel
-        )
+        update_enabled: bool = True
+        retrieval_enabled: bool = True
