@@ -17,7 +17,7 @@ from sprites.sprite_base import SpriteBase
 class DiscordSprite(SpriteBase):
     sprite_name: str = "discord_sprite"
     available_agents: List[Type] = [CEQAgent]
-    required_secrets: List[str] = ["discord_bot_token"]
+    REQUIRED_SECRETS: List[str] = ["discord_bot_token"]
 
     discord_enabled_servers: List[int] = [1132125546340421733]
     discord_specific_channel_ids: List[int] = [1133913077268627526]

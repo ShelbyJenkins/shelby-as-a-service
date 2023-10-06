@@ -1,7 +1,7 @@
 import concurrent.futures
 import os
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from app.app_manager import AppManager
 from app.index.index_base import IndexBase
@@ -45,10 +45,10 @@ class AppBase:
 
         if AppBase.app_name == "base":
             AppManager.check_and_create_base()
-            AppBase.update_app_config_file("base")
+            AppBase.update_app_config_file_from_default("base")
             AppBase.app_name = AppManager.load_web_sprite_default_app()
             if AppBase.app_name != "base":
-                AppBase.update_app_config_file(AppBase.app_name)
+                AppBase.update_app_config_file_from_default(AppBase.app_name)
 
         AppBase.local_index_dir = f"apps/{AppBase.app_name}/index"
         AppBase.app_dir = f"apps/{AppBase.app_name}/"
@@ -57,13 +57,8 @@ class AppBase:
 
         AppBase.create_app_enabled_instances(AppBase.app_name)
 
-        # sprites = AppManager.get_available_sprites(AppInstance.enabled_sprites)
-        # for sprite in sprites:
-        #     sprite_name = sprite.SPRITE_NAME
-        #     setattr(self, sprite_name, sprite())
-
     @staticmethod
-    def update_app_config_file(app_name):
+    def update_app_config_file_from_default(app_name):
         app_config_dict = AppManager.load_app_file(app_name)
 
         app_config_dict.setdefault(AppBase.CLASS_CONFIG_TYPE, {})
@@ -71,7 +66,8 @@ class AppBase:
             _,
             app_class_dict,
         ) = AppBase.load_class_config_model(
-            AppBase.ClassConfigModel, app_config_dict[AppBase.CLASS_CONFIG_TYPE]
+            class_config=AppBase.ClassConfigModel,
+            class_config_dict=app_config_dict[AppBase.CLASS_CONFIG_TYPE],
         )
         app_config_dict[AppBase.CLASS_CONFIG_TYPE] = app_class_dict
 
@@ -80,17 +76,54 @@ class AppBase:
             _,
             index_class_dict,
         ) = AppBase.load_class_config_model(
-            IndexBase.IndexConfigModel, app_config_dict[IndexBase.CLASS_CONFIG_TYPE]
+            class_config=IndexBase.IndexConfigModel,
+            class_config_dict=app_config_dict[IndexBase.CLASS_CONFIG_TYPE],
         )
         app_config_dict[IndexBase.CLASS_CONFIG_TYPE] = index_class_dict
 
         list_of_sprite_classes = AppBase.get_sprites(AppBase.AVAILABLE_SPRITES)
         app_config_dict = AppBase.load_config_and_or_class_instances(
-            available_classes=list_of_sprite_classes, existing_dict=app_config_dict
+            available_classes=list_of_sprite_classes,
+            existing_dict=app_config_dict,
         )
 
         AppManager.save_app_file(
             app_name=app_name, updated_app_config_dict=app_config_dict
+        )
+
+    @staticmethod
+    def update_app_config_file_from_ui():
+        app_config_dict = AppManager.load_app_file(AppBase.app_name)
+
+        app_config_dict.setdefault(AppBase.CLASS_CONFIG_TYPE, {})
+        (
+            _,
+            app_class_dict,
+        ) = AppBase.load_class_config_model(
+            existing_class_config=AppBase.config,
+            class_config_dict=app_config_dict[AppBase.CLASS_CONFIG_TYPE],
+        )
+        app_config_dict[AppBase.CLASS_CONFIG_TYPE] = app_class_dict
+
+        app_config_dict.setdefault(IndexBase.CLASS_CONFIG_TYPE, {})
+        (
+            _,
+            index_class_dict,
+        ) = AppBase.load_class_config_model(
+            existing_class_config=AppBase.index,
+            class_config_dict=app_config_dict[IndexBase.CLASS_CONFIG_TYPE],
+        )
+        app_config_dict[IndexBase.CLASS_CONFIG_TYPE] = index_class_dict
+
+        list_of_sprite_classes = AppBase.get_sprites(AppBase.config.enabled_sprites)
+        app_config_dict = AppBase.load_config_and_or_class_instances(
+            available_classes=list_of_sprite_classes,
+            existing_dict=app_config_dict,
+            update_from_ui=True,
+        )
+
+        AppManager.save_app_file(
+            app_name=AppBase.app_name, updated_app_config_dict=app_config_dict
         )
 
     @staticmethod
@@ -101,13 +134,15 @@ class AppBase:
             AppBase.config,
             _,
         ) = AppBase.load_class_config_model(
-            AppBase.ClassConfigModel, app_config_dict[AppBase.CLASS_CONFIG_TYPE]
+            class_config=AppBase.ClassConfigModel,
+            class_config_dict=app_config_dict[AppBase.CLASS_CONFIG_TYPE],
         )
         (
             AppBase.index,
             _,
         ) = AppBase.load_class_config_model(
-            IndexBase.IndexConfigModel, app_config_dict[IndexBase.CLASS_CONFIG_TYPE]
+            class_config=IndexBase.IndexConfigModel,
+            class_config_dict=app_config_dict[IndexBase.CLASS_CONFIG_TYPE],
         )
 
         list_of_sprite_classes = AppBase.get_sprites(AppBase.config.enabled_sprites)
@@ -145,6 +180,7 @@ class AppBase:
         parent_class_instance=None,
         existing_dict: Optional[Dict[str, Any]] = None,
         create_instances=False,
+        update_from_ui=False,
     ) -> Dict[str, Any]:
         updated_dict = existing_dict or {}
         for current_class in available_classes:
@@ -164,10 +200,6 @@ class AppBase:
             )
 
             current_class_name = getattr(current_class, current_class_name_type)
-            current_class_config_model = getattr(
-                current_class, current_class_model_type
-            )
-
             updated_dict.setdefault(current_class_config_type, {}).setdefault(
                 current_class_name, {}
             )
@@ -175,14 +207,34 @@ class AppBase:
                 current_class_name, {}
             )
 
-            (
-                config_class_instance,
-                config_class_dict,
-            ) = AppBase.load_class_config_model(
-                current_class_config_model, existing_class_dict
-            )
+            # Gets the existing current_class_config_model from UI
+            current_class_config_model = None
+            if update_from_ui:
+                current_class_config_model = getattr(current_class, "config", None)
+                (
+                    config_class_instance,
+                    config_class_dict,
+                ) = AppBase.load_class_config_model(  # type: ignore
+                    class_config=None,
+                    existing_class_config=current_class_config_model,
+                    class_config_dict=existing_class_dict,
+                )
+                AppBase.set_secrets(current_class)
+            # Or use the default model
+            if update_from_ui is False or current_class_config_model is None:
+                current_class_config_model = getattr(
+                    current_class, current_class_model_type
+                )
+                (
+                    config_class_instance,
+                    config_class_dict,
+                ) = AppBase.load_class_config_model(
+                    class_config=current_class_config_model,
+                    existing_class_config=None,
+                    class_config_dict=existing_class_dict,
+                )
 
-            updated_class_dict = existing_class_dict | config_class_dict
+            updated_class_dict = existing_class_dict | config_class_dict  # type: ignore
 
             updated_dict[current_class_config_type][current_class_name].update(
                 updated_class_dict
@@ -192,7 +244,7 @@ class AppBase:
             if create_instances:
                 current_class_instance = current_class()
                 AppBase.set_secrets(current_class_instance)
-                setattr(current_class_instance, "config", config_class_instance)
+                setattr(current_class_instance, "config", config_class_instance)  # type: ignore
                 if parent_class_instance:
                     setattr(
                         parent_class_instance,
@@ -217,6 +269,7 @@ class AppBase:
                         parent_class_instance=current_class_instance,
                         existing_dict=updated_class_dict,
                         create_instances=create_instances,
+                        update_from_ui=update_from_ui,
                     )
                     updated_dict[current_class_config_type][current_class_name].update(
                         child_class_dict
@@ -226,13 +279,24 @@ class AppBase:
 
     @staticmethod
     def load_class_config_model(
-        class_config: Type[ConfigModelType],
+        class_config: Optional[Type[ConfigModelType]] = None,
+        existing_class_config: Optional[ConfigModelType] = None,
         class_config_dict: Optional[Dict[str, Any]] = None,
     ) -> Tuple[ConfigModelType, Dict[str, Any]]:
-        if class_config_dict:
-            config_class_instance = class_config(**class_config_dict, extra="ignore")
+        if existing_class_config is None and class_config is None:
+            raise ValueError("Must supply either class_config or existing_class_config")
+
+        if existing_class_config:
+            config_class_instance = existing_class_config
+        elif class_config:
+            if class_config_dict:
+                config_class_instance = class_config(
+                    **class_config_dict, extra="ignore"
+                )
+            else:
+                config_class_instance = class_config()
         else:
-            config_class_instance = class_config()
+            raise ValueError("Unhandled configuration setup error")
 
         return config_class_instance, config_class_instance.model_dump()
 

@@ -2,27 +2,19 @@ from typing import Any, Dict, List, Optional, Type
 
 from app.app_base import AppBase
 from modules.utils.log_service import Logger
-from pydantic import BaseModel, Field
 
 
 class ProviderBase(AppBase):
-    PROVIDER_NAME: str
-    PROVIDER_UI_NAME: str
-    UI_MODEL_NAMES: Optional[List[str]]
-    TYPE_MODEL: Optional[str]
-    AVAILABLE_MODELS: Optional[List[Type]]
-    DEFAULT_MODEL: BaseModel
-    REQUIRED_SECRETS: Optional[List[str]] = None
-
-    app_name: str
-    log: Logger
-
     CLASS_NAME_TYPE: str = "PROVIDER_NAME"
     CLASS_CONFIG_TYPE: str = "providers"
     CLASS_MODEL_TYPE: str = "ProviderConfigModel"
 
+    app_name: str
+    log: Logger
+
     def __init__(self):
-        pass
+        self.app = AppBase
+        self.log = AppBase.log
 
     def get_model(self, type_model, model_name=None):
         """Returns an instance of a model

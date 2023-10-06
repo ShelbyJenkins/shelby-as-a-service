@@ -1,36 +1,28 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 # from modules.index.data_model import DataModels
-import modules.utils.config_manager as ConfigManager
 from agents.agent_base import AgentBase
-from app.app_base import AppBase
-from modules.index.index_model import DataDomainModel, DataSourceModel, IndexModel
 from pydantic import BaseModel
 from services.database_service import DatabaseService
 from services.ingest_service import IngestService
 
 
-class AgentConfig(BaseModel):
-    agent_select_status_message: str = (
-        "Load a URL Data Tab, and we'll access it and use it to generate a response."
-    )
-    llm_provider: str = "openai_llm"
-    llm_model: str = "gpt-4"
-    database_provider: str = "local_filestore_database"
-
-
 class IngestAgent(AgentBase):
     AGENT_NAME: str = "ingest_agent"
     AGENT_UI_NAME: str = "ingest_agent"
+    DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
+    AVAILABLE_SERVICES: List[Type] = [IngestService, DatabaseService]
 
-    app: Optional[Any] = None
-    index: Optional[Any] = None
+    class AgentConfigModel(BaseModel):
+        agent_select_status_message: str = "Load a URL Data Tab, and we'll access it and use it to generate a response."
+        llm_provider: str = "openai_llm"
+        llm_model: str = "gpt-4"
+        database_provider: str = "local_filestore_database"
 
-    def __init__(self, parent_class=None):
-        super().__init__(parent_class=parent_class)
+    config: AgentConfigModel
 
-        self.database_service = DatabaseService(self)
-        self.ingest_service = IngestService(self)
+    def __init__(self):
+        super().__init__()
 
     def load_single_website(self, url):
         data_source = DataSourceModel(

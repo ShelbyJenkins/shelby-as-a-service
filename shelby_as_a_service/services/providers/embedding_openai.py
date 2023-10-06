@@ -2,46 +2,48 @@ from decimal import Decimal
 from typing import Any, List, Type
 
 import modules.text_processing.text as text
-import modules.utils.config_manager as ConfigManager
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
 from services.providers.provider_base import ProviderBase
 
 
 class OpenAIEmbedding(ProviderBase):
+    PROVIDER_NAME: str = "openai_embedding"
+    PROVIDER_UI_NAME: str = "openai_embedding"
+    REQUIRED_SECRETS: List[str] = ["openai_api_key"]
+
     class OpenAIEmbeddingModel(BaseModel):
-        model_name: str
-        tokens_max: int
-        cost_per_k: float
+        MODEL_NAME: str
+        TOKENS_MAX: int
+        COST_PER_K: float
 
-    required_secrets: List[str] = ["openai_api_key"]
-
-    provider_name: str = "openai_embedding"
-    provider_ui_name: str = "openai_embedding"
-
-    ui_model_names = ["text-embedding-ada-002"]
-    type_model: str = "openai_embedding_model"
-    available_models: List[OpenAIEmbeddingModel] = [
+    AVAILABLE_MODELS: List[OpenAIEmbeddingModel] = [
         OpenAIEmbeddingModel(
-            model_name="text-embedding-ada-002", tokens_max=8192, cost_per_k=0.0001
+            MODEL_NAME="text-embedding-ada-002", TOKENS_MAX=8192, COST_PER_K=0.0001
         )
     ]
-    default_model: str = "text-embedding-ada-002"
 
-    openai_timeout_seconds: float = 180.0
+    class ProviderConfigModel(BaseModel):
+        openai_timeout_seconds: float = 180.0
 
-    def __init__(self, parent_service):
-        super().__init__(parent_service=parent_service)
+    config: ProviderConfigModel
 
-    def _get_query_embedding(self, query, model_name=None):
-        model = self.get_model(self.type_model, model_name=model_name)
+    UI_MODEL_NAMES = ["text-embedding-ada-002"]
+    DEFAULT_MODEL: str = "text-embedding-ada-002"
+    TYPE_MODEL: str = "openai_embedding_model"
+
+    def __init__(self):
+        super().__init__()
+
+    def _get_query_embedding(self, query, MODEL_NAME=None):
+        model = self.get_model(self.TYPE_MODEL, model_name=MODEL_NAME)
         if model is None:
             return None
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             openai_api_key=self.app.secrets["openai_api_key"],
-            model=model.model_name,
-            request_timeout=self.openai_timeout_seconds,
+            model=model.MODEL_NAME,
+            request_timeout=self.config.openai_timeout_seconds,
         )  # type: ignore
         query_embedding = embedding_retriever.embed_query(query)
         self._calculate_cost(query, model)
@@ -49,14 +51,14 @@ class OpenAIEmbedding(ProviderBase):
         return query_embedding
 
     def _calculate_cost(self, query, model):
-        token_count = text.tiktoken_len(query, model.model_name)
+        token_count = text.tiktoken_len(query, model.MODEL_NAME)
 
         # Convert numbers to Decimal
-        cost_per_k_decimal = Decimal(model.cost_per_k)
+        COST_PER_K_decimal = Decimal(model.COST_PER_K)
         token_count_decimal = Decimal(token_count)
 
         # Perform the calculation using Decimal objects
-        request_cost = cost_per_k_decimal * (token_count_decimal / 1000)
+        request_cost = COST_PER_K_decimal * (token_count_decimal / 1000)
 
         # If you still wish to round (even though Decimal is precise), you can do so
         request_cost = round(request_cost, 10)

@@ -2,7 +2,9 @@ from typing import Any, Dict, List, Optional, Type
 
 from app.app_base import AppBase
 from modules.utils.log_service import Logger
-from pydantic import BaseModel, Field
+from services.providers.database_pinecone import PineconeDatabase
+from services.providers.embedding_openai import OpenAIEmbedding
+from services.providers.llm_openai import OpenAILLM
 
 
 class ServiceBase(AppBase):
@@ -18,13 +20,17 @@ class ServiceBase(AppBase):
     CLASS_MODEL_TYPE: str = "ServiceConfigModel"
     AVAILABLE_CLASS_TYPES: List[str] = ["AVAILABLE_PROVIDERS"]
 
-    app_name: str
     log: Logger
-
-    parent_class: Type
+    openai_llm: OpenAILLM
+    openai_embedding: OpenAIEmbedding
+    pinecone_database: PineconeDatabase
+    local_filestore_database: Any
+    generic_recursive_web_scraper: Any
+    generic_web_scraper: Any
 
     def __init__(self):
-        pass
+        self.app = AppBase
+        self.log = AppBase.log
 
     def get_provider(self, new_provider_name=None):
         """Returns an instance of a provider

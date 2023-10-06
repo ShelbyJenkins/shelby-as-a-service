@@ -1,50 +1,47 @@
 import os
 from typing import Any, Dict, List, Type, Union
 
-import modules.text_processing.text as TextProcess
-import modules.utils.config_manager as ConfigManager
 import pinecone
-from modules.index.index_model import DataDomainModel, DataSourceModel, IndexModel
-from pydantic import Field
+from pydantic import BaseModel
 from services.providers.provider_base import ProviderBase
 
 
 class PineconeDatabase(ProviderBase):
-    index: IndexModel
+    PROVIDER_NAME: str = "pinecone_database"
+    PROVIDER_UI_NAME: str = "pinecone_database"
+    REQUIRED_SECRETS: List[str] = ["pinecone_api_key"]
 
-    required_secrets: List[str] = ["pinecone_api_key"]
+    class ProviderConfigModel(BaseModel):
+        index_env: str = "us-central1-gcp"
+        embedding_max_chunk_size: int = 8191
+        embedding_batch_size: int = 100
+        vectorstore_dimension: int = 1536
+        vectorstore_upsert_batch_size: int = 20
+        vectorstore_metric: str = "cosine"
+        vectorstore_pod_type: str = "p1"
+        preprocessor_min_length: int = 150
+        #  text_splitter_goal_length: int = 500
+        text_splitter_goal_length: int = 750
+        text_splitter_overlap_percent: int = 15  # In percent
+        retrieve_n_docs: int = 5
+        indexed_metadata: List[str] = [
+            "data_domain_name",
+            "data_source_name",
+            "doc_type",
+            "target_type",
+            "date_indexed",
+        ]
 
-    provider_name: str = "pinecone_database"
-    provider_ui_name: str = "pinecone_database"
+    config: ProviderConfigModel
 
-    index_name: str
-    index_env: str = "us-central1-gcp"
-    embedding_max_chunk_size: int = 8191
-    embedding_batch_size: int = 100
-    vectorstore_dimension: int = 1536
-    vectorstore_upsert_batch_size: int = 20
-    vectorstore_metric: str = "cosine"
-    vectorstore_pod_type: str = "p1"
-    preprocessor_min_length: int = 150
-    #  text_splitter_goal_length: int = 500
-    text_splitter_goal_length: int = 750
-    text_splitter_overlap_percent: int = 15  # In percent
-    retrieve_n_docs: int = 5
-    indexed_metadata: List[str] = [
-        "data_domain_name",
-        "data_source_name",
-        "doc_type",
-        "target_type",
-        "date_indexed",
-    ]
+    def __init__(self):
+        super().__init__()
 
-    def __init__(self, parent_service):
-        super().__init__(parent_service=parent_service)
-
+    def setup_index(self):
         self.index_name = "shelby-as-a-service"
         pinecone.init(
             api_key=self.app.secrets["pinecone_api_key"],
-            environment=self.index_env,
+            environment=self.config.index_env,
         )
         self.pinecone_index = pinecone.Index(self.index_name)
 
@@ -77,7 +74,7 @@ class PineconeDatabase(ProviderBase):
         filter = None  # Need to implement
 
         if retrieve_n_docs is None:
-            top_k = self.retrieve_n_docs
+            top_k = self.config.retrieve_n_docs
         else:
             top_k = retrieve_n_docs
 

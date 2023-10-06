@@ -1,46 +1,36 @@
 # region
 
-from typing import Any, Generator, List, Optional
+from typing import Any, Generator, List, Optional, Type
 from urllib.parse import urlparse, urlunparse
 
 import gradio as gr
-import modules.prompt_templates as PromptTemplates
 import modules.text_processing.text as text
-import modules.utils.config_manager as ConfigManager
 from agents.agent_base import AgentBase
 from agents.ingest_agent import IngestAgent
 from app.app_base import AppBase
 from pydantic import BaseModel
 from services.llm_service import LLMService
 
-
 # endregion
 #
-class AgentConfig(BaseModel):
-    agent_select_status_message: str = (
-        "Load a URL Data Tab, and we'll access it and use it to generate a response."
-    )
-    llm_provider: str = "openai_llm"
-    llm_model: str = "gpt-4"
-    database_provider: str = "local_filestore_database"
 
 
 class WebAgent(AgentBase):
     AGENT_NAME: str = "web_agent"
     AGENT_UI_NAME: str = "URL Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "web_prompt.yaml"
+    AVAILABLE_SERVICES: List[Type] = [LLMService, IngestAgent]
 
-    app: Optional[Any] = None
-    index: Optional[Any] = None
+    class AgentConfigModel(BaseModel):
+        agent_select_status_message: str = "Load a URL Data Tab, and we'll access it and use it to generate a response."
+        llm_provider: str = "openai_llm"
+        llm_model: str = "gpt-4"
+        database_provider: str = "local_filestore_database"
 
-    def __init__(self, parent_class=None):
-        super().__init__(parent_class=parent_class)
-        self.config = AppBase.load_service_config(
-            class_instance=self, config_class=AgentConfig
-        )
-        self.ingest_agent = IngestAgent(parent_class)
+    config: AgentConfigModel
 
-        self.llm_service = LLMService(self)
+    def __init__(self):
+        super().__init__()
 
     def create_streaming_chat(
         self,

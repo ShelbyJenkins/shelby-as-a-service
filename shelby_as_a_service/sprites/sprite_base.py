@@ -1,5 +1,8 @@
 from typing import Any, Dict, List, Optional, Type
 
+from agents.ceq_agent import CEQAgent
+from agents.vanillm_agent import VanillaLLM
+from agents.web_agent import WebAgent
 from app.app_base import AppBase
 from modules.utils.log_service import Logger
 
@@ -14,11 +17,12 @@ class SpriteBase(AppBase):
     AVAILABLE_CLASS_TYPES: List[str] = ["AVAILABLE_AGENTS"]
 
     log: Logger
-
-    required_secrets: Optional[List[str]] = None
-
+    vanillallm_agent: VanillaLLM
+    web_agent: WebAgent
+    ceq_agent: CEQAgent
+    
     def __init__(self):
-        pass
+        self.app = AppBase
 
         # self.log = AppBase.get_logger(logger_name=self.SPRITE_NAME)
 

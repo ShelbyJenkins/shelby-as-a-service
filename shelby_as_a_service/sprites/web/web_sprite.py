@@ -1,14 +1,13 @@
 # region
 
+import time
 from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
-import modules.utils.config_manager as ConfigManager
 import sprites.web.gradio_helpers as GRHelper
 from agents.ceq_agent import CEQAgent
 from agents.vanillm_agent import VanillaLLM
 from agents.web_agent import WebAgent
-from app.app_base import AppBase
 from pydantic import BaseModel
 from sprites.sprite_base import SpriteBase
 from sprites.web.chat_ui import ChatUI
@@ -20,8 +19,7 @@ from sprites.web.gradio_themes import AtYourServiceTheme
 class WebSprite(SpriteBase):
     SPRITE_NAME: str = "web_sprite"
     SPRITE_UI_NAME: str = "web_sprite"
-    # AVAILABLE_AGENTS: List[Type] = [VanillaLLM, WebAgent, CEQAgent]
-    AVAILABLE_AGENTS: List[Type] = [VanillaLLM]
+    AVAILABLE_AGENTS: List[Type] = [VanillaLLM, WebAgent, CEQAgent]
 
     class SpriteConfigModel(BaseModel):
         default_local_app_enabled: bool = False
@@ -34,6 +32,8 @@ class WebSprite(SpriteBase):
         super().__init__()
 
         self.ui = {}
+        self.ui["ui_shared"] = {}
+        self.ui["ui_shared"]["update_settings_file"] = False
 
     def create_interface(self):
         """Creates gradio app."""
@@ -111,3 +111,8 @@ class WebSprite(SpriteBase):
 
     def run_sprite(self):
         self.create_interface()
+        while True:
+            time.sleep(5)
+            if self.ui["ui_shared"]["update_settings_file"]:
+                self.ui["ui_shared"]["update_settings_file"] = False
+                self.app.update_app_config_file_from_ui()

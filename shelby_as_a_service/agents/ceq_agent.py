@@ -2,7 +2,7 @@
 import json
 import re
 import traceback
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 
 import modules.text_processing.text as text
 
@@ -14,42 +14,40 @@ from services.database_service import DatabaseService
 from services.embedding_service import EmbeddingService
 from services.llm_service import LLMService
 
-
 # endregion
-class AgentConfig(BaseModel):
-    agent_select_status_message: str = "Search index to find docs related to request."
-    # data_domain_name: str = "base"
-    data_domain_name: Optional[str] = None
-    index_name: str = "base"
-    llm_provider: str = "openai_llm"
-    llm_model: str = "gpt-4"
-    embedding_provider: str = "openai_embedding"
-    database_provider: str = "pinecone_database"
-
-    data_domain_constraints_enabled: bool = False
-    data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
-    keyword_generator_enabled: bool = False
-    doc_relevancy_check_enabled: bool = False
-    retrieve_n_docs: int = 5
-    docs_max_token_length: int = 1200
-    docs_max_total_tokens: int = 2500
-    docs_max_used: int = 5
 
 
 class CEQAgent(AgentBase):
     AGENT_NAME: str = "ceq_agent"
-    AGENT_UI_NAME: str = "Shelby Agent"
+    AGENT_UI_NAME: str = "ceq_agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
+    AVAILABLE_SERVICES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
 
-    def __init__(self, parent_class=None):
-        super().__init__(parent_class=parent_class)
-        self.config = AppBase.load_service_config(
-            class_instance=self, config_class=AgentConfig
+    class AgentConfigModel(BaseModel):
+        agent_select_status_message: str = (
+            "Search index to find docs related to request."
         )
+        # data_domain_name: str = "base"
+        data_domain_name: Optional[str] = None
+        index_name: str = "base"
+        llm_provider: str = "openai_llm"
+        llm_model: str = "gpt-4"
+        embedding_provider: str = "openai_embedding"
+        database_provider: str = "pinecone_database"
 
-        self.llm_service = LLMService(self)
-        self.embedding_service = EmbeddingService(self)
-        self.database_service = DatabaseService(self)
+        data_domain_constraints_enabled: bool = False
+        data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
+        keyword_generator_enabled: bool = False
+        doc_relevancy_check_enabled: bool = False
+        retrieve_n_docs: int = 5
+        docs_max_token_length: int = 1200
+        docs_max_total_tokens: int = 2500
+        docs_max_used: int = 5
+
+    config: AgentConfigModel
+
+    def __init__(self):
+        super().__init__()
         self.user_prompt_template_path = None
 
     def create_streaming_chat(

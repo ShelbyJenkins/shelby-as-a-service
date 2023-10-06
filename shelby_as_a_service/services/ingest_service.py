@@ -4,9 +4,6 @@ import traceback
 from typing import Any, Iterator, List, Type
 
 import modules.text_processing.text as TextProcess
-import modules.utils.config_manager as ConfigManager
-import pinecone
-import yaml
 from bs4 import BeautifulSoup
 from langchain.document_loaders import (
     GitbookLoader,
@@ -15,15 +12,25 @@ from langchain.document_loaders import (
     WebBaseLoader,
 )
 from langchain.schema import Document
-from pydantic import Field
+from pydantic import BaseModel, Field
+from services.providers.provider_base import ProviderBase
 from services.service_base import ServiceBase
 
 
-class GenericRecursiveWebScraper(ServiceBase):
-    provider_name: str = "generic_recursive_web_scraper"
+class GenericRecursiveWebScraper(ProviderBase):
+    PROVIDER_NAME: str = "generic_recursive_web_scraper"
+    PROVIDER_UI_NAME: str = "generic_recursive_web_scraper"
+    REQUIRED_SECRETS: List[str] = []
 
-    def __init__(self, parent_service):
-        super().__init__(parent_service=parent_service)
+    class ProviderConfigModel(BaseModel):
+        agent_select_status_message: str = (
+            "Search index to find docs related to request."
+        )
+
+    config: ProviderConfigModel
+
+    def __init__(self):
+        super().__init__()
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:
@@ -42,11 +49,20 @@ class GenericRecursiveWebScraper(ServiceBase):
         )
 
 
-class GenericWebScraper(ServiceBase):
-    provider_name: str = "generic_web_scraper"
+class GenericWebScraper(ProviderBase):
+    PROVIDER_NAME: str = "generic_web_scraper"
+    PROVIDER_UI_NAME: str = "generic_web_scraper"
+    REQUIRED_SECRETS: List[str] = []
 
-    def __init__(self, parent_service):
-        super().__init__(parent_service=parent_service)
+    class ProviderConfigModel(BaseModel):
+        agent_select_status_message: str = (
+            "Search index to find docs related to request."
+        )
+
+    config: ProviderConfigModel
+
+    def __init__(self):
+        super().__init__()
 
     def _load(self, url) -> Iterator[Document]:
         documents = WebBaseLoader(web_path=url).load()
@@ -176,19 +192,26 @@ class GenericWebScraper(ServiceBase):
 
 
 class IngestService(ServiceBase):
-    service_name: str = "ingest_service"
-    service_ui_name: str = "ingest_service"
-    provider_type: str = "ingest_provider"
-    available_providers: List[Type] = [
+    SERVICE_NAME: str = "ingest_service"
+    SERVICE_UI_NAME: str = "ingest_service"
+    PROVIDER_TYPE: str = "ingest_provider"
+    DEFAULT_PROVIDER: Type = GenericWebScraper
+    AVAILABLE_PROVIDERS: List[Type] = [
         GenericWebScraper,
         GenericRecursiveWebScraper,
         # OpenAPILoader,
         # LoadTextFromFile,
     ]
-    default_provider: Type = GenericWebScraper
 
-    def __init__(self, parent_agent=None):
-        super().__init__(parent_agent=parent_agent)
+    class ServiceConfigModel(BaseModel):
+        agent_select_status_message: str = (
+            "Search index to find docs related to request."
+        )
+
+    config: ServiceConfigModel
+
+    def __init__(self):
+        super().__init__()
 
     def load(self, data_source):
         provider = self.get_provider(data_source.data_source_ingest_provider)

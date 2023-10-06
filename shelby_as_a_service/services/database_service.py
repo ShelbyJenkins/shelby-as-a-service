@@ -2,17 +2,24 @@ import os
 from typing import Any, List, Type
 
 import modules.text_processing.text as TextProcess
-import modules.utils.config_manager as ConfigManager
-import pinecone
+from pydantic import BaseModel
 from services.providers.database_pinecone import PineconeDatabase
+from services.providers.provider_base import ProviderBase
 from services.service_base import ServiceBase
 
 
-class LocalFileStoreDatabase(ServiceBase):
-    provider_name: str = "local_filestore_database"
+class LocalFileStoreDatabase(ProviderBase):
+    PROVIDER_NAME: str = "local_filestore_database"
+    PROVIDER_UI_NAME: str = "local_filestore_database"
+    REQUIRED_SECRETS: List[str] = []
 
-    def __init__(self, parent_service):
-        super().__init__(parent_service=parent_service)
+    class ProviderConfigModel(BaseModel):
+        max_response_tokens: int = 1
+
+    config: ProviderConfigModel
+
+    def __init__(self):
+        super().__init__()
 
     def _write_documents_to_database(self, documents, data_domain, data_source):
         data_domain_name_file_path = os.path.join(
@@ -36,14 +43,21 @@ class LocalFileStoreDatabase(ServiceBase):
 
 
 class DatabaseService(ServiceBase):
-    service_name: str = "database_service"
-    service_ui_name: str = "database_service"
-    provider_type: str = "database_provider"
-    available_providers: List[Type] = [PineconeDatabase, LocalFileStoreDatabase]
-    default_provider: Type = LocalFileStoreDatabase
+    SERVICE_NAME: str = "database_service"
+    SERVICE_UI_NAME: str = "database_service"
+    PROVIDER_TYPE: str = "database_provider"
+    DEFAULT_PROVIDER: Type = LocalFileStoreDatabase
+    AVAILABLE_PROVIDERS: List[Type] = [PineconeDatabase, LocalFileStoreDatabase]
 
-    def __init__(self, parent_agent=None):
-        super().__init__(parent_agent=parent_agent)
+    class ServiceConfigModel(BaseModel):
+        agent_select_status_message: str = (
+            "Search index to find docs related to request."
+        )
+
+    config: ServiceConfigModel
+
+    def __init__(self):
+        super().__init__()
 
     def query_index(
         self,

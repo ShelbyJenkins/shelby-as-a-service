@@ -2,9 +2,7 @@
 import json
 from typing import Any, Dict, Generator, List, Optional, Type
 
-import modules.prompt_templates as PromptTemplates
 from agents.agent_base import AgentBase
-from app.app_base import AppBase
 from pydantic import BaseModel
 from services.llm_service import LLMService
 
@@ -21,6 +19,8 @@ class VanillaLLM(AgentBase):
         agent_select_status_message: str = "EZPZ"
         llm_provider: str = "openai_llm"
         llm_model: str = "gpt-4"
+
+    config: AgentConfigModel
 
     def __init__(self):
         super().__init__()

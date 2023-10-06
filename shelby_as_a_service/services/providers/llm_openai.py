@@ -5,25 +5,34 @@ from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 import modules.prompt_templates as PromptTemplates
 import modules.text_processing.text as TextProcess
 import openai
-from app.app_base import AppBase
 from pydantic import BaseModel
 from services.providers.provider_base import ProviderBase
 
 
 class OpenAILLM(ProviderBase):
-    class ProviderConfigModel(BaseModel):
-        openai_timeout_seconds: float = 180.0
-        max_response_tokens: int = 300
+    PROVIDER_NAME: str = "openai_llm"
+    PROVIDER_UI_NAME: str = "openai_llm"
+    REQUIRED_SECRETS: List[str] = ["openai_api_key"]
 
     class OpenAILLMModel(BaseModel):
         MODEL_NAME: str
         TOKENS_MAX: int
         COST_PER_K: float
 
+    AVAILABLE_MODELS: List[OpenAILLMModel] = [
+        OpenAILLMModel(MODEL_NAME="gpt-4", TOKENS_MAX=8192, COST_PER_K=0.06),
+        OpenAILLMModel(MODEL_NAME="gpt-4-32k", TOKENS_MAX=32768, COST_PER_K=0.06),
+        OpenAILLMModel(MODEL_NAME="gpt-3.5-turbo", TOKENS_MAX=4096, COST_PER_K=0.03),
+        OpenAILLMModel(
+            MODEL_NAME="gpt-3.5-turbo-16k", TOKENS_MAX=16384, COST_PER_K=0.03
+        ),
+    ]
+
+    class ProviderConfigModel(BaseModel):
+        openai_timeout_seconds: float = 180.0
+        max_response_tokens: int = 300
+
     config: ProviderConfigModel
-    REQUIRED_SECRETS: List[str] = ["openai_api_key"]
-    PROVIDER_NAME: str = "openai_llm"
-    PROVIDER_UI_NAME: str = "openai_llm"
 
     UI_MODEL_NAMES = [
         "gpt-4",
@@ -33,14 +42,6 @@ class OpenAILLM(ProviderBase):
     ]
     DEFAULT_MODEL: str = "gpt-3.5-turbo"
     TYPE_MODEL: str = "openai_llm_model"
-    AVAILABLE_MODELS: List[OpenAILLMModel] = [
-        OpenAILLMModel(MODEL_NAME="gpt-4", TOKENS_MAX=8192, COST_PER_K=0.06),
-        OpenAILLMModel(MODEL_NAME="gpt-4-32k", TOKENS_MAX=32768, COST_PER_K=0.06),
-        OpenAILLMModel(MODEL_NAME="gpt-3.5-turbo", TOKENS_MAX=4096, COST_PER_K=0.03),
-        OpenAILLMModel(
-            MODEL_NAME="gpt-3.5-turbo-16k", TOKENS_MAX=16384, COST_PER_K=0.03
-        ),
-    ]
 
     def __init__(self):
         super().__init__()
@@ -79,10 +80,10 @@ class OpenAILLM(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        AppBase.total_cost += request_cost
-        AppBase.last_request_cost = request_cost
+        self.app.total_cost += request_cost
+        self.app.last_request_cost = request_cost
         print(f"Request cost: ${format(request_cost, 'f')}")
-        print(f"Total cost: ${format(AppBase.total_cost, 'f')}")
+        print(f"Total cost: ${format(self.app.total_cost, 'f')}")
 
     def _calculate_cost_streaming(self, total_token_count, model):
         # Convert numbers to Decimal
@@ -96,9 +97,9 @@ class OpenAILLM(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        AppBase.total_cost += request_cost
-        AppBase.last_request_cost = request_cost
-        print(f"Total cost: ${format(AppBase.total_cost, 'f')}")
+        self.app.total_cost += request_cost
+        self.app.last_request_cost = request_cost
+        print(f"Total cost: ${format(self.app.total_cost, 'f')}")
 
     def _create_chat(
         self, query, prompt_template_path=None, documents=None, llm_model=None
@@ -110,7 +111,7 @@ class OpenAILLM(ProviderBase):
             llm_model=llm_model,
         )
         response = openai.ChatCompletion.create(
-            api_key=AppBase.secrets["openai_api_key"],
+            api_key=self.app.secrets["openai_api_key"],
             model=model.MODEL_NAME,
             messages=prompt,
             max_tokens=self.config.max_response_tokens,
@@ -145,7 +146,7 @@ class OpenAILLM(ProviderBase):
             return None
 
         stream = openai.ChatCompletion.create(
-            api_key=AppBase.secrets["openai_api_key"],
+            api_key=self.app.secrets["openai_api_key"],
             model=model.MODEL_NAME,
             messages=prompt,
             max_tokens=self.config.max_response_tokens,
