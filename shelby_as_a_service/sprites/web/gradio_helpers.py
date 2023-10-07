@@ -3,6 +3,28 @@ from typing import Any, Dict, List, Optional
 import gradio as gr
 
 
+def get_class_ui_name(ui_class) -> Optional[str]:
+    if not isinstance(ui_class, type):
+        ui_class = type(ui_class)
+    base_class = ui_class.__bases__[0]
+    class_ui_name_type = getattr(base_class, "CLASS_UI_NAME_TYPE", None)
+    if class_ui_name_type:
+        return getattr(ui_class, class_ui_name_type, None)
+    else:
+        return None
+
+
+def get_class_name(ui_class) -> Optional[str]:
+    if not isinstance(ui_class, type):
+        ui_class = type(ui_class)
+    base_class = ui_class.__bases__[0]
+    class_name_type = getattr(base_class, "CLASS_NAME_TYPE", None)
+    if class_name_type:
+        return getattr(ui_class, class_name_type, None)
+    else:
+        return None
+
+
 def list_available(class_model) -> Optional[List[Any]]:
     if available_providers := getattr(class_model, "AVAILABLE_PROVIDERS", None):
         return [provider.PROVIDER_NAME for provider in available_providers]
@@ -11,6 +33,13 @@ def list_available(class_model) -> Optional[List[Any]]:
     if available_agents := getattr(class_model, "AVAILABLE_AGENTS", None):
         return [agent.AGENT_UI_NAME for agent in available_agents]
     return None
+
+
+def agent_select_status_message(web_sprite, chat_tab_agent_dropdown):
+    agent = web_sprite.get_selected_agent(chat_tab_agent_dropdown)
+    if message := getattr(agent, "agent_select_status_message", None):
+        return message
+    raise gr.Error("Bad value for agent_select_status_message!")
 
 
 def dropdown_default_value(class_model):
@@ -34,8 +63,8 @@ def check_for_web_data(web_data_added):
 
 
 def comp_values_to_dict(ui, *values) -> Dict[str, Any]:
-    group_name = values[0]
-    comps_keys = ui[group_name]["comps"].keys()
+    feature_name = values[0]
+    comps_keys = ui["features"][feature_name]["components"].keys()
     return {k: v for k, v in zip(comps_keys, values)}
 
 

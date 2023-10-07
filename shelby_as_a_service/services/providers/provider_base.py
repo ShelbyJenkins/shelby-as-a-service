@@ -6,6 +6,7 @@ from modules.utils.log_service import Logger
 
 class ProviderBase(AppBase):
     CLASS_NAME_TYPE: str = "PROVIDER_NAME"
+    CLASS_UI_NAME_TYPE: str = "PROVIDER_UI_NAME"
     CLASS_CONFIG_TYPE: str = "providers"
     CLASS_MODEL_TYPE: str = "ProviderConfigModel"
 

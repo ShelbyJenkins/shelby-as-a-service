@@ -16,6 +16,7 @@ class ServiceBase(AppBase):
     AVAILABLE_PROVIDERS: List[Type]
 
     CLASS_NAME_TYPE: str = "SERVICE_NAME"
+    CLASS_UI_NAME_TYPE: str = "SERVICE_UI_NAME"
     CLASS_CONFIG_TYPE: str = "services"
     CLASS_MODEL_TYPE: str = "ServiceConfigModel"
     AVAILABLE_CLASS_TYPES: List[str] = ["AVAILABLE_PROVIDERS"]

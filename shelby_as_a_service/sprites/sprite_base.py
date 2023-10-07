@@ -18,9 +18,9 @@ class SpriteBase(AppBase):
 
     log: Logger
     vanillallm_agent: VanillaLLM
-    web_agent: WebAgent
     ceq_agent: CEQAgent
-    
+    web_agent: WebAgent
+
     def __init__(self):
         self.app = AppBase
 
