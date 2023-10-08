@@ -76,36 +76,10 @@ def check_for_web_data(web_data_added):
 
 
 def comp_values_to_dict(gradio_ui, *values) -> Dict[str, Any]:
-    agent_name = values[0]
-    comps_keys = gradio_ui["gradio_agents"][agent_name]["ui"]["components"].keys()
+    agent_name = values[-1]
+    ui_type = values[-2]
+    comps_keys = gradio_ui["gradio_agents"][agent_name][ui_type]["components"].keys()
     return {k: v for k, v in zip(comps_keys, values)}
-
-
-def merge_feature_components_and_create_state(feature, components):
-    def merge_without_overlap(dict1, dict2):
-        # Find overlapping keys
-        overlapping_keys = dict1.keys() & dict2.keys()
-
-        if overlapping_keys:
-            raise ValueError(f"Overlapping keys: {', '.join(overlapping_keys)}")
-
-        # Merge dictionaries (if using Python 3.9+)
-        return dict1 | dict2
-
-    feature_components_dict = feature.get("components", {})
-    merged_components = merge_without_overlap(feature_components_dict, components)
-
-    components_state = {k: gr.State(None) for k in components.keys()}
-
-    feature_components_state_dict = feature.get("components_state", {})
-    merged_components_state = merge_without_overlap(
-        feature_components_state_dict, components_state
-    )
-
-    return {
-        "components": merged_components,
-        "components_state": merged_components_state,
-    }
 
 
 # # Interface functions

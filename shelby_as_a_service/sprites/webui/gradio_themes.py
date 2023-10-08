@@ -42,21 +42,21 @@ class AtYourServiceTheme(Base):
         box-sizing: border-box;
     }
 
-    #chat_ui_feature_row {
+    #chat_ui_row {
         height: height: 100vh;
         display: flex;
         box-sizing: border-box;
         flex-direction: column;
         flex-grow: 8 !important;        
     }
-    #chat_ui_feature_col {
+    #chat_ui_col {
         height: height: 100vh;
         display: flex;
         box-sizing: border-box;
         flex-direction: column;
         flex-grow: 8 !important;        
     }
-    .chat_ui_feature_col > div:first-child {
+    .chat_ui_col > div:first-child {
         display: flex;
         flex-direction: column;
         height: 100%;
@@ -93,7 +93,6 @@ class AtYourServiceTheme(Base):
         resize: none !important; 
         box-sizing: border-box !important; 
     }
-    
     
     footer[class*='svelte-'] {
         display: none !important;

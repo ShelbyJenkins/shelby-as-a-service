@@ -10,13 +10,8 @@ from agents.ceq_agent import CEQAgent
 from agents.vanillallm_agent import VanillaLLM
 from agents.web_agent import WebAgent
 from pydantic import BaseModel
-from services.llm_service import LLMService
-from services.providers.llm_openai import OpenAILLM
 from sprites.sprite_base import SpriteBase
-from sprites.webui.gradio_events import GradioEvents
-from sprites.webui.gradio_themes import AtYourServiceTheme
-from sprites.webui.ui_chat import UIChat
-from sprites.webui.ui_settings import UISettings
+from sprites.webui.gradio_ui import GradioUI
 
 # endregion
 
@@ -24,7 +19,8 @@ from sprites.webui.ui_settings import UISettings
 class WebUISprite(SpriteBase):
     SPRITE_NAME: str = "webui_sprite"
     SPRITE_UI_NAME: str = "webui_sprite"
-    AVAILABLE_AGENTS: List[Type] = [VanillaLLM, CEQAgent, WebAgent]
+    AVAILABLE_AGENTS: List[Type] = [VanillaLLM, CEQAgent]
+    # AVAILABLE_AGENTS: List[Type] = [VanillaLLM, CEQAgent, WebAgent]
 
     class SpriteConfigModel(BaseModel):
         default_local_app_enabled: bool = False
@@ -40,29 +36,8 @@ class WebUISprite(SpriteBase):
         super().__init__()
 
         self.gradio_ui = {}
-        self.gradio_ui["ui_shared"] = {}
-        self.gradio_ui["ui_shared"]["update_settings_file"] = gr.State(False)
+        self.gradio_ui["update_settings_file"] = gr.State(False)
         self.gradio_ui["gradio_agents"] = {}
-
-        for agent in self.AVAILABLE_AGENTS:
-            name = GradioHelper.get_class_name(agent)
-            self.gradio_ui["gradio_agents"][name] = {}
-
-    def create_interface(self):
-        """Creates gradio app."""
-        with gr.Blocks(
-            theme=AtYourServiceTheme(),
-            css=AtYourServiceTheme.css,
-        ) as local_client:
-            with gr.Row(elem_id="main_row"):
-                with gr.Column(elem_id="settings_panel_col"):
-                    UISettings(self).create_settings_panel()
-                with gr.Column(elem_id="chat_ui_panel_col"):
-                    UIChat(self).create_chat_ui()
-
-            GradioEvents(self).create_event_handlers()
-            local_client.queue()
-            local_client.launch(prevent_thread_lock=True)
 
     def run_chat(
         self, *comps_state
@@ -84,16 +59,16 @@ class WebUISprite(SpriteBase):
                 query=ui_state["chat_tab_in_text"],
                 user_prompt_template_path=None,
                 documents=documents,
-                llm_provider=ui_state["chat_llm_provider"],
-                llm_model=ui_state["chat_llm_model"],
+                llm_provider=agent.config.llm_provider,
+                llm_model=agent.config.llm_model,
             )
         else:
             yield from agent.create_streaming_chat(
                 query=ui_state["chat_tab_in_text"],
                 user_prompt_template_path=None,
                 documents=documents,
-                llm_provider=ui_state["chat_llm_provider"],
-                llm_model=ui_state["chat_llm_model"],
+                llm_provider=agent.config.llm_provider,
+                llm_model=agent.config.llm_model,
             )
             return None
 
@@ -111,12 +86,12 @@ class WebUISprite(SpriteBase):
         gr.Info(message)
 
     def run_sprite(self):
-        self.create_interface()
+        GradioUI(self).creater_gradio_interface()
         asyncio.run(self.check_for_updates())
 
     async def check_for_updates(self):
         while True:
             await asyncio.sleep(5)  # non-blocking sleep
-            if self.gradio_ui["ui_shared"]["update_settings_file"]:
-                self.gradio_ui["ui_shared"]["update_settings_file"] = False
+            if self.gradio_ui["update_settings_file"]:
+                self.gradio_ui["update_settings_file"] = False
                 self.update_app_config_file_from_ui()

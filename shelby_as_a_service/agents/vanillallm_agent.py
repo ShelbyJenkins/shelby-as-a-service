@@ -5,6 +5,7 @@ from typing import Any, Dict, Generator, List, Optional, Type
 from agents.agent_base import AgentBase
 from pydantic import BaseModel
 from services.llm_service import LLMService
+from sprites.webui.ui.vanillallm_ui import VanillaLLMUI
 
 # endregion
 
@@ -12,6 +13,7 @@ from services.llm_service import LLMService
 class VanillaLLM(AgentBase):
     AGENT_NAME: str = "vanillallm_agent"
     AGENT_UI_NAME: str = "VanillaLLM Agent"
+    AGENT_UI = VanillaLLMUI
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "vanillallm_prompt.yaml"
     AVAILABLE_SERVICES: List[Type] = [LLMService]
 

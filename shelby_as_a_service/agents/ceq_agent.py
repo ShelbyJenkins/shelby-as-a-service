@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from services.database_service import DatabaseService
 from services.embedding_service import EmbeddingService
 from services.llm_service import LLMService
+from sprites.webui.ui.ceq_ui import CEQUI
 
 # endregion
 
@@ -20,6 +21,7 @@ from services.llm_service import LLMService
 class CEQAgent(AgentBase):
     AGENT_NAME: str = "ceq_agent"
     AGENT_UI_NAME: str = "ceq_agent"
+    AGENT_UI = CEQUI
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
     AVAILABLE_SERVICES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
 
