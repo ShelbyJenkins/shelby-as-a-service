@@ -41,7 +41,7 @@ class OpenAILLM(ProviderBase):
         "gpt-3.5-turbo-16k",
     ]
     DEFAULT_MODEL: str = "gpt-3.5-turbo"
-    TYPE_MODEL: str = "openai_llm_model"
+    TYPE_MODEL: str = "llm_model"
 
     def __init__(self):
         super().__init__()

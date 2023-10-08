@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Type
 
 from agents.ceq_agent import CEQAgent
-from agents.vanillm_agent import VanillaLLM
+from agents.vanillallm_agent import VanillaLLM
 from agents.web_agent import WebAgent
 from app.app_base import AppBase
 from modules.utils.log_service import Logger

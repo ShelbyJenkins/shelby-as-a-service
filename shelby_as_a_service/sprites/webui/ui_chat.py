@@ -2,21 +2,21 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import gradio as gr
-import sprites.web.gradio_helpers as GradioHelper
+import sprites.webui.gradio_helpers as GradioHelper
 
 
 class UIChat:
-    def __init__(self, web_sprite):
-        self.web_sprite = web_sprite
-        self.features = self.web_sprite.ui["features"]
+    def __init__(self, webui_sprite):
+        self.webui_sprite = webui_sprite
+        self.gradio_agents = self.webui_sprite.gradio_ui["gradio_agents"]
 
     def create_chat_ui(self):
         def creator(agent):
             name = GradioHelper.get_class_name(agent)
             ui_name = GradioHelper.get_class_ui_name(agent)
-            class_instance = getattr(self.web_sprite, name, None)
-            existing_ui_dict = self.features[name].get("ui", {})
-            if ui_name == self.web_sprite.config.current_feature_ui_name:
+            class_instance = getattr(self.webui_sprite, name, None)
+            existing_ui_dict = self.gradio_agents[name].get("ui", {})
+            if ui_name == self.webui_sprite.config.current_agent_ui_name:
                 visibility = True
             else:
                 visibility = False
@@ -36,15 +36,15 @@ class UIChat:
                     case _:
                         components = {}
 
-            self.features[name]["chat_ui_row"] = chat_ui_row
+            self.gradio_agents[name]["chat_ui_row"] = chat_ui_row
 
-            self.features[name][
+            self.gradio_agents[name][
                 "ui"
             ] = GradioHelper.merge_feature_components_and_create_state(
                 existing_ui_dict, components
             )
 
-        for agent in self.web_sprite.AVAILABLE_AGENTS:
+        for agent in self.webui_sprite.AVAILABLE_AGENTS:
             creator(agent)
 
     def create_vanillallm_agent(self, name, feature_class):

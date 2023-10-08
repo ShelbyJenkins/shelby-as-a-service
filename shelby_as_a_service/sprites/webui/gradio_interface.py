@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 import gradio as gr
-import sprites.web.gradio_helpers as helper
+import sprites.webui.gradio_helpers as GradioHelper
 from services.llm_service import LLMService, OpenAILLM
 from sprites.web.gradio_themes import AtYourServiceTheme
 from sprites.web.vanillm_interface import VanallmInterface
@@ -10,9 +10,9 @@ from sprites.web.vanillm_interface import VanallmInterface
 class GradioInterface:
     ui: Dict[Any, Any] = {}
 
-    def __init__(self, web_sprite):
-        self.ui = web_sprite.ui
-        self.web_sprite = web_sprite
+    def __init__(self, webui_sprite):
+        self.ui = webui_sprite.gradio_ui
+        self.webui_sprite = webui_sprite
 
     def web_ui(self):
         with gr.Tab("Chat", elem_id="default-tab"):

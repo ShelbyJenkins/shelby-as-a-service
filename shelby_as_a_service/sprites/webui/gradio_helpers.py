@@ -25,6 +25,33 @@ def get_class_name(ui_class) -> Optional[str]:
         return None
 
 
+def agent_select_status_message(webui_sprite, chat_tab_agent_dropdown):
+    agent = webui_sprite.get_selected_agent(chat_tab_agent_dropdown)
+    if message := getattr(agent, "agent_select_status_message", None):
+        return message
+    raise gr.Error("Bad value for agent_select_status_message!")
+
+
+def get_setting_type(setting_class) -> Optional[List[Any]]:
+    if provider_type := getattr(setting_class, "PROVIDER_TYPE", None):
+        return provider_type
+    if type_model := getattr(setting_class, "TYPE_MODEL", None):
+        return type_model
+
+    return None
+
+
+def dropdown_default_value(agent_instance, setting_class):
+    setting_type = get_setting_type(setting_class)
+    if setting_type:
+        if default_choice := getattr(agent_instance.config, setting_type, None):
+            return default_choice
+    choices = list_available(setting_class)
+    if choices:
+        return choices[0]
+    return None
+
+
 def list_available(class_model) -> Optional[List[Any]]:
     if available_providers := getattr(class_model, "AVAILABLE_PROVIDERS", None):
         return [provider.PROVIDER_NAME for provider in available_providers]
@@ -32,20 +59,6 @@ def list_available(class_model) -> Optional[List[Any]]:
         return [modes.MODEL_NAME for modes in available_models]
     if available_agents := getattr(class_model, "AVAILABLE_AGENTS", None):
         return [agent.AGENT_UI_NAME for agent in available_agents]
-    return None
-
-
-def agent_select_status_message(web_sprite, chat_tab_agent_dropdown):
-    agent = web_sprite.get_selected_agent(chat_tab_agent_dropdown)
-    if message := getattr(agent, "agent_select_status_message", None):
-        return message
-    raise gr.Error("Bad value for agent_select_status_message!")
-
-
-def dropdown_default_value(class_model):
-    choices = list_available(class_model)
-    if choices:
-        return choices[0]
     return None
 
 
@@ -62,9 +75,9 @@ def check_for_web_data(web_data_added):
     raise gr.Error("No valid web data found!")
 
 
-def comp_values_to_dict(ui, *values) -> Dict[str, Any]:
-    feature_name = values[0]
-    comps_keys = ui["features"][feature_name]["ui"]["components"].keys()
+def comp_values_to_dict(gradio_ui, *values) -> Dict[str, Any]:
+    agent_name = values[0]
+    comps_keys = gradio_ui["gradio_agents"][agent_name]["ui"]["components"].keys()
     return {k: v for k, v in zip(comps_keys, values)}
 
 
@@ -105,7 +118,7 @@ def merge_feature_components_and_create_state(feature, components):
 #         settings_components[0]
 #     ]
 
-#     if settings_components[0] == "web_sprite
+#     if settings_components[0] == "webui_sprite
 # ":
 #         class_instance = self
 #     else:
@@ -124,7 +137,7 @@ def merge_feature_components_and_create_state(feature, components):
 # def _save_config_to_file(self, *settings_components):
 #     self._save_config_to_memory(*settings_components)
 
-#     if settings_components[0] == "web_sprite
+#     if settings_components[0] == "webui_sprite
 # ":
 #         class_instance = self
 #     else:
@@ -164,7 +177,7 @@ def merge_feature_components_and_create_state(feature, components):
 #     This is used to identify the class to update the components."""
 
 #     class_name = settings_components[0]
-#     if class_name == "web_sprite
+#     if class_name == "webui_sprite
 # ":
 #         class_instance = self
 #     else:
@@ -201,13 +214,13 @@ def merge_feature_components_and_create_state(feature, components):
 #     self.app.setup_app(self.app)
 
 #     for attr, _ in vars(self.model_).items():
-#         val = getattr(self.app.web_sprite
+#         val = getattr(self.app.webui_sprite
 # , attr, None)
 #         setattr(self, attr, val)
 
 #     for service in self.required_services_:
 #         service_name = service.model_.service_name_
-#         service_instance = getattr(self.app.web_sprite
+#         service_instance = getattr(self.app.webui_sprite
 # , service_name)
 #         setattr(self, service_name, service_instance)
 

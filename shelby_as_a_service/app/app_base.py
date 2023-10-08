@@ -13,14 +13,14 @@ ConfigModelType = TypeVar("ConfigModelType", bound=BaseModel)
 
 
 class AppBase:
-    AVAILABLE_SPRITES: List[str] = ["web_sprite"]
-    # AVAILABLE_SPRITES: List[str] = ["web_sprite", "discord_sprite", "slack_sprite"]
+    AVAILABLE_SPRITES: List[str] = ["webui_sprite"]
+    # AVAILABLE_SPRITES: List[str] = ["webui_sprite", "discord_sprite", "slack_sprite"]
     PROMPT_TEMPLATE_DIR: str = "shelby_as_a_service/modules/prompt_templates"
     CLASS_CONFIG_TYPE: str = "app"
 
     class ClassConfigModel(BaseModel):
         app_name: str = "base"
-        enabled_sprites: List[str] = ["web_sprite"]
+        enabled_sprites: List[str] = ["webui_sprite"]
 
     app_name: str
     secrets: Dict[str, str] = {}
@@ -46,7 +46,7 @@ class AppBase:
         if AppBase.app_name == "base":
             AppManager.check_and_create_base()
             AppBase.update_app_config_file_from_default("base")
-            AppBase.app_name = AppManager.load_web_sprite_default_app()
+            AppBase.app_name = AppManager.load_webui_sprite_default_app()
             if AppBase.app_name != "base":
                 AppBase.update_app_config_file_from_default(AppBase.app_name)
 
@@ -158,10 +158,10 @@ class AppBase:
         list_of_sprite_classes = []
         for sprite_name in list_of_sprite_names:
             match sprite_name:
-                case "web_sprite":
-                    from sprites.web.web_sprite import WebSprite
+                case "webui_sprite":
+                    from sprites.webui_sprite import WebUISprite
 
-                    list_of_sprite_classes.append(WebSprite)
+                    list_of_sprite_classes.append(WebUISprite)
                 case "discord_sprite":
                     from sprites.discord_sprite import DiscordSprite
 

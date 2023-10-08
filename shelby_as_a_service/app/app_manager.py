@@ -99,12 +99,12 @@ class AppManager:
                 file.write(f"{key}={value}\n")
 
     @staticmethod
-    def load_web_sprite_default_app():
+    def load_webui_sprite_default_app():
         app_name = "base"
         # In the case of local app we check for a default_local_app
         app_config = AppManager.load_app_file("base")
         default_settings = (
-            app_config.get("sprites", {}).get("web_sprite", {}).get("optional", {})
+            app_config.get("sprites", {}).get("webui_sprite", {}).get("optional", {})
         )
         if default_settings.get("default_app_enabled") is True:
             existing_app_names = AppManager.check_for_existing_apps()
