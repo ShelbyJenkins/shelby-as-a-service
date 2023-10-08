@@ -117,6 +117,7 @@ class AppBase:
 
         list_of_sprite_classes = AppBase.get_sprites(AppBase.config.enabled_sprites)
         app_config_dict = AppBase.load_config_and_or_class_instances(
+            parent_class_instance=AppBase,
             available_classes=list_of_sprite_classes,
             existing_dict=app_config_dict,
             update_from_ui=True,
@@ -184,6 +185,7 @@ class AppBase:
     ) -> Dict[str, Any]:
         updated_dict = existing_dict or {}
         for current_class in available_classes:
+            current_class_instance = None
             # Get the names of the classes naming scheme
             base_class = current_class.__bases__[0]
             current_class_name_type = getattr(
@@ -210,7 +212,12 @@ class AppBase:
             # Gets the existing current_class_config_model from UI
             current_class_config_model = None
             if update_from_ui:
-                current_class_config_model = getattr(current_class, "config", None)
+                current_class_instance = getattr(
+                    parent_class_instance, current_class_name, None
+                )
+                current_class_config_model = getattr(
+                    current_class_instance, "config", None
+                )
                 (
                     config_class_instance,
                     config_class_dict,
@@ -240,7 +247,6 @@ class AppBase:
                 updated_class_dict
             )
 
-            current_class_instance = None
             if create_instances:
                 current_class_instance = current_class()
                 AppBase.set_secrets(current_class_instance)

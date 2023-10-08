@@ -32,9 +32,9 @@ class ProviderBase(AppBase):
             if model_instance:
                 return model_instance
         # Then the parent's agent
-        if model := getattr(self.parent_class, type_model, None):
-            if model_instance := getattr(self, model, None):
-                return model_instance
+        # if model := getattr(self.parent_class, type_model, None):
+        #     if model_instance := getattr(self, model, None):
+        #         return model_instance
         # Then the default
         return next(
             (

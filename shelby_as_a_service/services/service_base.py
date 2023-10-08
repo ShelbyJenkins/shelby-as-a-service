@@ -61,11 +61,11 @@ class ServiceBase(AppBase):
             provider_instance = _find_provider(new_provider_name)
             if provider_instance:
                 return provider_instance
-        # Then the service's agent
-        if agent_provider := getattr(self.parent_class, self.PROVIDER_TYPE, None):
-            provider_instance = _find_provider(agent_provider)
-            if provider_instance:
-                return provider_instance
+        # # Then the service's agent
+        # if agent_provider := getattr(self.parent_class, self.PROVIDER_TYPE, None):
+        #     provider_instance = _find_provider(agent_provider)
+        #     if provider_instance:
+        #         return provider_instance
         # The the service's default
         if default_provider := getattr(self.DEFAULT_PROVIDER, "PROVIDER_NAME", None):
             provider_instance = _find_provider(default_provider)

@@ -35,8 +35,8 @@ class OpenAIEmbedding(ProviderBase):
     def __init__(self):
         super().__init__()
 
-    def _get_query_embedding(self, query, MODEL_NAME=None):
-        model = self.get_model(self.TYPE_MODEL, model_name=MODEL_NAME)
+    def _get_query_embedding(self, query, model_name=None):
+        model = self.get_model(self.TYPE_MODEL, model_name=model_name)
         if model is None:
             return None
         embedding_retriever = OpenAIEmbeddings(
