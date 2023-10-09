@@ -7,6 +7,9 @@ from services.llm_service import LLMService, OpenAILLM
 
 
 class CEQUI:
+    SETTINGS_PANEL_COL = 3
+    CHAT_UI_PANEL_COL = 7
+
     def __init__(self, webui_sprite) -> None:
         self.webui_sprite = webui_sprite
 
@@ -21,6 +24,7 @@ class CEQUI:
                 placeholder=f"Welcome to {name}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
+                scale=7,
             )
 
             components["chat_tab_in_text"] = gr.Textbox(
@@ -28,6 +32,7 @@ class CEQUI:
                 placeholder="Send a message",
                 elem_id="chat_tab_in_text",
                 elem_classes="chat_tab_in_text_class",
+                scale=3,
             )
 
             with gr.Accordion(label="Tools", open=False, visible=True):

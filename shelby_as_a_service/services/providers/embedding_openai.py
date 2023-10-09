@@ -50,6 +50,21 @@ class OpenAIEmbedding(ProviderBase):
         self.log.print_and_log("Embeddings retrieved")
         return query_embedding
 
+    def _get_documents_embedding(self, documents, model_name=None):
+        model = self.get_model(self.TYPE_MODEL, model_name=model_name)
+        if model is None:
+            return None
+        embedding_retriever = OpenAIEmbeddings(
+            # Note that this is openai_api_key and not api_key
+            openai_api_key=self.app.secrets["openai_api_key"],
+            model=model.MODEL_NAME,
+            request_timeout=self.config.openai_timeout_seconds,
+        )  # type: ignore
+        query_embedding = embedding_retriever.embed_query(documents)
+        # self._calculate_cost(query, model)
+        self.log.print_and_log("Embeddings retrieved")
+        return query_embedding
+
     def _calculate_cost(self, query, model):
         token_count = text.tiktoken_len(query, model.MODEL_NAME)
 

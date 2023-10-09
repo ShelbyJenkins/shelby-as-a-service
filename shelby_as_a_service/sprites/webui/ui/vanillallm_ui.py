@@ -7,6 +7,9 @@ from services.llm_service import LLMService, OpenAILLM
 
 
 class VanillaLLMUI:
+    SETTINGS_PANEL_COL = 2
+    CHAT_UI_PANEL_COL = 8
+
     def __init__(self, webui_sprite) -> None:
         self.webui_sprite = webui_sprite
 
@@ -21,6 +24,7 @@ class VanillaLLMUI:
                 placeholder=f"Welcome to {name}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
+                scale=7,
             )
 
             components["chat_tab_in_text"] = gr.Textbox(
@@ -28,74 +32,94 @@ class VanillaLLMUI:
                 placeholder="Send a message",
                 elem_id="chat_tab_in_text",
                 elem_classes="chat_tab_in_text_class",
+                scale=3,
             )
 
-            with gr.Accordion(label="Tools", open=False, visible=True):
-                with gr.Row():
-                    components["chat_tab_status_text"] = gr.Textbox(
-                        label="status_text",
-                        lines=1,
-                        max_lines=1,
-                        show_label=False,
-                        placeholder="...status",
-                        elem_id=f"{name}_chat_tab_status_text",
-                    )
-                with gr.Row():
-                    components["chat_tab_stop_button"] = gr.Button(
-                        value="Stop",
+            with gr.Row():
+                with gr.Column(
+                    min_width=0,
+                ):
+                    components["chat_tab_generate_button"] = gr.Button(
+                        value="Generate",
                         variant="primary",
+                        elem_classes="chat_tab_button",
+                        min_width=0,
                     )
-                    components["chat_tab_reset_button"] = gr.Button(
-                        value="Reset",
-                        variant="primary",
-                    )
-                    components["chat_tab_undo_button"] = gr.Button(
-                        value="Undo",
-                        variant="primary",
-                    )
-                    components["chat_tab_retry_button"] = gr.Button(
-                        value="Retry",
-                        variant="primary",
-                    )
+                with gr.Column(scale=3):
+                    with gr.Accordion(label="Tools", open=False, visible=True):
+                        with gr.Row():
+                            components["chat_tab_status_text"] = gr.Textbox(
+                                label="status_text",
+                                lines=1,
+                                max_lines=1,
+                                show_label=False,
+                                placeholder="...status",
+                                elem_id=f"{name}_chat_tab_status_text",
+                            )
+                        with gr.Row():
+                            components["chat_tab_stop_button"] = gr.Button(
+                                value="Stop",
+                                variant="primary",
+                                elem_classes="chat_tab_button",
+                                min_width=0,
+                            )
+                            components["chat_tab_reset_button"] = gr.Button(
+                                value="Reset",
+                                variant="primary",
+                                elem_classes="chat_tab_button",
+                                min_width=0,
+                            )
+                            components["chat_tab_undo_button"] = gr.Button(
+                                value="Undo",
+                                variant="primary",
+                                elem_classes="chat_tab_button",
+                                min_width=0,
+                            )
+                            components["chat_tab_retry_button"] = gr.Button(
+                                value="Retry",
+                                variant="primary",
+                                elem_classes="chat_tab_button",
+                                min_width=0,
+                            )
 
-                with gr.Accordion(label="Stats", open=False):
-                    with gr.Row():
-                        components["chat_tab_in_token_count"] = gr.Textbox(
-                            value="Request token count: 0",
-                            max_lines=1,
-                            lines=1,
-                            interactive=False,
-                            label="Input Token Count",
-                            show_label=False,
-                        )
-                        components["chat_tab_out_token_count"] = gr.Textbox(
-                            value="Response token count: 0",
-                            max_lines=1,
-                            lines=1,
-                            interactive=False,
-                            show_label=False,
-                        )
-                        components["chat_tab_total_token_count"] = gr.Textbox(
-                            value="Total Token Count: 0",
-                            max_lines=1,
-                            lines=1,
-                            interactive=False,
-                            show_label=False,
-                        )
-                        components["chat_tab_response_cost"] = gr.Textbox(
-                            value="Response price: $0.00",
-                            max_lines=1,
-                            lines=1,
-                            interactive=False,
-                            show_label=False,
-                        )
-                        components["chat_tab_total_cost"] = gr.Textbox(
-                            value="Total spend: $0.00",
-                            max_lines=1,
-                            lines=1,
-                            interactive=False,
-                            show_label=False,
-                        )
+                        with gr.Accordion(label="Stats", open=False):
+                            with gr.Row():
+                                components["chat_tab_in_token_count"] = gr.Textbox(
+                                    value="Request token count: 0",
+                                    max_lines=1,
+                                    lines=1,
+                                    interactive=False,
+                                    label="Input Token Count",
+                                    show_label=False,
+                                )
+                                components["chat_tab_out_token_count"] = gr.Textbox(
+                                    value="Response token count: 0",
+                                    max_lines=1,
+                                    lines=1,
+                                    interactive=False,
+                                    show_label=False,
+                                )
+                                components["chat_tab_total_token_count"] = gr.Textbox(
+                                    value="Total Token Count: 0",
+                                    max_lines=1,
+                                    lines=1,
+                                    interactive=False,
+                                    show_label=False,
+                                )
+                                components["chat_tab_response_cost"] = gr.Textbox(
+                                    value="Response price: $0.00",
+                                    max_lines=1,
+                                    lines=1,
+                                    interactive=False,
+                                    show_label=False,
+                                )
+                                components["chat_tab_total_cost"] = gr.Textbox(
+                                    value="Total spend: $0.00",
+                                    max_lines=1,
+                                    lines=1,
+                                    interactive=False,
+                                    show_label=False,
+                                )
 
         return components
 
@@ -151,11 +175,6 @@ class VanillaLLMUI:
                         label="LLM Model",
                         container=True,
                     )
-                components["chat_tab_generate_button"] = gr.Button(
-                    value="Generate",
-                    variant="primary",
-                    scale=2,
-                )
 
         return components
 
@@ -166,7 +185,7 @@ class VanillaLLMUI:
     ):
         gr.on(
             triggers=[
-                # components["chat_tab_generate_button"].click,
+                chat_ui_components["chat_tab_generate_button"].click,
                 chat_ui_components["chat_tab_in_text"].submit,
             ],
             fn=lambda *comp_vals: comp_vals,

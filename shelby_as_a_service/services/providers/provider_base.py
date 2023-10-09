@@ -13,9 +13,9 @@ class ProviderBase(AppBase):
     app_name: str
     log: Logger
 
-    def __init__(self):
-        self.app = AppBase
-        self.log = AppBase.log
+    # def __init__(self):
+    #     self.app = AppBase
+    #     self.log = AppBase.log
 
     def get_model(self, type_model, model_name=None):
         """Returns an instance of a model

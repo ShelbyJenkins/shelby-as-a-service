@@ -9,10 +9,15 @@ from sprites.webui.gradio_themes import AtYourServiceTheme
 class GradioUI:
     def __init__(self, webui_sprite):
         self.webui_sprite = webui_sprite
-        self.gradio_agents = self.webui_sprite.gradio_ui["gradio_agents"]
+        self.gradio_ui = webui_sprite.gradio_ui
+        self.gradio_agents = self.gradio_ui["gradio_agents"]
         self.available_agents_ui_names = []
         for agent in self.webui_sprite.AVAILABLE_AGENTS:
-            self.available_agents_ui_names.append(GradioHelper.get_class_ui_name(agent))
+            ui_name = GradioHelper.get_class_ui_name(agent)
+            self.available_agents_ui_names.append(ui_name)
+            if ui_name == self.available_agents_ui_names[0]:
+                self.settings_panel_col_scaling = agent.AGENT_UI.SETTINGS_PANEL_COL
+                self.chat_ui_panel_col_scaling = agent.AGENT_UI.CHAT_UI_PANEL_COL
 
     def creater_gradio_interface(self):
         with gr.Blocks(
@@ -20,19 +25,25 @@ class GradioUI:
             css=AtYourServiceTheme.css,
         ) as webui_client:
             with gr.Row(elem_id="main_row"):
-                with gr.Column(elem_id="settings_panel_col") as settings_panel_col:
+                with gr.Column(
+                    elem_id="settings_panel_col", scale=self.settings_panel_col_scaling
+                ) as settings_panel_col:
                     for agent in self.webui_sprite.AVAILABLE_AGENTS:
                         self.settings_ui_creator(agent)
 
-                with gr.Column(elem_id="chat_ui_panel_col") as chat_ui_panel_col:
+                with gr.Column(
+                    elem_id="chat_ui_panel_col", scale=self.chat_ui_panel_col_scaling
+                ) as chat_ui_panel_col:
                     for agent in self.webui_sprite.AVAILABLE_AGENTS:
                         self.chat_ui_creator(agent)
+
+            self.gradio_ui["settings_panel_col"] = settings_panel_col
+            self.gradio_ui["chat_ui_panel_col"] = chat_ui_panel_col
 
             for agent in self.webui_sprite.AVAILABLE_AGENTS:
                 self.create_event_handlers(agent)
 
             self.create_nav_events()
-
             webui_client.queue()
             webui_client.launch(prevent_thread_lock=True)
 
@@ -138,6 +149,9 @@ class GradioUI:
             all_nav_tabs.append(agent["settings_ui_tab"])
             all_chat_ui_rows.append(agent["chat_ui_row"])
 
+        all_chat_ui_rows.append(self.gradio_ui["settings_panel_col"])
+        all_chat_ui_rows.append(self.gradio_ui["chat_ui_panel_col"])
+
         for agent_nav_tab in all_nav_tabs:
             agent_nav_tab.select(
                 fn=self.change_agent,
@@ -147,10 +161,17 @@ class GradioUI:
 
     def change_agent(self, evt: gr.SelectData):
         output = []
-        for ui_name in self.available_agents_ui_names:
+        for agent in self.webui_sprite.AVAILABLE_AGENTS:
+            ui_name = GradioHelper.get_class_ui_name(agent)
             if evt.value == ui_name:
                 output.append(gr.Row(visible=True))
                 self.webui_sprite.config.current_agent_ui_name = ui_name
+                settings_ui_scale = agent.AGENT_UI.SETTINGS_PANEL_COL
+                chat_ui_scale = agent.AGENT_UI.CHAT_UI_PANEL_COL
             else:
                 output.append(gr.Row(visible=False))
+
+        output.append(gr.Column(scale=settings_ui_scale))
+        output.append(gr.Column(scale=chat_ui_scale))
+
         return output

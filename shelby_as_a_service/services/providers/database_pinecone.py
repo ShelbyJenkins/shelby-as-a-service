@@ -37,11 +37,15 @@ class PineconeDatabase(ProviderBase):
     def __init__(self):
         super().__init__()
 
-    def setup_index(self):
+    def setup_index(self, pinecone_api_key=None):
+        if pinecone_api_key is None:
+            pinecone_api_key = self.app.secrets["pinecone_api_key"]
+
         self.index_name = "shelby-as-a-service"
+        self.index_env = "us-central1-gcp"
         pinecone.init(
-            api_key=self.app.secrets["pinecone_api_key"],
-            environment=self.config.index_env,
+            api_key=pinecone_api_key,
+            environment=self.index_env,
         )
         self.pinecone_index = pinecone.Index(self.index_name)
 

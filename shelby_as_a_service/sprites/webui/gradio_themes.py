@@ -29,7 +29,7 @@ class AtYourServiceTheme(Base):
         display: flex;
         box-sizing: border-box;
         flex-direction: column;
-        flex-grow: 1.5 !important;
+        
         padding: 1% !important;
         border-right-width: 4px !important; 
     }
@@ -37,61 +37,23 @@ class AtYourServiceTheme(Base):
     #chat_ui_panel_col {
         height: 100vh;
         display: flex;
-        flex-direction: row;
-        flex-grow: 9.5 !important;
+        flex-direction: col;
         box-sizing: border-box;
     }
-
-    #chat_ui_row {
-        height: height: 100vh;
+    .chat_ui_row {
+        height: 100%;
         display: flex;
         box-sizing: border-box;
         flex-direction: column;
-        flex-grow: 8 !important;        
-    }
-    #chat_ui_col {
-        height: height: 100vh;
-        display: flex;
-        box-sizing: border-box;
-        flex-direction: column;
-        flex-grow: 8 !important;        
     }
     .chat_ui_col > div:first-child {
         display: flex;
         flex-direction: column;
-        height: 100%;
+        flex-grow: 1 !important;
     }
-    
-    #chat_tab_out_text {
-        flex-grow: 7;
-    }
-    #chat_tab_out_text label,
-    #chat_tab_out_text textarea {
-        width: 100% !important;
-        height: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-    }
-    #chat_tab_out_text textarea {
-        flex-grow: 1 !important; 
-        resize: none !important; 
-        box-sizing: border-box !important; 
-    }
-    
-    #chat_tab_in_text {
-        flex-grow: 3;
-    }
-    #chat_tab_in_text label,
-    #chat_tab_in_text textarea {
-        width: 100% !important;
-        height: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-    }
-    #chat_tab_in_text textarea {
-        flex-grow: 1 !important; 
-        resize: none !important; 
-        box-sizing: border-box !important; 
+    .chat_tab_button {
+        margin: 3% !important;
+        width: auto !important;
     }
     
     footer[class*='svelte-'] {
@@ -163,7 +125,9 @@ class AtYourServiceTheme(Base):
             block_title_border_color_dark="black",
             block_label_border_color_dark="black",
             panel_border_color_dark="black",
-            # radio and checkbox
+            # radio and checkbox and button
+            button_primary_background_fill_dark="green",
+            button_primary_background_fill_hover_dark="#653b12",
             checkbox_background_color_focus_dark="black",
             checkbox_border_color_dark="#653b12",
             checkbox_border_color_focus_dark="#653b12",
