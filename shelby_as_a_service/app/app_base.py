@@ -18,13 +18,14 @@ class AppBase:
     PROMPT_TEMPLATE_DIR: str = "shelby_as_a_service/modules/prompt_templates"
     CLASS_CONFIG_TYPE: str = "app"
 
-    class ClassConfigModel(BaseModel):
+    class AppConfigModel(BaseModel):
         app_name: str = "base"
         enabled_sprites: List[str] = ["webui_sprite"]
 
+    config: AppConfigModel
+
     app_name: str
     secrets: Dict[str, str] = {}
-    config: ClassConfigModel
     log: Logger
     index: IndexBase.IndexConfigModel
     total_cost: Decimal = Decimal("0")
@@ -45,17 +46,28 @@ class AppBase:
 
         if AppBase.app_name == "base":
             AppManager.check_and_create_base()
-            AppBase.update_app_config_file_from_default("base")
-            AppBase.app_name = AppManager.load_webui_sprite_default_app()
-            if AppBase.app_name != "base":
-                AppBase.update_app_config_file_from_default(AppBase.app_name)
+            # AppBase.update_app_config_file_from_default("base")
+            # AppBase.app_name = AppManager.load_webui_sprite_default_app()
+            # if AppBase.app_name != "base":
+            #     AppBase.update_app_config_file_from_default(AppBase.app_name)
 
         AppBase.local_index_dir = f"apps/{AppBase.app_name}/index"
         AppBase.app_dir = f"apps/{AppBase.app_name}/"
         load_dotenv(os.path.join(AppBase.app_dir, ".env"))
         AppBase.log = AppBase.get_logger(logger_name=AppBase.app_name)
 
-        AppBase.create_app_enabled_instances(AppBase.app_name)
+        config_dict_from_file = AppManager.load_app_file(app_name)
+
+        # self.config = AppBase.AppConfigModel(**{**kwargs, **self.config_dict_from_file})
+        AppBase.config = AppBase.AppConfigModel(**config_dict_from_file)
+        config_dict_from_file.update(AppBase.config.model_dump())
+
+        sprites_config_dict_from_file = config_dict_from_file.get("sprites", {})
+        list_of_sprite_classes = AppBase.get_sprites(AppBase.AVAILABLE_SPRITES)
+
+        for sprite in list_of_sprite_classes:
+            sprite(config_dict_from_file=sprites_config_dict_from_file.get(sprite.SPRITE_NAME, {}))
+        # AppBase.create_app_enabled_instances(AppBase.app_name)
 
     @staticmethod
     def update_app_config_file_from_default(app_name):
@@ -66,7 +78,7 @@ class AppBase:
             _,
             app_class_dict,
         ) = AppBase.load_class_config_model(
-            class_config=AppBase.ClassConfigModel,
+            class_config=AppBase.AppConfigModel,
             class_config_dict=app_config_dict[AppBase.CLASS_CONFIG_TYPE],
         )
         app_config_dict[AppBase.CLASS_CONFIG_TYPE] = app_class_dict
@@ -87,9 +99,7 @@ class AppBase:
             existing_dict=app_config_dict,
         )
 
-        AppManager.save_app_file(
-            app_name=app_name, updated_app_config_dict=app_config_dict
-        )
+        AppManager.save_app_file(app_name=app_name, updated_app_config_dict=app_config_dict)
 
     @staticmethod
     def update_app_config_file_from_ui():
@@ -123,9 +133,7 @@ class AppBase:
             update_from_ui=True,
         )
 
-        AppManager.save_app_file(
-            app_name=AppBase.app_name, updated_app_config_dict=app_config_dict
-        )
+        AppManager.save_app_file(app_name=AppBase.app_name, updated_app_config_dict=app_config_dict)
 
     @staticmethod
     def create_app_enabled_instances(app_name):
@@ -135,7 +143,7 @@ class AppBase:
             AppBase.config,
             _,
         ) = AppBase.load_class_config_model(
-            class_config=AppBase.ClassConfigModel,
+            class_config=AppBase.AppConfigModel,
             class_config_dict=app_config_dict[AppBase.CLASS_CONFIG_TYPE],
         )
         (
@@ -212,12 +220,8 @@ class AppBase:
             # Gets the existing current_class_config_model from UI
             current_class_config_model = None
             if update_from_ui:
-                current_class_instance = getattr(
-                    parent_class_instance, current_class_name, None
-                )
-                current_class_config_model = getattr(
-                    current_class_instance, "config", None
-                )
+                current_class_instance = getattr(parent_class_instance, current_class_name, None)
+                current_class_config_model = getattr(current_class_instance, "config", None)
                 (
                     config_class_instance,
                     config_class_dict,
@@ -229,9 +233,7 @@ class AppBase:
                 AppBase.set_secrets(current_class)
             # Or use the default model
             if update_from_ui is False or current_class_config_model is None:
-                current_class_config_model = getattr(
-                    current_class, current_class_model_type
-                )
+                current_class_config_model = getattr(current_class, current_class_model_type)
                 (
                     config_class_instance,
                     config_class_dict,
@@ -243,9 +245,7 @@ class AppBase:
 
             updated_class_dict = existing_class_dict | config_class_dict  # type: ignore
 
-            updated_dict[current_class_config_type][current_class_name].update(
-                updated_class_dict
-            )
+            updated_dict[current_class_config_type][current_class_name].update(updated_class_dict)
 
             if create_instances:
                 current_class_instance = current_class()
@@ -260,15 +260,11 @@ class AppBase:
                 else:
                     setattr(AppBase, current_class_name, current_class_instance)
 
-            available_child_class_types = getattr(
-                base_class, "AVAILABLE_CLASS_TYPES", None
-            )
+            available_child_class_types = getattr(base_class, "AVAILABLE_CLASS_TYPES", None)
             # Recurse if nested classes exist
             if available_child_class_types:
                 for available_child_class_type in available_child_class_types:
-                    available_child_classes = getattr(
-                        current_class, available_child_class_type
-                    )
+                    available_child_classes = getattr(current_class, available_child_class_type)
 
                     child_class_dict = AppBase.load_config_and_or_class_instances(
                         available_classes=available_child_classes,
@@ -296,9 +292,7 @@ class AppBase:
             config_class_instance = existing_class_config
         elif class_config:
             if class_config_dict:
-                config_class_instance = class_config(
-                    **class_config_dict, extra="ignore"
-                )
+                config_class_instance = class_config(**class_config_dict, extra="ignore")
             else:
                 config_class_instance = class_config()
         else:
@@ -318,10 +312,7 @@ class AppBase:
 
     @staticmethod
     def set_secrets(class_instance: Type):
-        if (
-            hasattr(class_instance, "REQUIRED_SECRETS")
-            and class_instance.REQUIRED_SECRETS
-        ):
+        if hasattr(class_instance, "REQUIRED_SECRETS") and class_instance.REQUIRED_SECRETS:
             for secret in class_instance.REQUIRED_SECRETS:
                 env_secret = None
                 secret_str = f"{AppBase.app_name}_{secret}".upper()

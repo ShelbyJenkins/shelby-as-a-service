@@ -1,17 +1,20 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict, Generator, List, Optional, Tuple, Type
+from typing import Any, Dict, Generator, List, Optional, Tuple, Type, Union
 
+import gradio as gr
 import modules.prompt_templates as PromptTemplates
 import modules.text_processing.text as TextProcess
 import openai
-from pydantic import BaseModel
+import sprites.webui.gradio_helpers as GradioHelper
+from pydantic import BaseModel, Field
 from services.providers.provider_base import ProviderBase
+from typing_extensions import Annotated
 
 
 class OpenAILLM(ProviderBase):
     PROVIDER_NAME: str = "openai_llm"
-    PROVIDER_UI_NAME: str = "openai_llm"
+    PROVIDER_UI_NAME: str = "OpenAI LLM"
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
 
     class OpenAILLMModel(BaseModel):
@@ -23,17 +26,8 @@ class OpenAILLM(ProviderBase):
         OpenAILLMModel(MODEL_NAME="gpt-4", TOKENS_MAX=8192, COST_PER_K=0.06),
         OpenAILLMModel(MODEL_NAME="gpt-4-32k", TOKENS_MAX=32768, COST_PER_K=0.06),
         OpenAILLMModel(MODEL_NAME="gpt-3.5-turbo", TOKENS_MAX=4096, COST_PER_K=0.03),
-        OpenAILLMModel(
-            MODEL_NAME="gpt-3.5-turbo-16k", TOKENS_MAX=16384, COST_PER_K=0.03
-        ),
+        OpenAILLMModel(MODEL_NAME="gpt-3.5-turbo-16k", TOKENS_MAX=16384, COST_PER_K=0.03),
     ]
-
-    class ProviderConfigModel(BaseModel):
-        openai_timeout_seconds: float = 180.0
-        max_response_tokens: int = 300
-
-    config: ProviderConfigModel
-
     UI_MODEL_NAMES = [
         "gpt-4",
         "gpt-4-32k",
@@ -43,14 +37,29 @@ class OpenAILLM(ProviderBase):
     DEFAULT_MODEL: str = "gpt-3.5-turbo"
     TYPE_MODEL: str = "llm_model"
 
-    def __init__(self):
+    class ProviderConfigModel(BaseModel):
+        model: str = "gpt-3.5-turbo"
+        frequency_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = None
+        max_tokens: Annotated[int, Field(ge=0, le=65536)] = 16384
+        presence_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = None
+        stream: bool = True
+        temperature: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
+        top_p: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
+
+        class Config:
+            extra = "ignore"
+
+    config: ProviderConfigModel
+
+    def __init__(self, config_dict_from_file: Optional[Dict[str, Any]] = None, **kwargs):
+        self.config_dict_from_file = config_dict_from_file or {}
+        self.config = self.ProviderConfigModel(**{**kwargs, **self.config_dict_from_file})
+        self.config_dict_from_file.update(self.config.model_dump())
         super().__init__()
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
-        parsed_response = (
-            response.get("choices", [{}])[0].get("message", {}).get("content")
-        )
+        parsed_response = response.get("choices", [{}])[0].get("message", {}).get("content")
 
         total_prompt_tokens = int(response.get("usage").get("prompt_tokens", 0))
         total_completion_tokens = int(response.get("usage").get("completion_tokens", 0))
@@ -112,9 +121,14 @@ class OpenAILLM(ProviderBase):
         )
         response = openai.ChatCompletion.create(
             api_key=self.app.secrets["openai_api_key"],
-            model=model.MODEL_NAME,
             messages=prompt,
-            max_tokens=self.config.max_response_tokens,
+            model=model.MODEL_NAME,
+            frequency_penalty=self.config.frequency_penalty,
+            max_tokens=self.config.max_tokens,
+            presence_penalty=self.config.presence_penalty,
+            stream=False,
+            temperature=self.config.temperature,
+            top_p=self.config.top_p,
         )
 
         (
@@ -143,14 +157,20 @@ class OpenAILLM(ProviderBase):
             llm_model=llm_model,
         )
         if prompt is None or model is None or request_token_count is None:
-            return None
+            raise ValueError(
+                f"Error with input values - prompt: {prompt}, model: {model}, request_token_count: {request_token_count}"
+            )
 
         stream = openai.ChatCompletion.create(
             api_key=self.app.secrets["openai_api_key"],
-            model=model.MODEL_NAME,
             messages=prompt,
-            max_tokens=self.config.max_response_tokens,
+            model=model.MODEL_NAME,
+            frequency_penalty=self.config.frequency_penalty,
+            max_tokens=self.config.max_tokens,
+            presence_penalty=self.config.presence_penalty,
             stream=True,
+            temperature=self.config.temperature,
+            top_p=self.config.top_p,
         )
 
         chunk = {}
@@ -159,13 +179,9 @@ class OpenAILLM(ProviderBase):
         response_token_count = 0
         total_token_count = request_token_count
         for chunk in stream:
-            delta_content = (
-                chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-            )
+            delta_content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
             if len(delta_content) != 0:
-                chunk_token_count = TextProcess.tiktoken_len(
-                    delta_content, model.MODEL_NAME
-                )
+                chunk_token_count = TextProcess.tiktoken_len(delta_content, model.MODEL_NAME)
                 response_token_count += chunk_token_count
                 response_token_string = f"Response token count: {response_token_count}"
                 total_token_count += chunk_token_count
@@ -188,9 +204,7 @@ class OpenAILLM(ProviderBase):
     def _prep_chat(
         self, query, prompt_template_path=None, documents=None, llm_model=None
     ) -> Tuple[List[Dict[str, str]], OpenAILLMModel, int]:
-        model = self.get_model(self.TYPE_MODEL, model_name=llm_model)
-        if model is None:
-            return None, None, None
+        model = self.get_model(requested_model_name=llm_model)
 
         prompt = PromptTemplates.create_openai_prompt(
             query=query,
@@ -204,7 +218,57 @@ class OpenAILLM(ProviderBase):
             role = entry.get("role", "")
             content = entry.get("content", "")
             result += f"{role}: {content}\n"
-        request_token_count = TextProcess.tiktoken_len(
-            result, encoding_model=model.MODEL_NAME
-        )
+        request_token_count = TextProcess.tiktoken_len(result, encoding_model=model.MODEL_NAME)
         return prompt, model, request_token_count
+
+    def create_ui(self):
+        components = {}
+        with gr.Accordion(label="OpenAI", open=False):
+            with gr.Column():
+                components["llm_model"] = gr.Dropdown(
+                    value=self.config.model,
+                    choices=GradioHelper.dropdown_choices(OpenAILLM),
+                    label="OpenAI LLM Model",
+                )
+                components["max_tokens"] = gr.Slider(
+                    minimum=0,
+                    maximum=16384,
+                    value=self.config.max_tokens,
+                    step=0.05,
+                    label="Max Tokens",
+                )
+                components["stream"] = gr.Checkbox(
+                    value=self.config.stream,
+                    label="Stream Response",
+                )
+                with gr.Accordion(label="Advanced Settings", open=False):
+                    components["frequency_penalty"] = gr.Slider(
+                        minimum=-2.0,
+                        maximum=2.0,
+                        value=self.config.frequency_penalty,
+                        step=0.05,
+                        label="Frequency Penalty",
+                    )
+                    components["presence_penalty"] = gr.Slider(
+                        minimum=-2.0,
+                        maximum=2.0,
+                        value=self.config.presence_penalty,
+                        step=0.05,
+                        label="Presence Penalty",
+                    )
+                    components["temperature"] = gr.Slider(
+                        minimum=0.0,
+                        maximum=2.0,
+                        value=self.config.temperature,
+                        step=0.05,
+                        label="Temperature",
+                    )
+                    components["top_p"] = gr.Slider(
+                        minimum=0.0,
+                        maximum=2.0,
+                        value=self.config.top_p,
+                        step=0.05,
+                        label="Top P",
+                    )
+
+        return components

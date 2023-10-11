@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
 import sprites.webui.gradio_helpers as GradioHelper
@@ -9,6 +9,7 @@ from services.llm_service import LLMService, OpenAILLM
 class VanillaLLMUI:
     SETTINGS_PANEL_COL = 2
     CHAT_UI_PANEL_COL = 8
+    service: Type
 
     def __init__(self, webui_sprite) -> None:
         self.webui_sprite = webui_sprite
@@ -124,57 +125,14 @@ class VanillaLLMUI:
         return components
 
     @staticmethod
-    def create_settings_ui(name, agent_instance):
+    def create_settings_ui(agent_instance):
         components = {}
 
+        for service in agent_instance.AVAILABLE_SERVICES:
+            service_instance = getattr(agent_instance, service.SERVICE_NAME, None)
+
         with gr.Column():
-            with gr.Accordion(label="Past Chats", open=False):
-                components["chat_tab_history_dropdown"] = gr.Dropdown(
-                    value=None,
-                    choices=GradioHelper.dropdown_choices(OpenAILLM),
-                    label="Chats",
-                    container=True,
-                )
-                components["chat_tab_history_button"] = gr.Button(
-                    "Load Chat",
-                    variant="primary",
-                    size="sm",
-                )
-            with gr.Accordion(label="Prompt Templates", open=False):
-                components["chat_tab_prompts_dropdown"] = gr.Dropdown(
-                    value=None,
-                    choices=GradioHelper.dropdown_choices(OpenAILLM),
-                    label="Prompts",
-                    container=True,
-                )
-                components["chat_tab_prompts_button"] = gr.Button(
-                    "Load Template", variant="primary", size="sm"
-                )
-            with gr.Accordion(label="LLM Settings"):
-                components["llm_provider"] = gr.Dropdown(
-                    value=GradioHelper.dropdown_default_value(
-                        agent_instance, LLMService
-                    ),
-                    choices=GradioHelper.dropdown_choices(LLMService),
-                    label="LLM Provider",
-                    container=True,
-                )
-                components["llm_model"] = gr.Dropdown(
-                    value=GradioHelper.dropdown_default_value(
-                        agent_instance, OpenAILLM
-                    ),
-                    choices=GradioHelper.dropdown_choices(OpenAILLM),
-                    label="LLM Model",
-                    container=True,
-                    elem_classes="llm_model",
-                )
-                with gr.Accordion(label="Advanced Settings", open=False):
-                    components["chat_llm_advanced"] = gr.Dropdown(
-                        value=None,
-                        choices=GradioHelper.dropdown_choices(OpenAILLM),
-                        label="LLM Model",
-                        container=True,
-                    )
+            service.create_ui(agent_instance=agent_instance)
 
         return components
 

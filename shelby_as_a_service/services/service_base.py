@@ -22,12 +22,8 @@ class ServiceBase(AppBase):
     AVAILABLE_CLASS_TYPES: List[str] = ["AVAILABLE_PROVIDERS"]
 
     log: Logger
-    openai_llm: OpenAILLM
-    openai_embedding: OpenAIEmbedding
-    pinecone_database: PineconeDatabase
-    local_filestore_database: Any
-    generic_recursive_web_scraper: Any
-    generic_web_scraper: Any
+
+    provider_config_dict_from_file: Dict[str, Any]
 
     def __init__(self):
         self.app = AppBase
@@ -61,15 +57,28 @@ class ServiceBase(AppBase):
             provider_instance = _find_provider(new_provider_name)
             if provider_instance:
                 return provider_instance
-        # # Then the service's agent
-        # if agent_provider := getattr(self.parent_class, self.PROVIDER_TYPE, None):
-        #     provider_instance = _find_provider(agent_provider)
-        #     if provider_instance:
-        #         return provider_instance
-        # The the service's default
+
+        if config_provider := getattr(self.config, self.PROVIDER_TYPE, None):
+            provider_instance = _find_provider(config_provider)
+            if provider_instance:
+                return provider_instance
         if default_provider := getattr(self.DEFAULT_PROVIDER, "PROVIDER_NAME", None):
             provider_instance = _find_provider(default_provider)
             if provider_instance:
                 return provider_instance
 
         return None
+
+    def get_provider_instances(self):
+        list_of_provider_instances = []
+        for provider in self.AVAILABLE_PROVIDERS:
+            if provider_instance := getattr(self, provider.PROVIDER_NAME, None):
+                list_of_provider_instances.append(provider_instance)
+            else:
+                new_provider = provider(
+                    self.provider_config_dict_from_file.get(provider.PROVIDER_NAME, {})
+                )
+                setattr(self, provider.PROVIDER_NAME, new_provider)
+                list_of_provider_instances.append(new_provider)
+
+        return list_of_provider_instances

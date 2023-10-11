@@ -8,5 +8,9 @@
         "editor.defaultFormatter": "ms-python.black-formatter"
     },
     "python.linting.mypyEnabled": true,
-    "python.linting.enabled": true
+    "python.linting.enabled": true,
+    "black-formatter.args": [
+        "--line-length",
+        "100"
+    ],
 }

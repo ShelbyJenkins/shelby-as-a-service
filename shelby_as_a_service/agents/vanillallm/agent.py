@@ -1,13 +1,11 @@
-# region
-import json
 from typing import Any, Dict, Generator, List, Optional, Type
 
+import gradio as gr
+import sprites.webui.gradio_helpers as GradioHelper
 from agents.agent_base import AgentBase
+from agents.vanillallm.ui import VanillaLLMUI
 from pydantic import BaseModel
 from services.llm_service import LLMService
-from sprites.webui.ui.vanillallm_ui import VanillaLLMUI
-
-# endregion
 
 
 class VanillaLLM(AgentBase):
@@ -22,10 +20,24 @@ class VanillaLLM(AgentBase):
         llm_provider: str = "openai_llm"
         llm_model: str = "gpt-4"
 
+        class Config:
+            extra = "ignore"
+
     config: AgentConfigModel
 
-    def __init__(self):
+    def __init__(self, config_dict_from_file: Optional[Dict[str, Any]] = None, **kwargs):
+        self.config_dict_from_file = config_dict_from_file or {}
+        self.config = self.AgentConfigModel(**{**kwargs, **self.config_dict_from_file})
+        self.services_config_dict_from_file = self.config_dict_from_file.get("services", {})
         super().__init__()
+        self.config_dict_from_file.update(self.config.model_dump())
+
+        self.llm_service = LLMService(
+            self.services_config_dict_from_file.get("llm_service", {}),
+            llm_provider=self.config.llm_provider,
+            llm_model=self.config.llm_model,
+            **kwargs,
+        )
 
     def create_streaming_chat(
         self,

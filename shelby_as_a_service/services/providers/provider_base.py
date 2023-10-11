@@ -12,35 +12,35 @@ class ProviderBase(AppBase):
 
     app_name: str
     log: Logger
+    config: Type
+    DEFAULT_MODEL: str
 
-    # def __init__(self):
-    #     self.app = AppBase
-    #     self.log = AppBase.log
+    def __init__(self):
+        self.app = AppBase
+        self.log = AppBase.log
 
-    def get_model(self, type_model, model_name=None):
+    def get_model(self, requested_model_name=None):
         """Returns an instance of a model
         First tries the requested model,
-        Then tries the parent_agent's,
-        Then uses default"""
-        # Tries the requested model
+        Then tries the classes's config model,
+        Then tries provider class default"""
+        model_instance = None
         available_models = getattr(self, "AVAILABLE_MODELS", [])
-        if model_name:
-            model_instance = next(
-                (model for model in available_models if model.MODEL_NAME == model_name),
-                None,
-            )
-            if model_instance:
-                return model_instance
-        # Then the parent's agent
-        # if model := getattr(self.parent_class, type_model, None):
-        #     if model_instance := getattr(self, model, None):
-        #         return model_instance
-        # Then the default
-        return next(
-            (
-                model
-                for model in available_models
-                if model.MODEL_NAME == self.DEFAULT_MODEL
-            ),
-            None,
-        )
+        if requested_model_name:
+            for model in available_models:
+                if model.MODEL_NAME == requested_model_name:
+                    model_instance = model
+                    break
+        if model_instance is None:
+            for model in available_models:
+                if model.MODEL_NAME == self.config.model:
+                    model_instance = model
+                    break
+        if model_instance is None:
+            for model in available_models:
+                if model.MODEL_NAME == self.DEFAULT_MODEL:
+                    model_instance = model
+                    break
+        if model_instance is None:
+            raise ValueError("model_instance must not be None in ProviderBase")
+        return model_instance

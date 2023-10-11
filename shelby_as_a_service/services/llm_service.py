@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional, Type
 
+import gradio as gr
+import sprites.webui.gradio_helpers as GradioHelper
 from pydantic import BaseModel
 from services.providers.llm_openai import OpenAILLM
 from services.service_base import ServiceBase
@@ -12,16 +14,35 @@ class LLMService(ServiceBase):
     DEFAULT_PROVIDER: Type = OpenAILLM
     AVAILABLE_PROVIDERS: List[Type] = [OpenAILLM]
 
+    openai_llm: OpenAILLM
+
     class ServiceConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Search index to find docs related to request."
-        )
+        llm_provider: str = "openai_llm"
         max_response_tokens: int = 300
+
+        class Config:
+            extra = "ignore"
 
     config: ServiceConfigModel
 
-    def __init__(self):
+    def __init__(
+        self,
+        config_dict_from_file: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
+        self.config_dict_from_file = config_dict_from_file or {}
+        self.config = self.ServiceConfigModel(**{**kwargs, **self.config_dict_from_file})
+        self.provider_config_dict_from_file = self.config_dict_from_file.get("providers", {})
         super().__init__()
+        self.config_dict_from_file.update(self.config.model_dump())
+
+        kwargs.pop("llm_provider", None)
+
+        match self.config.llm_provider:
+            case "openai_llm":
+                self.openai_llm = OpenAILLM(
+                    self.provider_config_dict_from_file.get("openai_llm", {}), **kwargs
+                )
 
     def create_streaming_chat(
         self,
@@ -57,3 +78,20 @@ class LLMService(ServiceBase):
                 llm_model=llm_model,
             )
         return None
+
+    def create_ui(self):
+        components = {}
+        llm_providers = ServiceBase.get_provider_instances(self)
+
+        with gr.Column():
+            with gr.Accordion(label="LLM Settings", open=False):
+                components["llm_provider"] = gr.Dropdown(
+                    value=self.config.llm_provider,
+                    choices=GradioHelper.dropdown_choices(LLMService),
+                    label="LLM Provider",
+                    container=True,
+                )
+                for provider_instance in llm_providers:
+                    provider_instance.create_ui()
+
+        return components
