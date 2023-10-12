@@ -1,12 +1,12 @@
 from typing import Any, Dict, List, Optional, Type
 
-from config.app_base import AppBase
-from modules.utils.log_service import Logger
+from app_config.app_base import AppBase
+from app_config.log_service import Logger
 
 
 class ProviderBase(AppBase):
-    CLASS_NAME_TYPE: str = "PROVIDER_NAME"
-    CLASS_UI_NAME_TYPE: str = "PROVIDER_UI_NAME"
+    CLASS_NAME_TYPE: str = "MODULE_NAME"
+    CLASS_UI_NAME_TYPE: str = "MODULE_UI_NAME"
     CLASS_CONFIG_TYPE: str = "providers"
     CLASS_MODEL_TYPE: str = "ProviderConfigModel"
 

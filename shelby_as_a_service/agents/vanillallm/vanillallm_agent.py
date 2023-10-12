@@ -1,7 +1,7 @@
 from typing import Any, Dict, Generator, List, Optional, Type
 
 import gradio as gr
-import sprites.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelper
 from agents.agent_base import AgentBase
 from agents.vanillallm.vanillallm_ui import VanillaLLMUI
 from pydantic import BaseModel
@@ -9,10 +9,10 @@ from services.llm.llm_service import LLMService
 
 
 class VanillaLLM(AgentBase):
-    AGENT_NAME: str = "vanillallm_agent"
+    MODULE_NAME: str = "vanillallm_agent"
     AGENT_UI = VanillaLLMUI
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "vanillallm_prompt.yaml"
-    AVAILABLE_SERVICES: List[Type] = [LLMService]
+    REQUIRED_MODULES: List[Type] = [LLMService]
 
     class AgentConfigModel(BaseModel):
         agent_select_status_message: str = "EZPZ"
@@ -24,12 +24,12 @@ class VanillaLLM(AgentBase):
 
     config: AgentConfigModel
 
-    def __init__(self, agent_config={}, **kwargs):
+    def __init__(self, config_file_dict={}, **kwargs):
         # super().__init__()
-        self.config = self.AgentConfigModel(**{**kwargs, **agent_config})
-        self.available_service_instances = self.instantiate_available_services(
-            agent_config, **kwargs
-        )
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.AgentConfigModel(**{**kwargs, **module_config_file_dict})
+
+        self.llm_service = LLMService(module_config_file_dict)
 
     def create_streaming_chat(
         self,

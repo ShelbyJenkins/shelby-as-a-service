@@ -7,8 +7,8 @@ from services.provider_base import ProviderBase
 
 
 class PineconeDatabase(ProviderBase):
-    PROVIDER_NAME: str = "pinecone_database"
-    PROVIDER_UI_NAME: str = "pinecone_database"
+    MODULE_NAME: str = "pinecone_database"
+    MODULE_UI_NAME: str = "pinecone_database"
     REQUIRED_SECRETS: List[str] = ["pinecone_api_key"]
 
     class ProviderConfigModel(BaseModel):

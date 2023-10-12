@@ -1,7 +1,7 @@
 import os
 from typing import Any, List, Type
 
-import modules.text_processing.text as TextProcess
+import services.text_processing.text as TextProcess
 from pydantic import BaseModel
 from services.database.database_pinecone import PineconeDatabase
 from services.provider_base import ProviderBase
@@ -9,8 +9,8 @@ from services.service_base import ServiceBase
 
 
 class LocalFileStoreDatabase(ProviderBase):
-    PROVIDER_NAME: str = "local_filestore_database"
-    PROVIDER_UI_NAME: str = "local_filestore_database"
+    MODULE_NAME: str = "local_filestore_database"
+    MODULE_UI_NAME: str = "local_filestore_database"
     REQUIRED_SECRETS: List[str] = []
 
     class ProviderConfigModel(BaseModel):
@@ -41,11 +41,11 @@ class LocalFileStoreDatabase(ProviderBase):
 
 
 class DatabaseService(ServiceBase):
-    SERVICE_NAME: str = "database_service"
-    SERVICE_UI_NAME: str = "database_service"
+    MODULE_NAME: str = "database_service"
+    MODULE_UI_NAME: str = "database_service"
     PROVIDER_TYPE: str = "database_provider"
     DEFAULT_PROVIDER: Type = LocalFileStoreDatabase
-    AVAILABLE_PROVIDERS: List[Type] = [PineconeDatabase, LocalFileStoreDatabase]
+    REQUIRED_MODULES: List[Type] = [PineconeDatabase, LocalFileStoreDatabase]
 
     class ServiceConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."

@@ -8,7 +8,7 @@
             "name": "shelby_as_a_service",
             "type": "python",
             "request": "launch",
-            "program": "/workspaces/shelby-as-a-service/shelby_as_a_service/app.py",
+            "program": "/workspaces/shelby-as-a-service/shelby_as_a_service/run_me.py",
             // "console": "internalConsole",
             "console": "integratedTerminal",
             "justMyCode": false

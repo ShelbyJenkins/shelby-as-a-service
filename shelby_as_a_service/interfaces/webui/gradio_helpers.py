@@ -53,11 +53,11 @@ def dropdown_default_value(agent_instance, setting_class):
 
 
 def list_available(class_model) -> Optional[List[Any]]:
-    if available_providers := getattr(class_model, "AVAILABLE_PROVIDERS", None):
-        return [provider.PROVIDER_NAME for provider in available_providers]
+    if available_providers := getattr(class_model, "REQUIRED_MODULES", None):
+        return [provider.MODULE_NAME for provider in available_providers]
     if available_models := getattr(class_model, "AVAILABLE_MODELS", None):
         return [modes.MODEL_NAME for modes in available_models]
-    if available_agents := getattr(class_model, "AVAILABLE_AGENTS", None):
+    if available_agents := getattr(class_model, "REQUIRED_MODULES", None):
         return [agent.AGENT_UI_NAME for agent in available_agents]
     return None
 

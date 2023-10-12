@@ -8,10 +8,10 @@ from services.ingest.ingest_service import IngestService
 
 
 class IngestAgent(AgentBase):
-    AGENT_NAME: str = "ingest_agent"
+    MODULE_NAME: str = "ingest_agent"
     AGENT_UI_NAME: str = "ingest_agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
-    AVAILABLE_SERVICES: List[Type] = [IngestService, DatabaseService]
+    REQUIRED_MODULES: List[Type] = [IngestService, DatabaseService]
 
     class AgentConfigModel(BaseModel):
         agent_select_status_message: str = (

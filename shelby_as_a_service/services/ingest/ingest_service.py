@@ -3,7 +3,7 @@ import os
 import traceback
 from typing import Any, Iterator, List, Type
 
-import modules.text_processing.text as TextProcess
+import services.text_processing.text as TextProcess
 from bs4 import BeautifulSoup
 from langchain.document_loaders import (
     GitbookLoader,
@@ -18,8 +18,8 @@ from services.service_base import ServiceBase
 
 
 class GenericRecursiveWebScraper(ProviderBase):
-    PROVIDER_NAME: str = "generic_recursive_web_scraper"
-    PROVIDER_UI_NAME: str = "generic_recursive_web_scraper"
+    MODULE_NAME: str = "generic_recursive_web_scraper"
+    MODULE_UI_NAME: str = "generic_recursive_web_scraper"
     REQUIRED_SECRETS: List[str] = []
 
     class ProviderConfigModel(BaseModel):
@@ -45,8 +45,8 @@ class GenericRecursiveWebScraper(ProviderBase):
 
 
 class GenericWebScraper(ProviderBase):
-    PROVIDER_NAME: str = "generic_web_scraper"
-    PROVIDER_UI_NAME: str = "generic_web_scraper"
+    MODULE_NAME: str = "generic_web_scraper"
+    MODULE_UI_NAME: str = "generic_web_scraper"
     REQUIRED_SECRETS: List[str] = []
 
     class ProviderConfigModel(BaseModel):
@@ -180,11 +180,11 @@ class GenericWebScraper(ProviderBase):
 
 
 class IngestService(ServiceBase):
-    SERVICE_NAME: str = "ingest_service"
-    SERVICE_UI_NAME: str = "ingest_service"
+    MODULE_NAME: str = "ingest_service"
+    MODULE_UI_NAME: str = "ingest_service"
     PROVIDER_TYPE: str = "ingest_provider"
     DEFAULT_PROVIDER: Type = GenericWebScraper
-    AVAILABLE_PROVIDERS: List[Type] = [
+    REQUIRED_MODULES: List[Type] = [
         GenericWebScraper,
         GenericRecursiveWebScraper,
         # OpenAPILoader,

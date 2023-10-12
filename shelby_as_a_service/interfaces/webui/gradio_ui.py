@@ -2,8 +2,8 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import gradio as gr
-import sprites.webui.gradio_helpers as GradioHelper
-from sprites.webui.gradio_themes import AtYourServiceTheme
+import interfaces.webui.gradio_helpers as GradioHelper
+from interfaces.webui.gradio_themes import AtYourServiceTheme
 
 
 class GradioUI:
@@ -12,7 +12,7 @@ class GradioUI:
         self.available_agent_instances = webui_sprite.available_agent_instances
 
         self.available_agents_ui_names = []
-        for agent in self.webui_sprite.AVAILABLE_AGENTS:
+        for agent in self.webui_sprite.REQUIRED_MODULES:
             ui_name = GradioHelper.get_class_ui_name(agent)
             self.available_agents_ui_names.append(ui_name)
             if ui_name == self.available_agents_ui_names[0]:
@@ -81,7 +81,7 @@ class GradioUI:
             gradio_agent["chat_ui"]["components_state"] = components_state
 
     def settings_ui_creator(self, agent_instance):
-        agent_name = agent_instance.AGENT_NAME
+        agent_name = agent_instance.MODULE_NAME
         agent_ui_class = agent_instance.AGENT_UI
         agent_ui_name = agent_ui_class.AGENT_UI_NAME
 
@@ -163,7 +163,7 @@ class GradioUI:
 
     # def change_agent(self, evt: gr.SelectData):
     #     output = []
-    #     for agent in self.webui_sprite.AVAILABLE_AGENTS:
+    #     for agent in self.webui_sprite.REQUIRED_MODULES:
     #         ui_name = GradioHelper.get_class_ui_name(agent)
     #         if evt.value == ui_name:
     #             output.append(gr.Row(visible=True))

@@ -1,25 +1,25 @@
 from typing import Any, Dict, List, Optional, Type
 
-from config.app_base import AppBase
-from modules.utils.log_service import Logger
+from app_config.app_base import AppBase
+from app_config.log_service import Logger
 from services.database.database_pinecone import PineconeDatabase
 from services.embedding.embedding_openai import OpenAIEmbedding
 from services.llm.llm_openai import OpenAILLM
 
 
 class ServiceBase(AppBase):
-    SERVICE_NAME: str
-    SERVICE_UI_NAME: str
+    MODULE_NAME: str
+    MODULE_UI_NAME: str
     REQUIRED_SECRETS: Optional[List[str]] = None
     PROVIDER_TYPE: str
     DEFAULT_PROVIDER: Type
-    AVAILABLE_PROVIDERS: List[Type]
+    REQUIRED_MODULES: List[Type]
 
-    CLASS_NAME_TYPE: str = "SERVICE_NAME"
-    CLASS_UI_NAME_TYPE: str = "SERVICE_UI_NAME"
+    CLASS_NAME_TYPE: str = "MODULE_NAME"
+    CLASS_UI_NAME_TYPE: str = "MODULE_UI_NAME"
     CLASS_CONFIG_TYPE: str = "services"
     CLASS_MODEL_TYPE: str = "ServiceConfigModel"
-    AVAILABLE_CLASS_TYPES: List[str] = ["AVAILABLE_PROVIDERS"]
+    AVAILABLE_CLASS_TYPES: List[str] = ["REQUIRED_MODULES"]
 
     log: Logger
 
@@ -36,18 +36,18 @@ class ServiceBase(AppBase):
         Then uses default"""
 
         def _find_provider(check_provider_name):
-            if not self.AVAILABLE_PROVIDERS:
+            if not self.REQUIRED_MODULES:
                 return None
-            for provider in self.AVAILABLE_PROVIDERS:
+            for provider in self.REQUIRED_MODULES:
                 if (
-                    provider.PROVIDER_NAME == check_provider_name
-                    or provider.PROVIDER_UI_NAME == check_provider_name
+                    provider.MODULE_NAME == check_provider_name
+                    or provider.MODULE_UI_NAME == check_provider_name
                 ):
-                    if provider_instance := getattr(self, provider.PROVIDER_NAME, None):
+                    if provider_instance := getattr(self, provider.MODULE_NAME, None):
                         return provider_instance
                     else:
                         new_provider = provider(self)
-                        setattr(self, provider.PROVIDER_NAME, new_provider)
+                        setattr(self, provider.MODULE_NAME, new_provider)
                         return new_provider
 
                 return None
@@ -62,7 +62,7 @@ class ServiceBase(AppBase):
             provider_instance = _find_provider(config_provider)
             if provider_instance:
                 return provider_instance
-        if default_provider := getattr(self.DEFAULT_PROVIDER, "PROVIDER_NAME", None):
+        if default_provider := getattr(self.DEFAULT_PROVIDER, "MODULE_NAME", None):
             provider_instance = _find_provider(default_provider)
             if provider_instance:
                 return provider_instance
@@ -72,17 +72,17 @@ class ServiceBase(AppBase):
     def instantiate_available_providers(self, service_config, **kwargs):
         available_provider_instances = []
         providers_config = service_config.get("providers", {})
-        for provider in self.AVAILABLE_PROVIDERS:
-            providers_config = providers_config.get(provider.PROVIDER_NAME, {})
+        for provider in self.REQUIRED_MODULES:
+            providers_config = providers_config.get(provider.MODULE_NAME, {})
             provider_instance = provider(providers_config=providers_config, **kwargs)
-            setattr(self, provider.PROVIDER_NAME, provider_instance)
+            setattr(self, provider.MODULE_NAME, provider_instance)
             available_provider_instances.append(provider_instance)
         return available_provider_instances
 
     def get_provider_names(self, default_provider):
         list_of_provider_names = []
         for provider in self.available_provider_instances:
-            if provider.PROVIDER_NAME == default_provider:
-                default_provider = provider.PROVIDER_UI_NAME
-            list_of_provider_names.append(provider.PROVIDER_UI_NAME)
+            if provider.MODULE_NAME == default_provider:
+                default_provider = provider.MODULE_UI_NAME
+            list_of_provider_names.append(provider.MODULE_UI_NAME)
         return list_of_provider_names, default_provider

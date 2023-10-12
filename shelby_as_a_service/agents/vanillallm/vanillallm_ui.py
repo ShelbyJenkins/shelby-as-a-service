@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
-import sprites.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelper
 from services.llm.llm_service import LLMService, OpenAILLM
 
 
@@ -21,7 +21,7 @@ class VanillaLLMUI:
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=f"Welcome to {agent_instance.AGENT_NAME}",
+                placeholder=f"Welcome to {agent_instance.MODULE_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
@@ -54,7 +54,7 @@ class VanillaLLMUI:
                                 max_lines=1,
                                 show_label=False,
                                 placeholder="...status",
-                                elem_id=f"{agent_instance.AGENT_NAME}_chat_tab_status_text",
+                                elem_id=f"{agent_instance.MODULE_NAME}_chat_tab_status_text",
                             )
                         with gr.Row():
                             components["chat_tab_stop_button"] = gr.Button(
@@ -127,8 +127,8 @@ class VanillaLLMUI:
     def create_settings_ui(agent_instance):
         components = {}
 
-        for service in agent_instance.AVAILABLE_SERVICES:
-            service_instance = getattr(agent_instance, service.SERVICE_NAME, None)
+        for service in agent_instance.REQUIRED_MODULES:
+            service_instance = getattr(agent_instance, service.MODULE_NAME, None)
 
         with gr.Column():
             service_instance.create_settings_ui()

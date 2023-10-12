@@ -1,15 +1,15 @@
 from decimal import Decimal
 from typing import Any, List, Type
 
-import modules.text_processing.text as text
+import services.text_processing.text as text
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
 from services.provider_base import ProviderBase
 
 
 class OpenAIEmbedding(ProviderBase):
-    PROVIDER_NAME: str = "openai_embedding"
-    PROVIDER_UI_NAME: str = "openai_embedding"
+    MODULE_NAME: str = "openai_embedding"
+    MODULE_UI_NAME: str = "openai_embedding"
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
 
     class OpenAIEmbeddingModel(BaseModel):

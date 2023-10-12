@@ -4,23 +4,22 @@ from typing import Any, Generator, List, Optional, Type
 from urllib.parse import urlparse, urlunparse
 
 import gradio as gr
-import modules.text_processing.text as text
+import services.text_processing.text as text
 from agents.agent_base import AgentBase
-from config.app_base import AppBase
+from agents.ingest.ingest_agent import IngestAgent
+from app_config.app_base import AppBase
 from pydantic import BaseModel
 from services.llm.llm_service import LLMService
-
-from shelby_as_a_service.agents.ingest.ingest_agent import IngestAgent
 
 # endregion
 #
 
 
 class WebAgent(AgentBase):
-    AGENT_NAME: str = "web_agent"
+    MODULE_NAME: str = "web_agent"
     AGENT_UI_NAME: str = "URL Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "web_prompt.yaml"
-    AVAILABLE_SERVICES: List[Type] = [LLMService, IngestAgent]
+    REQUIRED_MODULES: List[Type] = [LLMService, IngestAgent]
 
     class AgentConfigModel(BaseModel):
         agent_select_status_message: str = (

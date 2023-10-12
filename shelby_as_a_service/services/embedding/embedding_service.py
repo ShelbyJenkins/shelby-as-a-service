@@ -2,18 +2,18 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, List, Type
 
-import modules.text_processing.text as text
+import services.text_processing.text as text
 from pydantic import BaseModel
 from services.embedding.embedding_openai import OpenAIEmbedding
 from services.service_base import ServiceBase
 
 
 class EmbeddingService(ServiceBase):
-    SERVICE_NAME: str = "embedding_service"
-    SERVICE_UI_NAME: str = "embedding_service"
+    MODULE_NAME: str = "embedding_service"
+    MODULE_UI_NAME: str = "embedding_service"
     PROVIDER_TYPE: str = "embedding_provider"
     DEFAULT_PROVIDER: Type = OpenAIEmbedding
-    AVAILABLE_PROVIDERS: List[Type] = [OpenAIEmbedding]
+    REQUIRED_MODULES: List[Type] = [OpenAIEmbedding]
 
     class ServiceConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."

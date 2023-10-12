@@ -3,18 +3,18 @@ from decimal import Decimal
 from typing import Any, Dict, Generator, List, Optional, Tuple, Type, Union
 
 import gradio as gr
-import modules.prompt_templates as PromptTemplates
-import modules.text_processing.text as TextProcess
+import interfaces.webui.gradio_helpers as GradioHelper
 import openai
-import sprites.webui.gradio_helpers as GradioHelper
+import services.prompt_templates.prompt_templates as PromptTemplates
+import services.text_processing.text as TextProcess
 from pydantic import BaseModel, Field
 from services.provider_base import ProviderBase
 from typing_extensions import Annotated
 
 
 class OpenAILLM(ProviderBase):
-    PROVIDER_NAME: str = "openai_llm"
-    PROVIDER_UI_NAME: str = "OpenAI LLM"
+    MODULE_NAME: str = "openai_llm"
+    MODULE_UI_NAME: str = "OpenAI LLM"
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
 
     class OpenAILLMModel(BaseModel):
@@ -51,8 +51,9 @@ class OpenAILLM(ProviderBase):
 
     config: ProviderConfigModel
 
-    def __init__(self, provider_config={}, **kwargs):
-        self.config = self.ProviderConfigModel(**{**kwargs, **provider_config})
+    def __init__(self, config_file_dict={}, **kwargs):
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.ProviderConfigModel(**{**kwargs, **module_config_file_dict})
 
         # super().__init__()
 

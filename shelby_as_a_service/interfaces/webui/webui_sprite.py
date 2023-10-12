@@ -6,23 +6,22 @@ from collections import defaultdict
 from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
-import sprites.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelper
+from agents.ceq.ceq_agent import CEQAgent
 from agents.vanillallm.vanillallm_agent import VanillaLLM
+from agents.web.web_agent import WebAgent
+from interfaces.sprite_base import SpriteBase
+from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
-from sprites.sprite_base import SpriteBase
-from sprites.webui.gradio_ui import GradioUI
-
-from shelby_as_a_service.agents.ceq.ceq_agent import CEQAgent
-from shelby_as_a_service.agents.web.web_agent import WebAgent
 
 # endregion
 
 
 class WebUISprite(SpriteBase):
-    SPRITE_NAME: str = "webui_sprite"
-    SPRITE_UI_NAME: str = "webui_sprite"
-    AVAILABLE_AGENTS: List[Type] = [VanillaLLM]
-    # AVAILABLE_AGENTS: List[Type] = [VanillaLLM, CEQAgent, WebAgent]
+    MODULE_NAME: str = "webui_sprite"
+    MODULE_UI_NAME: str = "webui_sprite"
+    REQUIRED_MODULES: List[Type] = [VanillaLLM]
+    # REQUIRED_MODULES: List[Type] = [VanillaLLM, CEQAgent, WebAgent]
 
     class SpriteConfigModel(BaseModel):
         default_local_app_enabled: bool = False
@@ -36,13 +35,14 @@ class WebUISprite(SpriteBase):
 
     config: SpriteConfigModel
 
-    def __init__(self, sprite_config={}, **kwargs):
+    def __init__(self, config_file_dict={}, **kwargs):
         # super().__init__()
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.SpriteConfigModel(**{**kwargs, **module_config_file_dict})
 
-        self.config = self.SpriteConfigModel(**{**kwargs, **sprite_config})
-        self.available_agent_instances = self.instantiate_available_agents(sprite_config, **kwargs)
+        self.vanillallm_agent = VanillaLLM(module_config_file_dict)
 
-        self.gradio_ui = GradioUI(self)
+        # self.gradio_ui = GradioUI(self)
 
     def run_chat(self, *comps_state) -> Union[Generator[List[str], None, None], List[str]]:
         ui_state = GradioHelper.comp_values_to_dict(self.gradio_ui, *comps_state)
@@ -51,7 +51,7 @@ class WebUISprite(SpriteBase):
         agent = self.get_selected_agent(self.config.current_agent_ui_name)
         if agent is None:
             raise gr.Error("Bad value for chat_tab_agent_dropdown!")
-        if agent.AGENT_NAME == "web_agent":
+        if agent.MODULE_NAME == "web_agent":
             if content := ui_state["web_data_content"]:
                 documents = content
             else:

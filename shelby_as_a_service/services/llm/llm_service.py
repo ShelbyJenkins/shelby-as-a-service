@@ -1,18 +1,18 @@
 from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
-import sprites.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelper
 from pydantic import BaseModel
 from services.llm.llm_openai import OpenAILLM
 from services.service_base import ServiceBase
 
 
 class LLMService(ServiceBase):
-    SERVICE_NAME: str = "llm_service"
-    SERVICE_UI_NAME: str = "llm_service"
+    MODULE_NAME: str = "llm_service"
+    MODULE_UI_NAME: str = "llm_service"
     PROVIDER_TYPE: str = "llm_provider"
     DEFAULT_PROVIDER: Type = OpenAILLM
-    AVAILABLE_PROVIDERS: List[Type] = [OpenAILLM]
+    REQUIRED_MODULES: List[Type] = [OpenAILLM]
 
     openai_llm: OpenAILLM
 
@@ -27,14 +27,14 @@ class LLMService(ServiceBase):
 
     def __init__(
         self,
-        service_config={},
+        config_file_dict={},
         **kwargs,
     ):
         # super().__init__()
-        self.config = self.ServiceConfigModel(**{**kwargs, **service_config})
-        self.available_provider_instances = self.instantiate_available_providers(
-            service_config, **kwargs
-        )
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.ServiceConfigModel(**{**kwargs, **module_config_file_dict})
+
+        self.openai_llm = OpenAILLM(module_config_file_dict)
 
     def create_streaming_chat(
         self,

@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import gradio as gr
-import sprites.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelper
 from services.llm.llm_service import LLMService, OpenAILLM
 
 

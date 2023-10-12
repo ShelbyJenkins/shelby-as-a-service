@@ -4,26 +4,26 @@ import re
 import traceback
 from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 
-import modules.text_processing.text as text
+import services.text_processing.text as text
 
 # from agents.action_agent import ActionAgent
 from agents.agent_base import AgentBase
-from config.app_base import AppBase
+from app_config.app_base import AppBase
+from interfaces.webui.ui.ceq_ui import CEQUI
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 from services.embedding.embedding_service import EmbeddingService
 from services.llm.llm_service import LLMService
-from sprites.webui.ui.ceq_ui import CEQUI
 
 # endregion
 
 
 class CEQAgent(AgentBase):
-    AGENT_NAME: str = "ceq_agent"
+    MODULE_NAME: str = "ceq_agent"
     AGENT_UI_NAME: str = "ceq_agent"
     AGENT_UI = CEQUI
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
-    AVAILABLE_SERVICES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
+    REQUIRED_MODULES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
 
     class AgentConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
