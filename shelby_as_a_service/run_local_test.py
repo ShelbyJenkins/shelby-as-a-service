@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from app.extensions.content_aggregator.aggregator_agent import AggregatorAgent
+from config.extensions.content_aggregator.aggregator_agent import AggregatorAgent
 
 
 def main():

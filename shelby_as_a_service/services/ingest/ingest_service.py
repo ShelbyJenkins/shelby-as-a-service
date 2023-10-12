@@ -13,7 +13,7 @@ from langchain.document_loaders import (
 )
 from langchain.schema import Document
 from pydantic import BaseModel, Field
-from services.providers.provider_base import ProviderBase
+from services.provider_base import ProviderBase
 from services.service_base import ServiceBase
 
 
@@ -23,9 +23,7 @@ class GenericRecursiveWebScraper(ProviderBase):
     REQUIRED_SECRETS: List[str] = []
 
     class ProviderConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Search index to find docs related to request."
-        )
+        agent_select_status_message: str = "Search index to find docs related to request."
 
     config: ProviderConfigModel
 
@@ -43,10 +41,7 @@ class GenericRecursiveWebScraper(ProviderBase):
     def _load(self, url) -> Iterator[Document]:
         documents = RecursiveUrlLoader(url=url, extractor=self.custom_extractor).load()
 
-        return (
-            Document(page_content=doc.page_content, metadata=doc.metadata)
-            for doc in documents
-        )
+        return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
 
 class GenericWebScraper(ProviderBase):
@@ -55,9 +50,7 @@ class GenericWebScraper(ProviderBase):
     REQUIRED_SECRETS: List[str] = []
 
     class ProviderConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Search index to find docs related to request."
-        )
+        agent_select_status_message: str = "Search index to find docs related to request."
 
     config: ProviderConfigModel
 
@@ -67,14 +60,9 @@ class GenericWebScraper(ProviderBase):
     def _load(self, url) -> Iterator[Document]:
         documents = WebBaseLoader(web_path=url).load()
         for document in documents:
-            document.page_content = TextProcess.clean_text_content(
-                document.page_content
-            )
+            document.page_content = TextProcess.clean_text_content(document.page_content)
 
-        return (
-            Document(page_content=doc.page_content, metadata=doc.metadata)
-            for doc in documents
-        )
+        return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
 
 # class OpenAPILoader(ServiceBase):
@@ -204,9 +192,7 @@ class IngestService(ServiceBase):
     ]
 
     class ServiceConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Search index to find docs related to request."
-        )
+        agent_select_status_message: str = "Search index to find docs related to request."
 
     config: ServiceConfigModel
 

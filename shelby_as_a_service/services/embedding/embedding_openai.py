@@ -4,7 +4,7 @@ from typing import Any, List, Type
 import modules.text_processing.text as text
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
-from services.providers.provider_base import ProviderBase
+from services.provider_base import ProviderBase
 
 
 class OpenAIEmbedding(ProviderBase):

@@ -1,9 +1,6 @@
 from typing import Any, Dict, List, Optional, Type
 
-from agents.ceq_agent import CEQAgent
-from agents.vanillallm.agent import VanillaLLM
-from agents.web_agent import WebAgent
-from app.app_base import AppBase
+from config.app_base import AppBase
 from modules.utils.log_service import Logger
 
 
@@ -17,9 +14,7 @@ class SpriteBase(AppBase):
     AVAILABLE_CLASS_TYPES: List[str] = ["AVAILABLE_AGENTS"]
 
     log: Logger
-    vanillallm_agent: VanillaLLM
-    ceq_agent: CEQAgent
-    web_agent: WebAgent
+    available_agent_instances: List[Any]
 
     def __init__(self):
         self.app = AppBase
@@ -32,10 +27,7 @@ class SpriteBase(AppBase):
         If an existing instance doesn't exit it creates one for the sprite."""
         for agent in self.AVAILABLE_AGENTS:
             if agent:
-                if (
-                    agent.AGENT_UI_NAME == new_agent_name
-                    or agent.AGENT_NAME == new_agent_name
-                ):
+                if agent.AGENT_UI_NAME == new_agent_name or agent.AGENT_NAME == new_agent_name:
                     if agent_instance := getattr(self, agent.AGENT_NAME, None):
                         return agent_instance
                     else:
@@ -44,3 +36,14 @@ class SpriteBase(AppBase):
                         return new_agent
 
         return None
+
+    def instantiate_available_agents(self, sprite_config, **kwargs):
+        available_agent_instances = []
+        agents_config = sprite_config.get("agents", {})
+        for agent in self.AVAILABLE_AGENTS:
+            agent_config = agents_config.get(agent.AGENT_NAME, {})
+            agent_instance = agent(agent_config=agent_config, **kwargs)
+
+            setattr(self, agent.AGENT_NAME, agent_instance)
+            available_agent_instances.append(agent_instance)
+        return available_agent_instances

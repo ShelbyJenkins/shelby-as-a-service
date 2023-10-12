@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Type
 
-from app.app_base import AppBase
+from config.app_base import AppBase
 from modules.utils.log_service import Logger
 
 

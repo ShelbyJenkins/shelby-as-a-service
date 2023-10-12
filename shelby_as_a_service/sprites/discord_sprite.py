@@ -7,9 +7,10 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import discord
-from agents.ceq_agent import CEQAgent
 from discord.ext import commands
 from sprites.sprite_base import SpriteBase
+
+from shelby_as_a_service.agents.ceq.ceq_agent import CEQAgent
 
 # endregion
 
@@ -63,9 +64,7 @@ class DiscordSprite(SpriteBase):
                             self.get_random_animal(),
                         )
                     )
-                self.log.print_and_log(
-                    f"Bot has successfully join the server: {guild.name})"
-                )
+                self.log.print_and_log(f"Bot has successfully join the server: {guild.name})")
 
         @self.bot.event
         async def on_ready():
@@ -147,9 +146,7 @@ class DiscordSprite(SpriteBase):
             if isinstance(request_response, dict) and "answer_text" in request_response:
                 # Parse for discord and then respond
                 parsed_reponse = self.parse_discord_markdown(request_response)
-                self.log.print_and_log(
-                    f"Parsed output: {json.dumps(parsed_reponse, indent=4)}"
-                )
+                self.log.print_and_log(f"Parsed output: {json.dumps(parsed_reponse, indent=4)}")
                 await thread.send(parsed_reponse)
                 await thread.send(self.discord_message_end)
             else:
@@ -167,9 +164,7 @@ class DiscordSprite(SpriteBase):
 
             # For each document, add a numbered list item with the title and URL
             for doc in request_response["documents"]:
-                markdown_string += (
-                    f"[{doc['doc_num']}] **{doc['title']}**: <{doc['url']}>\n"
-                )
+                markdown_string += f"[{doc['doc_num']}] **{doc['title']}**: <{doc['url']}>\n"
         else:
             markdown_string += "No related documents found.\n"
 
@@ -218,17 +213,11 @@ class DiscordSprite(SpriteBase):
         If specific channels enabled, find one that is named 'general' or just pick one at random
         """
         matching_channel = None
-        if (
-            self.discord_specific_channels_enabled
-            and self.discord_specific_channel_ids is not None
-        ):
+        if self.discord_specific_channels_enabled and self.discord_specific_channel_ids is not None:
             for channel in guild.channels:
                 for config_channel_id in self.discord_specific_channel_ids:
                     if channel.id == int(config_channel_id):
-                        if (
-                            isinstance(channel, discord.TextChannel)
-                            and channel.name == "general"
-                        ):
+                        if isinstance(channel, discord.TextChannel) and channel.name == "general":
                             return channel
                         matching_channel = channel
             if matching_channel:
@@ -245,9 +234,7 @@ class DiscordSprite(SpriteBase):
         # Required to run multiple requests at a time in async
         with ThreadPoolExecutor() as executor:
             loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                executor, self.ceq_agent.create_chat, request
-            )
+            response = await loop.run_in_executor(executor, self.ceq_agent.create_chat, request)
             return response
 
     def run_sprite(self):

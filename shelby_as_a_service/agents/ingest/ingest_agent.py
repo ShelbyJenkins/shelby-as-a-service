@@ -3,8 +3,8 @@ from typing import Any, Dict, List, Optional, Type
 # from modules.index.data_model import DataModels
 from agents.agent_base import AgentBase
 from pydantic import BaseModel
-from services.database_service import DatabaseService
-from services.ingest_service import IngestService
+from services.database.database_service import DatabaseService
+from services.ingest.ingest_service import IngestService
 
 
 class IngestAgent(AgentBase):
@@ -14,7 +14,9 @@ class IngestAgent(AgentBase):
     AVAILABLE_SERVICES: List[Type] = [IngestService, DatabaseService]
 
     class AgentConfigModel(BaseModel):
-        agent_select_status_message: str = "Load a URL Data Tab, and we'll access it and use it to generate a response."
+        agent_select_status_message: str = (
+            "Load a URL Data Tab, and we'll access it and use it to generate a response."
+        )
         llm_provider: str = "openai_llm"
         llm_model: str = "gpt-4"
         database_provider: str = "local_filestore_database"
@@ -78,23 +80,17 @@ class IngestAgent(AgentBase):
         #             continue
         #         self.enabled_data_sources.append(data_source)
         #         self.log.print_and_log(f"Will index: {data_source_name}")
-        self.log.print_and_log(
-            f"Initial index stats: {self.vectorstore.describe_index_stats()}\n"
-        )
+        self.log.print_and_log(f"Initial index stats: {self.vectorstore.describe_index_stats()}\n")
 
         for data_source in self.enabled_data_sources:
             # Retries if there is an error
             retry_count = 2
             for i in range(retry_count):
                 try:
-                    self.log.print_and_log(
-                        f"-----Now indexing: {data_source.data_source_name}\n"
-                    )
+                    self.log.print_and_log(f"-----Now indexing: {data_source.data_source_name}\n")
                     # Get count of vectors in index matching the "resource" metadata field
                     index_resource_stats = data_source.vectorstore.describe_index_stats(
-                        filter={
-                            "data_source_name": {"$eq": data_source.data_source_name}
-                        }
+                        filter={"data_source_name": {"$eq": data_source.data_source_name}}
                     )
                     existing_resource_vector_count = (
                         index_resource_stats.get("namespaces", {})
@@ -112,9 +108,7 @@ class IngestAgent(AgentBase):
                             f"Skipping data_source: no data loaded for {data_source.data_source_name}"
                         )
                         break
-                    self.log.print_and_log(
-                        f"Total documents loaded for indexing: {len(documents)}"
-                    )
+                    self.log.print_and_log(f"Total documents loaded for indexing: {len(documents)}")
 
                     # Removes bad chars, and chunks text
                     document_chunks = data_source.preprocessor.run(documents)
@@ -131,9 +125,7 @@ class IngestAgent(AgentBase):
                     (
                         has_changes,
                         new_or_changed_chunks,
-                    ) = data_source.preprocessor.compare_chunks(
-                        data_source, document_chunks
-                    )
+                    ) = data_source.preprocessor.compare_chunks(data_source, document_chunks)
                     # If there are changes or new docs, delete existing local files and write new files
                     if not has_changes:
                         self.log.print_and_log(
@@ -146,30 +138,20 @@ class IngestAgent(AgentBase):
                     (
                         text_chunks,
                         document_chunks,
-                    ) = data_source.preprocessor.create_text_chunks(
-                        data_source, document_chunks
-                    )
+                    ) = data_source.preprocessor.create_text_chunks(data_source, document_chunks)
                     self.log.print_and_log(
                         f"Total document chunks after final check: {len(document_chunks)}"
                     )
 
                     # Get dense_embeddings
-                    dense_embeddings = data_source.embedding_retriever.embed_documents(
-                        text_chunks
-                    )
+                    dense_embeddings = data_source.embedding_retriever.embed_documents(text_chunks)
 
                     # If the "resource" already has vectors delete the existing vectors before upserting new vectors
                     # We have to delete all because the difficulty in specifying specific documents in pinecone
                     if existing_resource_vector_count != 0:
                         self._clear_data_source(data_source)
-                        index_resource_stats = (
-                            data_source.vectorstore.describe_index_stats(
-                                filter={
-                                    "data_source_name": {
-                                        "$eq": data_source.data_source_name
-                                    }
-                                }
-                            )
+                        index_resource_stats = data_source.vectorstore.describe_index_stats(
+                            filter={"data_source_name": {"$eq": data_source.data_source_name}}
                         )
                         cleared_resource_vector_count = (
                             index_resource_stats.get("namespaces", {})
@@ -191,9 +173,7 @@ class IngestAgent(AgentBase):
                         vector_counter += 1
                         vectors_to_upsert.append(prepared_vector)
 
-                    self.log.print_and_log(
-                        f"Upserting {len(vectors_to_upsert)} vectors"
-                    )
+                    self.log.print_and_log(f"Upserting {len(vectors_to_upsert)} vectors")
                     # data_source.vectorstore.upsert(
                     #     vectors=vectors_to_upsert,
                     #     namespace=self.deployment_name,
@@ -202,9 +182,7 @@ class IngestAgent(AgentBase):
                     # )
 
                     index_resource_stats = data_source.vectorstore.describe_index_stats(
-                        filter={
-                            "data_source_name": {"$eq": data_source.data_source_name}
-                        }
+                        filter={"data_source_name": {"$eq": data_source.data_source_name}}
                     )
                     new_resource_vector_count = (
                         index_resource_stats.get("namespaces", {})
@@ -229,6 +207,4 @@ class IngestAgent(AgentBase):
                     else:
                         raise  # if exception in the last retry then raise it.
 
-        self.log.print_and_log(
-            f"Final index stats: {self.vectorstore.describe_index_stats()}"
-        )
+        self.log.print_and_log(f"Final index stats: {self.vectorstore.describe_index_stats()}")

@@ -8,11 +8,11 @@ import modules.text_processing.text as text
 
 # from agents.action_agent import ActionAgent
 from agents.agent_base import AgentBase
-from app.app_base import AppBase
+from config.app_base import AppBase
 from pydantic import BaseModel
-from services.database_service import DatabaseService
-from services.embedding_service import EmbeddingService
-from services.llm_service import LLMService
+from services.database.database_service import DatabaseService
+from services.embedding.embedding_service import EmbeddingService
+from services.llm.llm_service import LLMService
 from sprites.webui.ui.ceq_ui import CEQUI
 
 # endregion
@@ -26,9 +26,7 @@ class CEQAgent(AgentBase):
     AVAILABLE_SERVICES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
 
     class AgentConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Search index to find docs related to request."
-        )
+        agent_select_status_message: str = "Search index to find docs related to request."
         # data_domain_name: str = "base"
         data_domain_name: Optional[str] = None
         index_name: str = "base"
@@ -168,9 +166,7 @@ class CEQAgent(AgentBase):
         soft_count = sum(1 for doc in returned_documents if doc["doc_type"] == "soft")
 
         # Sort the list by score
-        sorted_documents = sorted(
-            returned_documents, key=lambda x: x["score"], reverse=True
-        )
+        sorted_documents = sorted(returned_documents, key=lambda x: x["score"], reverse=True)
 
         for i, document in enumerate(sorted_documents, start=1):
             token_count = text.tiktoken_len(document["content"])

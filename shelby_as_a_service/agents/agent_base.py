@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Type
 
-from app.app_base import AppBase
+from config.app_base import AppBase
 from modules.utils.log_service import Logger
 
 
@@ -33,3 +33,13 @@ class AgentBase(AppBase):
                 list_of_service_instances.append(new_service)
 
         return list_of_service_instances
+
+    def instantiate_available_services(self, agent_config, **kwargs):
+        available_service_instances = []
+        services_config = agent_config.get("services", {})
+        for service in self.AVAILABLE_SERVICES:
+            service_config = services_config.get(service.SERVICE_NAME, {})
+            service_instance = service(service_config=service_config, **kwargs)
+            setattr(self, service.SERVICE_NAME, service_instance)
+            available_service_instances.append(service_instance)
+        return available_service_instances

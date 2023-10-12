@@ -1,6 +1,6 @@
 import argparse
 
-from app.app_base import AppBase
+from config.app_base import AppBase
 
 
 def main():

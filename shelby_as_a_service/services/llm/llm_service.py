@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Type
 import gradio as gr
 import sprites.webui.gradio_helpers as GradioHelper
 from pydantic import BaseModel
-from services.providers.llm_openai import OpenAILLM
+from services.llm.llm_openai import OpenAILLM
 from services.service_base import ServiceBase
 
 
@@ -27,22 +27,14 @@ class LLMService(ServiceBase):
 
     def __init__(
         self,
-        config_dict_from_file: Optional[Dict[str, Any]] = None,
+        service_config={},
         **kwargs,
     ):
-        self.config_dict_from_file = config_dict_from_file or {}
-        self.config = self.ServiceConfigModel(**{**kwargs, **self.config_dict_from_file})
-        self.provider_config_dict_from_file = self.config_dict_from_file.get("providers", {})
-        super().__init__()
-        self.config_dict_from_file.update(self.config.model_dump())
-
-        kwargs.pop("llm_provider", None)
-
-        match self.config.llm_provider:
-            case "openai_llm":
-                self.openai_llm = OpenAILLM(
-                    self.provider_config_dict_from_file.get("openai_llm", {}), **kwargs
-                )
+        # super().__init__()
+        self.config = self.ServiceConfigModel(**{**kwargs, **service_config})
+        self.available_provider_instances = self.instantiate_available_providers(
+            service_config, **kwargs
+        )
 
     def create_streaming_chat(
         self,
@@ -79,19 +71,19 @@ class LLMService(ServiceBase):
             )
         return None
 
-    def create_ui(self):
+    def create_settings_ui(self):
         components = {}
-        llm_providers = ServiceBase.get_provider_instances(self)
+        llm_providers, default_llm_provider = self.get_provider_names(self.config.llm_provider)
 
         with gr.Column():
             with gr.Accordion(label="LLM Settings", open=False):
                 components["llm_provider"] = gr.Dropdown(
-                    value=self.config.llm_provider,
-                    choices=GradioHelper.dropdown_choices(LLMService),
+                    value=default_llm_provider,
+                    choices=llm_providers,
                     label="LLM Provider",
                     container=True,
                 )
-                for provider_instance in llm_providers:
+                for provider_instance in self.available_provider_instances:
                     provider_instance.create_ui()
 
         return components

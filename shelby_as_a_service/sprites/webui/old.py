@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional
 
 import gradio as gr
 import sprites.webui.gradio_helpers as GradioHelper
-from services.llm_service import LLMService, OpenAILLM
+from services.llm.llm_service import LLMService, OpenAILLM
 from sprites.web.gradio_themes import AtYourServiceTheme
 from sprites.web.vanillm_interface import VanallmInterface
 
@@ -118,8 +118,7 @@ class GradioInterface:
         source_instance = data_domain_instance.data_domain_sources[0]
         data_source_name = source_instance.data_source_name
         data_source_names = [
-            source.data_source_name
-            for source in data_domain_instance.data_domain_sources
+            source.data_source_name for source in data_domain_instance.data_domain_sources
         ]
 
         txb = gr.Textbox(
@@ -133,13 +132,9 @@ class GradioInterface:
 
         with gr.Blocks():
             with gr.Row():
-                gr.Textbox(
-                    show_label=False, scale=2, lines=3, value="Instructions here"
-                )
+                gr.Textbox(show_label=False, scale=2, lines=3, value="Instructions here")
                 with gr.Column(variant="panel"):
-                    config_memory_btn = gr.Button(
-                        size="sm", value="Save Config to Memory"
-                    )
+                    config_memory_btn = gr.Button(size="sm", value="Save Config to Memory")
                     config_file_btn = gr.Button(size="sm", value="Save Config to File")
 
             with gr.Group():
@@ -186,9 +181,7 @@ class GradioInterface:
                                     label="Check to confirm",
                                     container=True,
                                 )
-                                make_app_btn = gr.Button(
-                                    size="sm", value="Rename", container=True
-                                )
+                                make_app_btn = gr.Button(size="sm", value="Rename", container=True)
                         with gr.Tab(label="Clear Selected Data Source"):
                             with gr.Row():
                                 delete_app_chk_box = gr.Checkbox(
@@ -196,9 +189,7 @@ class GradioInterface:
                                     label="Check to confirm",
                                     container=True,
                                 )
-                                delete_app_btn = gr.Button(
-                                    size="sm", value="Clear", container=True
-                                )
+                                delete_app_btn = gr.Button(size="sm", value="Clear", container=True)
                         with gr.Tab(label="Delete Selected Data Source"):
                             with gr.Row():
                                 delete_app_chk_box = gr.Checkbox(
@@ -220,9 +211,7 @@ class GradioInterface:
                                     label="Check to confirm",
                                     container=True,
                                 )
-                                make_app_btn = gr.Button(
-                                    size="sm", value="Create", container=True
-                                )
+                                make_app_btn = gr.Button(size="sm", value="Create", container=True)
 
                     with gr.Tab(label="Rename Selected Data Domain"):
                         make_app_textbox = gr.Textbox(
@@ -235,9 +224,7 @@ class GradioInterface:
                                 label="Check to confirm",
                                 container=True,
                             )
-                            make_app_btn = gr.Button(
-                                size="sm", value="Rename", container=True
-                            )
+                            make_app_btn = gr.Button(size="sm", value="Rename", container=True)
                     with gr.Tab(label="Clear Selected Data Domain"):
                         with gr.Row():
                             Clear_app_chk_box = gr.Checkbox(
@@ -245,9 +232,7 @@ class GradioInterface:
                                 label="Check to confirm",
                                 container=True,
                             )
-                            Clear_app_btn = gr.Button(
-                                size="sm", value="Clear", container=True
-                            )
+                            Clear_app_btn = gr.Button(size="sm", value="Clear", container=True)
                     with gr.Tab(label="Delete Selected Data Domain"):
                         with gr.Row():
                             delete_app_chk_box = gr.Checkbox(
@@ -255,9 +240,7 @@ class GradioInterface:
                                 label="Check to confirm",
                                 container=True,
                             )
-                            delete_app_btn = gr.Button(
-                                size="sm", value="Delete", container=True
-                            )
+                            delete_app_btn = gr.Button(size="sm", value="Delete", container=True)
                     with gr.Tab(label="Create New Data Domain"):
                         make_app_textbox = gr.Textbox(
                             placeholder="<your_new_data_domain_name>",
@@ -269,9 +252,7 @@ class GradioInterface:
                                 label="Check to confirm",
                                 container=True,
                             )
-                            make_app_btn = gr.Button(
-                                size="sm", value="Create", container=True
-                            )
+                            make_app_btn = gr.Button(size="sm", value="Create", container=True)
 
                 with gr.Tab(label="Rename Selected Index"):
                     make_app_textbox = gr.Textbox(
@@ -284,9 +265,7 @@ class GradioInterface:
                             label="Check to confirm",
                             container=True,
                         )
-                        make_app_btn = gr.Button(
-                            size="sm", value="Rename", container=True
-                        )
+                        make_app_btn = gr.Button(size="sm", value="Rename", container=True)
                 with gr.Tab(label="Clear Selected Index"):
                     with gr.Row():
                         Clear_app_chk_box = gr.Checkbox(
@@ -294,9 +273,7 @@ class GradioInterface:
                             label="Check to confirm",
                             container=True,
                         )
-                        Clear_app_btn = gr.Button(
-                            size="sm", value="Clear", container=True
-                        )
+                        Clear_app_btn = gr.Button(size="sm", value="Clear", container=True)
                 with gr.Tab(label="Delete Selected Index"):
                     with gr.Row():
                         delete_app_chk_box = gr.Checkbox(
@@ -304,9 +281,7 @@ class GradioInterface:
                             label="Check to confirm",
                             container=True,
                         )
-                        delete_app_btn = gr.Button(
-                            size="sm", value="Delete", container=True
-                        )
+                        delete_app_btn = gr.Button(size="sm", value="Delete", container=True)
 
             # index_name_dropdown.change()
 
@@ -365,9 +340,7 @@ class GradioInterface:
                         value="Instructions here",
                     )
                     with gr.Column(variant="panel"):
-                        secrets_file_btn = gr.Button(
-                            size="sm", value="Save Secrets to .env File"
-                        )
+                        secrets_file_btn = gr.Button(size="sm", value="Save Secrets to .env File")
                 with gr.Row():
                     secrets_components = create_secrets_components(self)
 
@@ -464,12 +437,8 @@ class GradioInterface:
                             value="Instructions here",
                         )
                         with gr.Column(variant="panel"):
-                            config_memory_btn = gr.Button(
-                                size="sm", value="Save Config to Memory"
-                            )
-                            config_file_btn = gr.Button(
-                                size="sm", value="Save Config to File"
-                            )
+                            config_memory_btn = gr.Button(size="sm", value="Save Config to Memory")
+                            config_file_btn = gr.Button(size="sm", value="Save Config to File")
 
                     # with gr.Row():
                     #     with gr.Group():

@@ -3,14 +3,13 @@ from typing import Any, Dict, Generator, List, Optional, Type
 import gradio as gr
 import sprites.webui.gradio_helpers as GradioHelper
 from agents.agent_base import AgentBase
-from agents.vanillallm.ui import VanillaLLMUI
+from agents.vanillallm.vanillallm_ui import VanillaLLMUI
 from pydantic import BaseModel
-from services.llm_service import LLMService
+from services.llm.llm_service import LLMService
 
 
 class VanillaLLM(AgentBase):
     AGENT_NAME: str = "vanillallm_agent"
-    AGENT_UI_NAME: str = "VanillaLLM Agent"
     AGENT_UI = VanillaLLMUI
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "vanillallm_prompt.yaml"
     AVAILABLE_SERVICES: List[Type] = [LLMService]
@@ -25,18 +24,11 @@ class VanillaLLM(AgentBase):
 
     config: AgentConfigModel
 
-    def __init__(self, config_dict_from_file: Optional[Dict[str, Any]] = None, **kwargs):
-        self.config_dict_from_file = config_dict_from_file or {}
-        self.config = self.AgentConfigModel(**{**kwargs, **self.config_dict_from_file})
-        self.services_config_dict_from_file = self.config_dict_from_file.get("services", {})
-        super().__init__()
-        self.config_dict_from_file.update(self.config.model_dump())
-
-        self.llm_service = LLMService(
-            self.services_config_dict_from_file.get("llm_service", {}),
-            llm_provider=self.config.llm_provider,
-            llm_model=self.config.llm_model,
-            **kwargs,
+    def __init__(self, agent_config={}, **kwargs):
+        # super().__init__()
+        self.config = self.AgentConfigModel(**{**kwargs, **agent_config})
+        self.available_service_instances = self.instantiate_available_services(
+            agent_config, **kwargs
         )
 
     def create_streaming_chat(

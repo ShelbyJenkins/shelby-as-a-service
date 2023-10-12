@@ -8,7 +8,7 @@ import modules.text_processing.text as TextProcess
 import openai
 import sprites.webui.gradio_helpers as GradioHelper
 from pydantic import BaseModel, Field
-from services.providers.provider_base import ProviderBase
+from services.provider_base import ProviderBase
 from typing_extensions import Annotated
 
 
@@ -39,9 +39,9 @@ class OpenAILLM(ProviderBase):
 
     class ProviderConfigModel(BaseModel):
         model: str = "gpt-3.5-turbo"
-        frequency_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = None
+        frequency_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
         max_tokens: Annotated[int, Field(ge=0, le=65536)] = 16384
-        presence_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = None
+        presence_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
         stream: bool = True
         temperature: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
         top_p: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
@@ -51,11 +51,10 @@ class OpenAILLM(ProviderBase):
 
     config: ProviderConfigModel
 
-    def __init__(self, config_dict_from_file: Optional[Dict[str, Any]] = None, **kwargs):
-        self.config_dict_from_file = config_dict_from_file or {}
-        self.config = self.ProviderConfigModel(**{**kwargs, **self.config_dict_from_file})
-        self.config_dict_from_file.update(self.config.model_dump())
-        super().__init__()
+    def __init__(self, provider_config={}, **kwargs):
+        self.config = self.ProviderConfigModel(**{**kwargs, **provider_config})
+
+        # super().__init__()
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
@@ -229,17 +228,20 @@ class OpenAILLM(ProviderBase):
                     value=self.config.model,
                     choices=GradioHelper.dropdown_choices(OpenAILLM),
                     label="OpenAI LLM Model",
+                    interactive=True,
                 )
                 components["max_tokens"] = gr.Slider(
                     minimum=0,
                     maximum=16384,
                     value=self.config.max_tokens,
-                    step=0.05,
+                    step=1,
                     label="Max Tokens",
+                    interactive=True,
                 )
                 components["stream"] = gr.Checkbox(
                     value=self.config.stream,
                     label="Stream Response",
+                    interactive=True,
                 )
                 with gr.Accordion(label="Advanced Settings", open=False):
                     components["frequency_penalty"] = gr.Slider(
@@ -248,6 +250,7 @@ class OpenAILLM(ProviderBase):
                         value=self.config.frequency_penalty,
                         step=0.05,
                         label="Frequency Penalty",
+                        interactive=True,
                     )
                     components["presence_penalty"] = gr.Slider(
                         minimum=-2.0,
@@ -255,6 +258,7 @@ class OpenAILLM(ProviderBase):
                         value=self.config.presence_penalty,
                         step=0.05,
                         label="Presence Penalty",
+                        interactive=True,
                     )
                     components["temperature"] = gr.Slider(
                         minimum=0.0,
@@ -262,6 +266,7 @@ class OpenAILLM(ProviderBase):
                         value=self.config.temperature,
                         step=0.05,
                         label="Temperature",
+                        interactive=True,
                     )
                     components["top_p"] = gr.Slider(
                         minimum=0.0,
@@ -269,6 +274,7 @@ class OpenAILLM(ProviderBase):
                         value=self.config.top_p,
                         step=0.05,
                         label="Top P",
+                        interactive=True,
                     )
 
         return components

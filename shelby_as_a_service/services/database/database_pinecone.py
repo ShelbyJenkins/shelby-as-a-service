@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Type, Union
 
 import pinecone
 from pydantic import BaseModel
-from services.providers.provider_base import ProviderBase
+from services.provider_base import ProviderBase
 
 
 class PineconeDatabase(ProviderBase):
@@ -84,9 +84,7 @@ class PineconeDatabase(ProviderBase):
 
         if data_domain_name:
             namespace = data_domain_name
-            returned_documents = _query_namespace(
-                dense_embedding, top_k, namespace, filter
-            )
+            returned_documents = _query_namespace(dense_embedding, top_k, namespace, filter)
         # If we don't have a namespace, just search all available namespaces
         else:
             returned_documents = []

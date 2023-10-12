@@ -4,7 +4,7 @@ from typing import Any, List, Type
 
 import modules.text_processing.text as text
 from pydantic import BaseModel
-from services.providers.embedding_openai import OpenAIEmbedding
+from services.embedding.embedding_openai import OpenAIEmbedding
 from services.service_base import ServiceBase
 
 
@@ -16,9 +16,7 @@ class EmbeddingService(ServiceBase):
     AVAILABLE_PROVIDERS: List[Type] = [OpenAIEmbedding]
 
     class ServiceConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Search index to find docs related to request."
-        )
+        agent_select_status_message: str = "Search index to find docs related to request."
 
     config: ServiceConfigModel
 

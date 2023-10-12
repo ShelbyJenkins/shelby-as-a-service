@@ -3,8 +3,8 @@ from typing import Any, List, Type
 
 import modules.text_processing.text as TextProcess
 from pydantic import BaseModel
-from services.providers.database_pinecone import PineconeDatabase
-from services.providers.provider_base import ProviderBase
+from services.database.database_pinecone import PineconeDatabase
+from services.provider_base import ProviderBase
 from services.service_base import ServiceBase
 
 
@@ -29,9 +29,7 @@ class LocalFileStoreDatabase(ProviderBase):
         )
         os.makedirs(data_domain_name_file_path, exist_ok=True)
         for document in documents:
-            title = TextProcess.extract_and_clean_title(
-                document, data_source.data_source_url
-            )
+            title = TextProcess.extract_and_clean_title(document, data_source.data_source_url)
             valid_filename = "".join(c if c.isalnum() else "_" for c in title)
             file_path = os.path.join(data_domain_name_file_path, f"{valid_filename}.md")
             page_content = document.page_content
@@ -50,9 +48,7 @@ class DatabaseService(ServiceBase):
     AVAILABLE_PROVIDERS: List[Type] = [PineconeDatabase, LocalFileStoreDatabase]
 
     class ServiceConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Search index to find docs related to request."
-        )
+        agent_select_status_message: str = "Search index to find docs related to request."
 
     config: ServiceConfigModel
 
@@ -68,9 +64,7 @@ class DatabaseService(ServiceBase):
     ):
         provider = self.get_provider(database_provider)
         if provider:
-            return provider._query_index(
-                search_terms, retrieve_n_docs, data_domain_name
-            )
+            return provider._query_index(search_terms, retrieve_n_docs, data_domain_name)
         else:
             print("rnr")
 
@@ -82,8 +76,6 @@ class DatabaseService(ServiceBase):
     ):
         provider = self.get_provider(data_source.data_source_database_provider)
         if provider:
-            return provider._write_documents_to_database(
-                documents, data_domain, data_source
-            )
+            return provider._write_documents_to_database(documents, data_domain, data_source)
         else:
             print("rnr")

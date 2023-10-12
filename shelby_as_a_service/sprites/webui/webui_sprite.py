@@ -2,16 +2,18 @@
 
 import asyncio
 import time
+from collections import defaultdict
 from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
 import sprites.webui.gradio_helpers as GradioHelper
-from agents.ceq_agent import CEQAgent
-from agents.vanillallm.agent import VanillaLLM
-from agents.web_agent import WebAgent
+from agents.vanillallm.vanillallm_agent import VanillaLLM
 from pydantic import BaseModel
 from sprites.sprite_base import SpriteBase
 from sprites.webui.gradio_ui import GradioUI
+
+from shelby_as_a_service.agents.ceq.ceq_agent import CEQAgent
+from shelby_as_a_service.agents.web.web_agent import WebAgent
 
 # endregion
 
@@ -34,16 +36,13 @@ class WebUISprite(SpriteBase):
 
     config: SpriteConfigModel
 
-    def __init__(self, config_dict_from_file: Optional[Dict[str, Any]] = None, **kwargs):
-        self.config_dict_from_file = config_dict_from_file or {}
-        self.config = self.SpriteConfigModel(**{**kwargs, **self.config_dict_from_file})
-        self.agent_config_dict_from_file = self.config_dict_from_file.get("agents", {})
-        self.config_dict_from_file.update(self.config.model_dump())
-        super().__init__()
+    def __init__(self, sprite_config={}, **kwargs):
+        # super().__init__()
 
-        self.gradio_ui = {}
-        self.gradio_ui["update_settings_file"] = gr.State(False)
-        self.gradio_ui["gradio_agents"] = {}
+        self.config = self.SpriteConfigModel(**{**kwargs, **sprite_config})
+        self.available_agent_instances = self.instantiate_available_agents(sprite_config, **kwargs)
+
+        self.gradio_ui = GradioUI(self)
 
     def run_chat(self, *comps_state) -> Union[Generator[List[str], None, None], List[str]]:
         ui_state = GradioHelper.comp_values_to_dict(self.gradio_ui, *comps_state)
@@ -90,12 +89,12 @@ class WebUISprite(SpriteBase):
         gr.Info(message)
 
     def run_sprite(self):
-        GradioUI(self).creater_gradio_interface()
-        asyncio.run(self.check_for_updates())
+        self.gradio_ui.create_gradio_interface()
+        # asyncio.run(self.check_for_updates())
 
-    async def check_for_updates(self):
-        while True:
-            await asyncio.sleep(5)  # non-blocking sleep
-            if self.gradio_ui["update_settings_file"]:
-                self.gradio_ui["update_settings_file"] = False
-                self.update_app_config_file_from_ui()
+    # async def check_for_updates(self):
+    #     while True:
+    #         await asyncio.sleep(5)  # non-blocking sleep
+    #         if self.gradio_ui["update_settings_file"]:
+    #             self.gradio_ui["update_settings_file"] = False
+    #             self.update_app_config_file_from_ui()

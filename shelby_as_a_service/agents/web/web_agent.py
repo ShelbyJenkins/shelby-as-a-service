@@ -6,10 +6,11 @@ from urllib.parse import urlparse, urlunparse
 import gradio as gr
 import modules.text_processing.text as text
 from agents.agent_base import AgentBase
-from agents.ingest_agent import IngestAgent
-from app.app_base import AppBase
+from config.app_base import AppBase
 from pydantic import BaseModel
-from services.llm_service import LLMService
+from services.llm.llm_service import LLMService
+
+from shelby_as_a_service.agents.ingest.ingest_agent import IngestAgent
 
 # endregion
 #
@@ -22,7 +23,9 @@ class WebAgent(AgentBase):
     AVAILABLE_SERVICES: List[Type] = [LLMService, IngestAgent]
 
     class AgentConfigModel(BaseModel):
-        agent_select_status_message: str = "Load a URL Data Tab, and we'll access it and use it to generate a response."
+        agent_select_status_message: str = (
+            "Load a URL Data Tab, and we'll access it and use it to generate a response."
+        )
         llm_provider: str = "openai_llm"
         llm_model: str = "gpt-4"
         database_provider: str = "local_filestore_database"

@@ -44,3 +44,5 @@ class IndexBase:
 
         update_enabled: bool = True
         retrieval_enabled: bool = True
+
+    config: IndexConfigModel

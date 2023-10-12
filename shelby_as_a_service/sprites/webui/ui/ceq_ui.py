@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import gradio as gr
 import sprites.webui.gradio_helpers as GradioHelper
-from services.llm_service import LLMService, OpenAILLM
+from services.llm.llm_service import LLMService, OpenAILLM
 
 
 class CEQUI:

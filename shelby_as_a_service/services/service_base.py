@@ -1,10 +1,10 @@
 from typing import Any, Dict, List, Optional, Type
 
-from app.app_base import AppBase
+from config.app_base import AppBase
 from modules.utils.log_service import Logger
-from services.providers.database_pinecone import PineconeDatabase
-from services.providers.embedding_openai import OpenAIEmbedding
-from services.providers.llm_openai import OpenAILLM
+from services.database.database_pinecone import PineconeDatabase
+from services.embedding.embedding_openai import OpenAIEmbedding
+from services.llm.llm_openai import OpenAILLM
 
 
 class ServiceBase(AppBase):
@@ -23,7 +23,7 @@ class ServiceBase(AppBase):
 
     log: Logger
 
-    provider_config_dict_from_file: Dict[str, Any]
+    available_provider_instances: List[Any]
 
     def __init__(self):
         self.app = AppBase
@@ -69,16 +69,20 @@ class ServiceBase(AppBase):
 
         return None
 
-    def get_provider_instances(self):
-        list_of_provider_instances = []
+    def instantiate_available_providers(self, service_config, **kwargs):
+        available_provider_instances = []
+        providers_config = service_config.get("providers", {})
         for provider in self.AVAILABLE_PROVIDERS:
-            if provider_instance := getattr(self, provider.PROVIDER_NAME, None):
-                list_of_provider_instances.append(provider_instance)
-            else:
-                new_provider = provider(
-                    self.provider_config_dict_from_file.get(provider.PROVIDER_NAME, {})
-                )
-                setattr(self, provider.PROVIDER_NAME, new_provider)
-                list_of_provider_instances.append(new_provider)
+            providers_config = providers_config.get(provider.PROVIDER_NAME, {})
+            provider_instance = provider(providers_config=providers_config, **kwargs)
+            setattr(self, provider.PROVIDER_NAME, provider_instance)
+            available_provider_instances.append(provider_instance)
+        return available_provider_instances
 
-        return list_of_provider_instances
+    def get_provider_names(self, default_provider):
+        list_of_provider_names = []
+        for provider in self.available_provider_instances:
+            if provider.PROVIDER_NAME == default_provider:
+                default_provider = provider.PROVIDER_UI_NAME
+            list_of_provider_names.append(provider.PROVIDER_UI_NAME)
+        return list_of_provider_names, default_provider

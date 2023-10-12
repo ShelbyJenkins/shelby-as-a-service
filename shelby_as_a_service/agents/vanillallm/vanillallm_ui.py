@@ -3,26 +3,25 @@ from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
 import sprites.webui.gradio_helpers as GradioHelper
-from services.llm_service import LLMService, OpenAILLM
+from services.llm.llm_service import LLMService, OpenAILLM
 
 
 class VanillaLLMUI:
     SETTINGS_PANEL_COL = 2
     CHAT_UI_PANEL_COL = 8
+    AGENT_UI_NAME: str = "VanillaLLM Agent"
+
     service: Type
 
-    def __init__(self, webui_sprite) -> None:
-        self.webui_sprite = webui_sprite
-
     @staticmethod
-    def create_chat_ui(name):
+    def create_chat_ui(agent_instance):
         components = {}
 
         with gr.Column(elem_classes="chat_ui_col"):
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=f"Welcome to {name}",
+                placeholder=f"Welcome to {agent_instance.AGENT_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
@@ -55,7 +54,7 @@ class VanillaLLMUI:
                                 max_lines=1,
                                 show_label=False,
                                 placeholder="...status",
-                                elem_id=f"{name}_chat_tab_status_text",
+                                elem_id=f"{agent_instance.AGENT_NAME}_chat_tab_status_text",
                             )
                         with gr.Row():
                             components["chat_tab_stop_button"] = gr.Button(
@@ -132,7 +131,7 @@ class VanillaLLMUI:
             service_instance = getattr(agent_instance, service.SERVICE_NAME, None)
 
         with gr.Column():
-            service.create_ui(agent_instance=agent_instance)
+            service_instance.create_settings_ui()
 
         return components
 
