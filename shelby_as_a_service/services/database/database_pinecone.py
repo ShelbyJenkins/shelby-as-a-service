@@ -1,7 +1,10 @@
 import os
 from typing import Any, Dict, List, Type, Union
 
+import gradio as gr
+import interfaces.webui.gradio_helpers as GradioHelper
 import pinecone
+from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 from services.provider_base import ProviderBase
 
@@ -14,7 +17,6 @@ class PineconeDatabase(ProviderBase):
     class ModuleConfigModel(BaseModel):
         index_env: str = "us-central1-gcp"
         embedding_max_chunk_size: int = 8191
-        embedding_batch_size: int = 100
         vectorstore_dimension: int = 1536
         vectorstore_upsert_batch_size: int = 20
         vectorstore_metric: str = "cosine"
@@ -34,7 +36,9 @@ class PineconeDatabase(ProviderBase):
 
     config: ModuleConfigModel
 
-    def __init__(self):
+    def __init__(self, config_file_dict={}, **kwargs):
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
         self.set_secrets(self)
 
     def setup_index(self, pinecone_api_key=None):
@@ -185,3 +189,41 @@ class PineconeDatabase(ProviderBase):
             pod_type=self.config.index_vectorstore_pod_type,
             metadata_config=metadata_config,
         )
+
+    def create_ui(self):
+        components = {}
+        with gr.Accordion(label=self.MODULE_UI_NAME, open=True):
+            with gr.Column():
+                components["index_env"] = gr.Textbox(
+                    value=self.config.index_env,
+                    label="index_env",
+                    interactive=True,
+                )
+                components["vectorstore_dimension"] = gr.Number(
+                    value=self.config.vectorstore_dimension,
+                    label="vectorstore_dimension",
+                    interactive=True,
+                )
+                components["vectorstore_upsert_batch_size"] = gr.Number(
+                    value=self.config.vectorstore_upsert_batch_size,
+                    label="vectorstore_upsert_batch_size",
+                    interactive=True,
+                )
+                components["vectorstore_metric"] = gr.TextArea(
+                    value=self.config.vectorstore_metric,
+                    label="vectorstore_metric",
+                    interactive=True,
+                )
+                components["vectorstore_pod_type"] = gr.TextArea(
+                    value=self.config.vectorstore_pod_type,
+                    label="vectorstore_pod_type",
+                    interactive=True,
+                )
+                components["indexed_metadata"] = gr.Dropdown(
+                    value=self.config.indexed_metadata[0],
+                    choices=self.config.indexed_metadata,
+                    label="indexed_metadata",
+                    interactive=True,
+                )
+            GradioUI.create_settings_event_listener(self, components)
+        return components

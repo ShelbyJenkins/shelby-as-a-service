@@ -21,7 +21,7 @@ class GradioUI:
 
         self.available_agents_ui_names = []
         for agent in self.required_module_instances:
-            self.available_agents_ui_names.append(agent.MODULE_UI.MODULE_UI_NAME)
+            self.available_agents_ui_names.append(agent.MODULE_UI_NAME)
 
         self.gradio_ui = {}
         self.gradio_ui["gradio_agents"] = {}
@@ -74,14 +74,12 @@ class GradioUI:
         agent_name = agent_instance.MODULE_NAME
         agent_ui_class = agent_instance.MODULE_UI
 
-        components = {}
-
         with gr.Row(
             elem_classes="chat_ui_row",
             elem_id=f"{agent_name}_chat_ui_row",
             visible=False,
         ) as chat_ui_row:
-            components = agent_ui_class.create_chat_ui(agent_instance)
+            agent_ui_class.create_chat_ui(agent_instance)
 
         return chat_ui_row
 
@@ -90,8 +88,6 @@ class GradioUI:
         agent_name = agent_instance.MODULE_NAME
         agent_ui_class = agent_instance.MODULE_UI
         agent_ui_name = agent_ui_class.MODULE_UI_NAME
-
-        components = {}
 
         with gr.Tab(
             label=agent_ui_name,
@@ -133,29 +129,22 @@ class GradioUI:
 
         for agent_nav_tab in all_nav_tabs:
             agent_nav_tab.select(
-                fn=self.set_agent_view,
+                fn=self.get_nav_evt,
                 inputs=None,
                 outputs=outputs,
             )
 
-    def set_agent_view(
-        self, evt: Optional[gr.SelectData] = None, requested_agent_view: Optional[str] = None
-    ):
+    def get_nav_evt(self, evt: gr.SelectData):
+        output = self.set_agent_view(evt.value)
+        return output
+
+    def set_agent_view(self, requested_agent_view: str):
         output = []
         settings_ui_scale = 1
         chat_ui_scale = 1
-        if evt and requested_agent_view:
-            gr.Error("set_agent_view requires only one of evt or requested_agent_view")
-            return
-        if requested_agent_view:
-            new_agent_view = requested_agent_view
-        elif evt:
-            new_agent_view = evt.value
-        else:
-            new_agent_view = self.webui_sprite.config.current_agent_ui_name
 
         for agent_instance in self.required_module_instances:
-            if new_agent_view == agent_instance.MODULE_UI_NAME:
+            if requested_agent_view == agent_instance.MODULE_UI_NAME:
                 output.append(gr.Row(visible=True))
                 self.webui_sprite.config.current_agent_ui_name = agent_instance.MODULE_UI_NAME
                 settings_ui_scale = agent_instance.MODULE_UI.SETTINGS_PANEL_COL

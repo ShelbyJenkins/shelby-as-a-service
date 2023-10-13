@@ -1,14 +1,14 @@
-from decimal import Decimal
 from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
+import interfaces.webui.gradio_helpers as GradioHelper
 
 
-class VanillaLLMUI:
-    MODULE_NAME: str = "vanillallm_agent"
-    MODULE_UI_NAME: str = "VanillaLLM Agent"
-    SETTINGS_PANEL_COL = 2
-    CHAT_UI_PANEL_COL = 8
+class CEQUI:
+    MODULE_NAME: str = "ceq_agent"
+    MODULE_UI_NAME: str = "Context Enhanced Querying"
+    SETTINGS_PANEL_COL = 4
+    CHAT_UI_PANEL_COL = 6
 
     service: Type
 
@@ -20,7 +20,7 @@ class VanillaLLMUI:
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=f"Welcome to {VanillaLLMUI.MODULE_UI_NAME}",
+                placeholder=f"Welcome to {CEQUI.MODULE_UI_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
@@ -129,7 +129,6 @@ class VanillaLLMUI:
         with gr.Column():
             for service in agent_instance.REQUIRED_MODULES:
                 service_instance = getattr(agent_instance, service.MODULE_NAME, None)
-
                 service_instance.create_settings_ui()
 
     @classmethod

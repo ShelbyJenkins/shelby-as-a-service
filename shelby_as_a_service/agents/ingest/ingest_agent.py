@@ -1,17 +1,20 @@
 from typing import Any, Dict, List, Optional, Type
 
+from agents.ingest.ingest_ui import IngestUI
+
 # from modules.index.data_model import DataModels
 from app_config.app_base import AppBase
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
-from services.ingest.ingest_service import IngestService
+from services.document_loading.document_loading_service import DocLoadingService
 
 
 class IngestAgent(AppBase):
     MODULE_NAME: str = "ingest_agent"
-    MODULE_UI_NAME: str = "ingest_agent"
-    DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
-    REQUIRED_MODULES: List[Type] = [IngestService, DatabaseService]
+    MODULE_UI: Type = IngestUI
+    MODULE_UI_NAME: str = IngestUI.MODULE_UI_NAME
+    REQUIRED_MODULES: List[Type] = [DocLoadingService]
+    # REQUIRED_MODULES: List[Type] = [DocLoadingService, DatabaseService]
 
     class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = (
@@ -20,41 +23,20 @@ class IngestAgent(AppBase):
         llm_provider: str = "openai_llm"
         llm_model: str = "gpt-4"
         database_provider: str = "local_filestore_database"
+        doc_loading_provider: str = "generic_web_scraper"
 
     config: ModuleConfigModel
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config_file_dict={}, **kwargs):
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
 
-    def load_single_website(self, url):
-        data_source = DataSourceModel(
-            data_source_name=None,
-            data_source_description=None,
-            data_source_filter_url=None,
-            data_source_ingest_provider="generic_web_scraper",
-            data_source_database_provider="local_filestore_database",
-            data_source_url=url,
+        self.doc_loading_service = DocLoadingService(
+            module_config_file_dict, doc_loading_provider=self.config.doc_loading_provider
         )
-        data_domain = DataDomainModel(
-            data_domain_name="web_agent",
-            data_domain_database_provider="local_filestore_database",
-            data_domain_sources=[data_source],
+        self.database_service = DatabaseService(
+            module_config_file_dict, database_provider="local_filestore_database"
         )
-        documents_list = []
-        for data_source in data_domain.data_domain_sources:
-            documents_iterator = self.ingest_service.load(data_source)
-            if documents_iterator is not None:
-                try:
-                    documents_list = list(documents_iterator)
-                except TypeError:
-                    print(f"Error: Object {documents_iterator} is not iterable")
-            else:
-                print("Error: documents_iterator is None")
-            if documents_list:
-                self.database_service.write_documents_to_database(
-                    documents_list, data_domain, data_source
-                )
-                return documents_list
 
     def ingest_docs(self):
         # indexes = pinecone.list_indexes()
@@ -208,3 +190,33 @@ class IngestAgent(AppBase):
                         raise  # if exception in the last retry then raise it.
 
         self.log.print_and_log(f"Final index stats: {self.vectorstore.describe_index_stats()}")
+
+    # def load_single_website(self, url):
+    #     data_source = DataSourceModel(
+    #         data_source_name=None,
+    #         data_source_description=None,
+    #         data_source_filter_url=None,
+    #         data_source_ingest_provider="generic_web_scraper",
+    #         data_source_database_provider="local_filestore_database",
+    #         data_source_url=url,
+    #     )
+    #     data_domain = DataDomainModel(
+    #         data_domain_name="web_agent",
+    #         data_domain_database_provider="local_filestore_database",
+    #         data_domain_sources=[data_source],
+    #     )
+    #     documents_list = []
+    #     for data_source in data_domain.data_domain_sources:
+    #         documents_iterator = self.ingest_service.load(data_source)
+    #         if documents_iterator is not None:
+    #             try:
+    #                 documents_list = list(documents_iterator)
+    #             except TypeError:
+    #                 print(f"Error: Object {documents_iterator} is not iterable")
+    #         else:
+    #             print("Error: documents_iterator is None")
+    #         if documents_list:
+    #             self.database_service.write_documents_to_database(
+    #                 documents_list, data_domain, data_source
+    #             )
+    #             return documents_list

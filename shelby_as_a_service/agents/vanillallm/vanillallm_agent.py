@@ -11,8 +11,8 @@ from services.llm.llm_service import LLMService
 
 class VanillaLLM(AppBase):
     MODULE_NAME: str = "vanillallm_agent"
-    MODULE_UI_NAME: str = "VanillaLLM Agent"
     MODULE_UI = VanillaLLMUI
+    MODULE_UI_NAME: str = VanillaLLMUI.MODULE_UI_NAME
     DEFAULT_PROMPT_TEMPLATE_PATH: str = (
         "shelby_as_a_service/agents/vanillallm/vanillallm_prompt_templates.yaml"
     )
@@ -27,7 +27,6 @@ class VanillaLLM(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        # super().__init__()
         module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
         self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
 

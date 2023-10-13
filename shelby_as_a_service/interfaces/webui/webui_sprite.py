@@ -8,6 +8,7 @@ from typing import Any, Dict, Generator, List, Optional, Type, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from agents.ceq.ceq_agent import CEQAgent
+from agents.ingest.ingest_agent import IngestAgent
 from agents.vanillallm.vanillallm_agent import VanillaLLM
 from agents.web.web_agent import WebAgent
 from app_config.app_base import AppBase
@@ -20,7 +21,7 @@ from pydantic import BaseModel
 class WebUISprite(AppBase):
     MODULE_NAME: str = "webui_sprite"
     MODULE_UI_NAME: str = "webui_sprite"
-    REQUIRED_MODULES: List[Type] = [VanillaLLM]
+    REQUIRED_MODULES: List[Type] = [VanillaLLM, IngestAgent]
     # REQUIRED_MODULES: List[Type] = [VanillaLLM, CEQAgent, WebAgent]
 
     class ModuleConfigModel(BaseModel):
@@ -41,6 +42,9 @@ class WebUISprite(AppBase):
         self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
 
         self.vanillallm_agent = VanillaLLM(module_config_file_dict)
+        # self.ceq_agent = CEQAgent(module_config_file_dict)
+        self.ingest_agent = IngestAgent(module_config_file_dict)
+
         self.required_module_instances = self.get_list_of_module_instances(
             self, self.REQUIRED_MODULES
         )

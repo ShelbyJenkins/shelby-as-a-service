@@ -24,14 +24,8 @@ class LLMService(AppBase):
             extra = "ignore"
 
     config: ModuleConfigModel
-    llm_providers: Any
 
-    def __init__(
-        self,
-        config_file_dict={},
-        **kwargs,
-    ):
-        # super().__init__()
+    def __init__(self, config_file_dict={}, **kwargs):
         module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
         self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
 

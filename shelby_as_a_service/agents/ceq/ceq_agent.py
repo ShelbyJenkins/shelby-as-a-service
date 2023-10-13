@@ -1,38 +1,26 @@
-# region
-import json
 import re
-import traceback
 from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 
 import services.text_processing.text as text
-
-# from agents.action_agent import ActionAgent
+from agents.ceq.ceq_ui import CEQUI
+from agents.ingest.ingest_agent import IngestAgent
 from app_config.app_base import AppBase
-from interfaces.webui.ui.ceq_ui import CEQUI
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 from services.embedding.embedding_service import EmbeddingService
 from services.llm.llm_service import LLMService
 
-# endregion
-
 
 class CEQAgent(AppBase):
     MODULE_NAME: str = "ceq_agent"
-    MODULE_UI_NAME: str = "ceq_agent"
+    MODULE_UI_NAME: str = "Context Enhanced Querying"
     MODULE_UI = CEQUI
-    DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
-    REQUIRED_MODULES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
+    DEFAULT_PROMPT_TEMPLATE_PATH: str = "shelby_as_a_service/agents/ceq/ceq_main_prompt.yaml"
+    REQUIRED_MODULES: List[Type] = [LLMService, IngestAgent]
+    # REQUIRED_MODULES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
 
     class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
-        # data_domain_name: str = "base"
-        data_domain_name: Optional[str] = None
-        index_name: str = "base"
-        llm_provider: str = "openai_llm"
-        llm_model: str = "gpt-4"
-        embedding_provider: str = "openai_embedding"
-        database_provider: str = "pinecone_database"
 
         data_domain_constraints_enabled: bool = False
         data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
@@ -43,69 +31,45 @@ class CEQAgent(AppBase):
         docs_max_total_tokens: int = 2500
         docs_max_used: int = 5
 
+        class Config:
+            extra = "ignore"
+
     config: ModuleConfigModel
 
-    def __init__(self):
-        super().__init__()
-        self.user_prompt_template_path = None
+    def __init__(self, config_file_dict={}, **kwargs):
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
 
-    def create_streaming_chat(
-        self,
-        query,
-        user_prompt_template_path: Optional[str] = None,
-        llm_provider=None,
-        llm_model=None,
-        **kwargs,
-    ) -> Generator[List[str], None, None]:
-        prompt_template_path, prepared_documents = self.run_context_enriched_query(
-            query, user_prompt_template_path
+        self.ingest_agent = IngestAgent(
+            module_config_file_dict,
+            llm_provider="openai_llm",
+            model="gpt-4",
+            database_provider="local_filestore_database",
         )
-        if llm_model:
-            self.llm_model = llm_model
-        yield from self.llm_service.create_streaming_chat(
-            query=query,
-            prompt_template_path=prompt_template_path,
-            documents=prepared_documents,
-            llm_provider=llm_provider,
-            llm_model=llm_model,
+        self.llm_service = LLMService(
+            module_config_file_dict, llm_provider="openai_llm", model="gpt-4"
         )
+        # self.embedding_service = EmbeddingService(
+        #     module_config_file_dict, llm_provider="openai_embedding", model="gpt-4"
+        # )
+        # self.database_service = DatabaseService(
+        #     module_config_file_dict, llm_provider="pinecone_database"
+        # )
 
-    def create_chat(
-        self,
-        query,
-        user_prompt_template_path=None,
-        llm_provider=None,
-        llm_model=None,
-        **kwargs,
-    ) -> Optional[Dict[str, str]]:
-        prompt_template_path, prepared_documents = self.run_context_enriched_query(
-            query, user_prompt_template_path
-        )
-        if llm_model:
-            self.llm_model = llm_model
-        llm_response = self.llm_service.create_chat(
-            query=query,
-            prompt_template_path=prompt_template_path,
-            documents=prepared_documents,
-            llm_provider=llm_provider,
-            llm_model=llm_model,
-        )
-        parsed_response = self.ceq_append_meta(llm_response, prepared_documents)
-        self.log.print_and_log(
-            f"LLM response with appended metadata: {json.dumps(parsed_response, indent=4)}"
+        self.required_module_instances = self.get_list_of_module_instances(
+            self, self.REQUIRED_MODULES
         )
 
-        return parsed_response
+    def run_chat(self, chat_in) -> Generator[List[str], None, None]:
+        self.log.print_and_log(f"Running query: {chat_in}")
 
-    def run_context_enriched_query(
-        self, query, user_prompt_template_path=None
-    ) -> Tuple[str, List[Any]]:
-        if user_prompt_template_path:
-            prompt_template_path = user_prompt_template_path
-        else:
-            prompt_template_path = self.DEFAULT_PROMPT_TEMPLATE_PATH
-        query = query
+        response = self.llm_service.create_chat(
+            query=chat_in,
+            prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
+        )
+        yield from response
 
+    def run_context_enriched_query(self, chat_in) -> Generator[List[str], None, None]:
         # try:
 
         # if self.data_domain_constraints_enabled:
