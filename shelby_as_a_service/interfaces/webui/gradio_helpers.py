@@ -3,62 +3,13 @@ from typing import Any, Dict, List, Optional
 import gradio as gr
 
 
-def get_class_ui_name(ui_class) -> Optional[str]:
-    if not isinstance(ui_class, type):
-        ui_class = type(ui_class)
-    base_class = ui_class.__bases__[0]
-    class_ui_name_type = getattr(base_class, "CLASS_UI_NAME_TYPE", None)
-    if class_ui_name_type:
-        return getattr(ui_class, class_ui_name_type, None)
-    else:
-        return None
-
-
-def get_class_name(ui_class) -> Optional[str]:
-    if not isinstance(ui_class, type):
-        ui_class = type(ui_class)
-    base_class = ui_class.__bases__[0]
-    class_name_type = getattr(base_class, "CLASS_NAME_TYPE", None)
-    if class_name_type:
-        return getattr(ui_class, class_name_type, None)
-    else:
-        return None
-
-
-def agent_select_status_message(webui_sprite, chat_tab_agent_dropdown):
-    agent = webui_sprite.get_selected_agent(chat_tab_agent_dropdown)
-    if message := getattr(agent, "agent_select_status_message", None):
-        return message
-    raise gr.Error("Bad value for agent_select_status_message!")
-
-
-def get_setting_type(setting_class) -> Optional[List[Any]]:
-    if provider_type := getattr(setting_class, "PROVIDER_TYPE", None):
-        return provider_type
-    if type_model := getattr(setting_class, "TYPE_MODEL", None):
-        return type_model
-
-    return None
-
-
-def dropdown_default_value(agent_instance, setting_class):
-    setting_type = get_setting_type(setting_class)
-    if setting_type:
-        if default_choice := getattr(agent_instance.config, setting_type, None):
-            return default_choice
-    choices = list_available(setting_class)
-    if choices:
-        return choices[0]
-    return None
-
-
 def list_available(class_model) -> Optional[List[Any]]:
     if available_providers := getattr(class_model, "REQUIRED_MODULES", None):
         return [provider.MODULE_NAME for provider in available_providers]
     if available_models := getattr(class_model, "AVAILABLE_MODELS", None):
         return [modes.MODEL_NAME for modes in available_models]
     if available_agents := getattr(class_model, "REQUIRED_MODULES", None):
-        return [agent.AGENT_UI_NAME for agent in available_agents]
+        return [agent.MODULE_UI_NAME for agent in available_agents]
     return None
 
 
@@ -69,17 +20,17 @@ def dropdown_choices(class_model):
     return None
 
 
-def check_for_web_data(web_data_added):
-    if web_data_added:
-        return True
-    raise gr.Error("No valid web data found!")
+def get_list_of_module_ui_names(available_modules):
+    list_of_module_ui_name = []
+    for module in available_modules:
+        list_of_module_ui_name.append(module.MODULE_UI_NAME)
+    return list_of_module_ui_name
 
 
-def comp_values_to_dict(gradio_ui, *values) -> Dict[str, Any]:
-    agent_name = values[-1]
-    ui_type = values[-2]
-    comps_keys = gradio_ui["gradio_agents"][agent_name][ui_type]["components"].keys()
-    return {k: v for k, v in zip(comps_keys, values)}
+def get_module_ui_name_from_str(available_modules, requested_module):
+    for module in available_modules:
+        if module.MODULE_NAME == requested_module:
+            return module.MODULE_UI_NAME
 
 
 # # Interface functions
@@ -118,7 +69,7 @@ def comp_values_to_dict(gradio_ui, *values) -> Dict[str, Any]:
 #         class_instance = getattr(self, settings_components[0])
 
 #     AppManager.update_app_json_from_file(
-#         self.app, self.app.app_name, class_instance
+#         self.app, self.app_name, class_instance
 #     )
 #     output_message = "Config settings saved to file."
 
@@ -136,7 +87,7 @@ def comp_values_to_dict(gradio_ui, *values) -> Dict[str, Any]:
 #     for component in secrets_components:
 #         output.append(component.update(value="", placeholder=component.placeholder))
 
-#     AppManager.create_update_env_file(self.app.app_name, self.secrets)
+#     AppManager.create_update_env_file(self.app_name, self.secrets)
 
 #     output_message = "Secrets saved to .env file and loaded into memory."
 #     self._log(output_message)
@@ -180,25 +131,25 @@ def comp_values_to_dict(gradio_ui, *values) -> Dict[str, Any]:
 #         if load_app_name not in self.existing_app_names_:
 #             output_message = f"Can't find a app named: '{load_app_name}'"
 #             raise gr.Error(output_message)
-#         if load_app_name == self.app.app_name:
+#         if load_app_name == self.app_name:
 #             output_message = f"app already loaded: '{load_app_name}'"
 #             raise gr.Error(output_message)
-#         self.app.app_name = load_app_name
+#         self.app_name = load_app_name
 
-#     self.app.setup_app(self.app)
+#     self.setup_app(self.app)
 
 #     for attr, _ in vars(self.model_).items():
-#         val = getattr(self.app.webui_sprite
+#         val = getattr(self.webui_sprite
 # , attr, None)
 #         setattr(self, attr, val)
 
 #     for service in self.required_services_:
 #         service_name = service.model_.service_name_
-#         service_instance = getattr(self.app.webui_sprite
+#         service_instance = getattr(self.webui_sprite
 # , service_name)
 #         setattr(self, service_name, service_instance)
 
-#     output_message = f"app loaded: '{self.app.app_name}'"
+#     output_message = f"app loaded: '{self.app_name}'"
 #     self._log(output_message)
 
 # def _create_new_app(self, new_app_name):

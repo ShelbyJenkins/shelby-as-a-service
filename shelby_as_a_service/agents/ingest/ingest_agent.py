@@ -1,19 +1,19 @@
 from typing import Any, Dict, List, Optional, Type
 
 # from modules.index.data_model import DataModels
-from agents.agent_base import AgentBase
+from app_config.app_base import AppBase
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 from services.ingest.ingest_service import IngestService
 
 
-class IngestAgent(AgentBase):
+class IngestAgent(AppBase):
     MODULE_NAME: str = "ingest_agent"
-    AGENT_UI_NAME: str = "ingest_agent"
+    MODULE_UI_NAME: str = "ingest_agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
     REQUIRED_MODULES: List[Type] = [IngestService, DatabaseService]
 
-    class AgentConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = (
             "Load a URL Data Tab, and we'll access it and use it to generate a response."
         )
@@ -21,7 +21,7 @@ class IngestAgent(AgentBase):
         llm_model: str = "gpt-4"
         database_provider: str = "local_filestore_database"
 
-    config: AgentConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
         super().__init__()

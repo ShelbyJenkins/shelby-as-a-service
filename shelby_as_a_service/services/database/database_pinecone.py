@@ -11,7 +11,7 @@ class PineconeDatabase(ProviderBase):
     MODULE_UI_NAME: str = "pinecone_database"
     REQUIRED_SECRETS: List[str] = ["pinecone_api_key"]
 
-    class ProviderConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         index_env: str = "us-central1-gcp"
         embedding_max_chunk_size: int = 8191
         embedding_batch_size: int = 100
@@ -32,14 +32,14 @@ class PineconeDatabase(ProviderBase):
             "date_indexed",
         ]
 
-    config: ProviderConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
-        super().__init__()
+        self.set_secrets(self)
 
     def setup_index(self, pinecone_api_key=None):
         if pinecone_api_key is None:
-            pinecone_api_key = self.app.secrets["pinecone_api_key"]
+            pinecone_api_key = self.secrets["pinecone_api_key"]
 
         self.index_name = "shelby-as-a-service"
         self.index_env = "us-central1-gcp"

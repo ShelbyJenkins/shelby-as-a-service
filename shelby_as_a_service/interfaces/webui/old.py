@@ -311,7 +311,7 @@ class GradioInterface:
     def create_secrets_components(self):
         secrets_components = []
 
-        # for secret_name, secret in self.app.secrets.items():
+        # for secret_name, secret in self.secrets.items():
         #     if secret in [None, ""]:
         #         placeholder = ""
         #     else:

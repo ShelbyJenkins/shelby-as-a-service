@@ -2,10 +2,10 @@ import os
 from typing import Any, List, Type
 
 import services.text_processing.text as TextProcess
+from app_config.app_base import AppBase
 from pydantic import BaseModel
 from services.database.database_pinecone import PineconeDatabase
 from services.provider_base import ProviderBase
-from services.service_base import ServiceBase
 
 
 class LocalFileStoreDatabase(ProviderBase):
@@ -13,17 +13,17 @@ class LocalFileStoreDatabase(ProviderBase):
     MODULE_UI_NAME: str = "local_filestore_database"
     REQUIRED_SECRETS: List[str] = []
 
-    class ProviderConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         max_response_tokens: int = 1
 
-    config: ProviderConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
         super().__init__()
 
     def _write_documents_to_database(self, documents, data_domain, data_source):
         data_domain_name_file_path = os.path.join(
-            self.app.local_index_dir,
+            self.local_index_dir,
             "outputs",
             data_domain.data_domain_name,
         )
@@ -40,20 +40,20 @@ class LocalFileStoreDatabase(ProviderBase):
             print(f"Document written to: {file_path}")
 
 
-class DatabaseService(ServiceBase):
+class DatabaseService(AppBase):
     MODULE_NAME: str = "database_service"
     MODULE_UI_NAME: str = "database_service"
     PROVIDER_TYPE: str = "database_provider"
     DEFAULT_PROVIDER: Type = LocalFileStoreDatabase
     REQUIRED_MODULES: List[Type] = [PineconeDatabase, LocalFileStoreDatabase]
 
-    class ServiceConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
 
-    config: ServiceConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
-        super().__init__()
+        self.set_secrets(self)
 
     def query_index(
         self,

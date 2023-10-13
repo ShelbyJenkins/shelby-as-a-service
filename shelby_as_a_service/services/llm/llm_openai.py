@@ -7,6 +7,7 @@ import interfaces.webui.gradio_helpers as GradioHelper
 import openai
 import services.prompt_templates.prompt_templates as PromptTemplates
 import services.text_processing.text as TextProcess
+from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel, Field
 from services.provider_base import ProviderBase
 from typing_extensions import Annotated
@@ -34,10 +35,8 @@ class OpenAILLM(ProviderBase):
         "gpt-3.5-turbo",
         "gpt-3.5-turbo-16k",
     ]
-    DEFAULT_MODEL: str = "gpt-3.5-turbo"
-    TYPE_MODEL: str = "llm_model"
 
-    class ProviderConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         model: str = "gpt-3.5-turbo"
         frequency_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
         max_tokens: Annotated[int, Field(ge=0, le=65536)] = 16384
@@ -49,13 +48,58 @@ class OpenAILLM(ProviderBase):
         class Config:
             extra = "ignore"
 
-    config: ProviderConfigModel
+    config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
         module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ProviderConfigModel(**{**kwargs, **module_config_file_dict})
+        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
+        self.set_secrets(self)
 
-        # super().__init__()
+    def create_chat(
+        self, query, prompt_template_path=None, documents=None, model=None
+    ) -> Union[Generator[List[str], None, None], List[str]]:
+        prompt, model, request_token_count = self._prep_chat(
+            query=query,
+            prompt_template_path=prompt_template_path,
+            documents=documents,
+            model=model,
+        )
+
+        if self.config.stream:
+            yield from self._create_streaming_chat(prompt, request_token_count, model)
+        else:
+            response = openai.ChatCompletion.create(
+                api_key=self.secrets["openai_api_key"],
+                messages=prompt,
+                model=model.MODEL_NAME,
+                frequency_penalty=self.config.frequency_penalty,
+                max_tokens=self.config.max_tokens,
+                presence_penalty=self.config.presence_penalty,
+                stream=False,
+                temperature=self.config.temperature,
+                top_p=self.config.top_p,
+            )
+
+            (
+                prompt_response,
+                total_prompt_tokens,
+                total_completion_tokens,
+                token_count,
+            ) = self._check_response(response, model)
+
+            if not prompt_response:
+                return None
+
+            request_token_string = f"Request token count: {total_prompt_tokens}"
+            response_token_string = f"Response token count: {total_completion_tokens}"
+            total_token_string = f"Total token count: {token_count}"
+
+            yield [
+                prompt_response,
+                request_token_string,
+                response_token_string,
+                total_token_string,
+            ]
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
@@ -89,10 +133,10 @@ class OpenAILLM(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        self.app.total_cost += request_cost
-        self.app.last_request_cost = request_cost
+        self.total_cost += request_cost
+        self.last_request_cost = request_cost
         print(f"Request cost: ${format(request_cost, 'f')}")
-        print(f"Total cost: ${format(self.app.total_cost, 'f')}")
+        print(f"Total cost: ${format(self.total_cost, 'f')}")
 
     def _calculate_cost_streaming(self, total_token_count, model):
         # Convert numbers to Decimal
@@ -106,63 +150,15 @@ class OpenAILLM(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        self.app.total_cost += request_cost
-        self.app.last_request_cost = request_cost
-        print(f"Total cost: ${format(self.app.total_cost, 'f')}")
-
-    def _create_chat(
-        self, query, prompt_template_path=None, documents=None, llm_model=None
-    ) -> Optional[str]:
-        prompt, model, _ = self._prep_chat(
-            query=query,
-            prompt_template_path=prompt_template_path,
-            documents=documents,
-            llm_model=llm_model,
-        )
-        response = openai.ChatCompletion.create(
-            api_key=self.app.secrets["openai_api_key"],
-            messages=prompt,
-            model=model.MODEL_NAME,
-            frequency_penalty=self.config.frequency_penalty,
-            max_tokens=self.config.max_tokens,
-            presence_penalty=self.config.presence_penalty,
-            stream=False,
-            temperature=self.config.temperature,
-            top_p=self.config.top_p,
-        )
-
-        (
-            prompt_response,
-            total_prompt_tokens,
-            total_completion_tokens,
-            token_count,
-        ) = self._check_response(response, model)
-
-        if not prompt_response:
-            return None
-
-        # request_token_string = f"Request token count: {total_prompt_tokens}"
-        # response_token_string = f"Response token count: {total_completion_tokens}"
-        # total_token_string = f"Total token count: {total_completion_tokens}"
-
-        return prompt_response
+        self.total_cost += request_cost
+        self.last_request_cost = request_cost
+        print(f"Total cost: ${format(self.total_cost, 'f')}")
 
     def _create_streaming_chat(
-        self, query, prompt_template_path=None, documents=None, llm_model=None
+        self, prompt, request_token_count, model
     ) -> Generator[List[str], None, None]:
-        prompt, model, request_token_count = self._prep_chat(
-            query=query,
-            prompt_template_path=prompt_template_path,
-            documents=documents,
-            llm_model=llm_model,
-        )
-        if prompt is None or model is None or request_token_count is None:
-            raise ValueError(
-                f"Error with input values - prompt: {prompt}, model: {model}, request_token_count: {request_token_count}"
-            )
-
         stream = openai.ChatCompletion.create(
-            api_key=self.app.secrets["openai_api_key"],
+            api_key=self.secrets["openai_api_key"],
             messages=prompt,
             model=model.MODEL_NAME,
             frequency_penalty=self.config.frequency_penalty,
@@ -202,13 +198,12 @@ class OpenAILLM(ProviderBase):
                 )
 
     def _prep_chat(
-        self, query, prompt_template_path=None, documents=None, llm_model=None
+        self, query, prompt_template_path=None, documents=None, model=None
     ) -> Tuple[List[Dict[str, str]], OpenAILLMModel, int]:
-        model = self.get_model(requested_model_name=llm_model)
+        model = self.get_model(self, requested_model_name=model)
 
         prompt = PromptTemplates.create_openai_prompt(
             query=query,
-            prompt_template_dir=self.PROMPT_TEMPLATE_DIR,
             prompt_template_path=prompt_template_path,
             documents=documents,
         )
@@ -219,13 +214,18 @@ class OpenAILLM(ProviderBase):
             content = entry.get("content", "")
             result += f"{role}: {content}\n"
         request_token_count = TextProcess.tiktoken_len(result, encoding_model=model.MODEL_NAME)
+
+        if prompt is None or model is None or request_token_count is None:
+            raise ValueError(
+                f"Error with input values - prompt: {prompt}, model: {model}, request_token_count: {request_token_count}"
+            )
         return prompt, model, request_token_count
 
     def create_ui(self):
         components = {}
         with gr.Accordion(label="OpenAI", open=False):
             with gr.Column():
-                components["llm_model"] = gr.Dropdown(
+                components["model"] = gr.Dropdown(
                     value=self.config.model,
                     choices=GradioHelper.dropdown_choices(OpenAILLM),
                     label="OpenAI LLM Model",
@@ -277,5 +277,5 @@ class OpenAILLM(ProviderBase):
                         label="Top P",
                         interactive=True,
                     )
-
+            GradioUI.create_settings_event_listener(self, components)
         return components

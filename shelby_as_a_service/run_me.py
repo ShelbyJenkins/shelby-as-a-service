@@ -22,8 +22,8 @@ def main():
         app_name = "base"
 
     print(f"app.py is being run as: {app_name}")
-    app = AppBase.create_app(app_name)
-    app.run_sprites()
+    AppBase.setup_app(app_name)
+    AppBase.run_sprites()
 
 
 if __name__ == "__main__":

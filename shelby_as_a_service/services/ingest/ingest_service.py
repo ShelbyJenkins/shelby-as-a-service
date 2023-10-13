@@ -4,6 +4,7 @@ import traceback
 from typing import Any, Iterator, List, Type
 
 import services.text_processing.text as TextProcess
+from app_config.app_base import AppBase
 from bs4 import BeautifulSoup
 from langchain.document_loaders import (
     GitbookLoader,
@@ -14,7 +15,6 @@ from langchain.document_loaders import (
 from langchain.schema import Document
 from pydantic import BaseModel, Field
 from services.provider_base import ProviderBase
-from services.service_base import ServiceBase
 
 
 class GenericRecursiveWebScraper(ProviderBase):
@@ -22,10 +22,10 @@ class GenericRecursiveWebScraper(ProviderBase):
     MODULE_UI_NAME: str = "generic_recursive_web_scraper"
     REQUIRED_SECRETS: List[str] = []
 
-    class ProviderConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
 
-    config: ProviderConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
         super().__init__()
@@ -49,10 +49,10 @@ class GenericWebScraper(ProviderBase):
     MODULE_UI_NAME: str = "generic_web_scraper"
     REQUIRED_SECRETS: List[str] = []
 
-    class ProviderConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
 
-    config: ProviderConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
         super().__init__()
@@ -179,7 +179,7 @@ class GenericWebScraper(ProviderBase):
 #         return text_documents
 
 
-class IngestService(ServiceBase):
+class IngestService(AppBase):
     MODULE_NAME: str = "ingest_service"
     MODULE_UI_NAME: str = "ingest_service"
     PROVIDER_TYPE: str = "ingest_provider"
@@ -191,10 +191,10 @@ class IngestService(ServiceBase):
         # LoadTextFromFile,
     ]
 
-    class ServiceConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
 
-    config: ServiceConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
         super().__init__()

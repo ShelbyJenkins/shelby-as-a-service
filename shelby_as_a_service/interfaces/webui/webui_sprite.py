@@ -10,20 +10,20 @@ import interfaces.webui.gradio_helpers as GradioHelper
 from agents.ceq.ceq_agent import CEQAgent
 from agents.vanillallm.vanillallm_agent import VanillaLLM
 from agents.web.web_agent import WebAgent
-from interfaces.sprite_base import SpriteBase
+from app_config.app_base import AppBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 
 # endregion
 
 
-class WebUISprite(SpriteBase):
+class WebUISprite(AppBase):
     MODULE_NAME: str = "webui_sprite"
     MODULE_UI_NAME: str = "webui_sprite"
     REQUIRED_MODULES: List[Type] = [VanillaLLM]
     # REQUIRED_MODULES: List[Type] = [VanillaLLM, CEQAgent, WebAgent]
 
-    class SpriteConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         default_local_app_enabled: bool = False
         default_local_app_name: Optional[str] = None
         local_message_start: str = "Running request... relax, chill, and vibe a minute."
@@ -33,56 +33,19 @@ class WebUISprite(SpriteBase):
         class Config:
             extra = "ignore"
 
-    config: SpriteConfigModel
+    config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
         # super().__init__()
         module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.SpriteConfigModel(**{**kwargs, **module_config_file_dict})
+        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
 
         self.vanillallm_agent = VanillaLLM(module_config_file_dict)
+        self.required_module_instances = self.get_list_of_module_instances(
+            self, self.REQUIRED_MODULES
+        )
 
-        # self.gradio_ui = GradioUI(self)
-
-    def run_chat(self, *comps_state) -> Union[Generator[List[str], None, None], List[str]]:
-        ui_state = GradioHelper.comp_values_to_dict(self.gradio_ui, *comps_state)
-        documents = None
-
-        agent = self.get_selected_agent(self.config.current_agent_ui_name)
-        if agent is None:
-            raise gr.Error("Bad value for chat_tab_agent_dropdown!")
-        if agent.MODULE_NAME == "web_agent":
-            if content := ui_state["web_data_content"]:
-                documents = content
-            else:
-                raise gr.Error("Bad value for web_data_content!")
-        # try:
-        if ui_state.get("stream_chat", False):
-            return agent.create_chat(
-                query=ui_state["chat_tab_in_text"],
-                user_prompt_template_path=None,
-                documents=documents,
-                llm_provider=agent.config.llm_provider,
-                llm_model=agent.config.llm_model,
-            )
-        else:
-            yield from agent.create_streaming_chat(
-                query=ui_state["chat_tab_in_text"],
-                user_prompt_template_path=None,
-                documents=documents,
-                llm_provider=agent.config.llm_provider,
-                llm_model=agent.config.llm_model,
-            )
-            return None
-
-        # except Exception as e:
-        #     print(f"An error occurred: {str(e)}")
-        #     raise gr.Error(f"Error: {e}") from e
-
-    def load_single_website(self, *comps_state) -> List[str]:
-        comps_state = GradioHelper.comp_values_to_dict(self.gradio_ui, *comps_state)
-
-        return WebAgent(self).load_single_website(comps_state)
+        self.gradio_ui = GradioUI(self)
 
     def _log(self, message):
         self.log.print_and_log_gradio(message)
@@ -90,11 +53,3 @@ class WebUISprite(SpriteBase):
 
     def run_sprite(self):
         self.gradio_ui.create_gradio_interface()
-        # asyncio.run(self.check_for_updates())
-
-    # async def check_for_updates(self):
-    #     while True:
-    #         await asyncio.sleep(5)  # non-blocking sleep
-    #         if self.gradio_ui["update_settings_file"]:
-    #             self.gradio_ui["update_settings_file"] = False
-    #             self.update_app_config_file_from_ui()

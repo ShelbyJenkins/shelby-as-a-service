@@ -1,78 +1,49 @@
-from typing import Any, Dict, Generator, List, Optional, Type
+import types
+from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from agents.agent_base import AgentBase
 from agents.vanillallm.vanillallm_ui import VanillaLLMUI
+from app_config.app_base import AppBase
 from pydantic import BaseModel
 from services.llm.llm_service import LLMService
 
 
-class VanillaLLM(AgentBase):
+class VanillaLLM(AppBase):
     MODULE_NAME: str = "vanillallm_agent"
-    AGENT_UI = VanillaLLMUI
-    DEFAULT_PROMPT_TEMPLATE_PATH: str = "vanillallm_prompt.yaml"
+    MODULE_UI_NAME: str = "VanillaLLM Agent"
+    MODULE_UI = VanillaLLMUI
+    DEFAULT_PROMPT_TEMPLATE_PATH: str = (
+        "shelby_as_a_service/agents/vanillallm/vanillallm_prompt_templates.yaml"
+    )
     REQUIRED_MODULES: List[Type] = [LLMService]
 
-    class AgentConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "EZPZ"
-        llm_provider: str = "openai_llm"
-        llm_model: str = "gpt-4"
 
         class Config:
             extra = "ignore"
 
-    config: AgentConfigModel
+    config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
         # super().__init__()
         module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.AgentConfigModel(**{**kwargs, **module_config_file_dict})
+        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
 
-        self.llm_service = LLMService(module_config_file_dict)
-
-    def create_streaming_chat(
-        self,
-        query,
-        user_prompt_template_path=None,
-        documents=None,
-        llm_provider=None,
-        llm_model=None,
-    ) -> Generator[List[str], None, None]:
-        self.log.print_and_log(f"Running query: {query}")
-        if user_prompt_template_path:
-            prompt_template_path = user_prompt_template_path
-        else:
-            prompt_template_path = self.DEFAULT_PROMPT_TEMPLATE_PATH
-
-        self.log.print_and_log("Sending prompt to LLM")
-        yield from self.llm_service.create_streaming_chat(
-            query=query,
-            prompt_template_path=prompt_template_path,
-            documents=documents,
-            llm_provider=llm_provider,
-            llm_model=llm_model,
+        self.llm_service = LLMService(
+            module_config_file_dict, llm_provider="openai_llm", model="gpt-4"
         )
 
-    def create_chat(
-        self,
-        query,
-        user_prompt_template_path=None,
-        documents=None,
-        llm_provider=None,
-        llm_model=None,
-    ) -> Optional[str]:
-        self.log.print_and_log(f"Running query: {query}")
-        if user_prompt_template_path:
-            prompt_template_path = user_prompt_template_path
-        else:
-            prompt_template_path = self.DEFAULT_PROMPT_TEMPLATE_PATH
-
-        self.log.print_and_log("Sending prompt to LLM")
-        return self.llm_service.create_chat(
-            query=query,
-            prompt_template_path=prompt_template_path,
-            documents=documents,
-            llm_provider=llm_provider,
-            llm_model=llm_model,
+        self.required_module_instances = self.get_list_of_module_instances(
+            self, self.REQUIRED_MODULES
         )
+
+    def run_chat(self, chat_in) -> Generator[List[str], None, None]:
+        self.log.print_and_log(f"Running query: {chat_in}")
+
+        response = self.llm_service.create_chat(
+            query=chat_in,
+            prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
+        )
+        yield from response

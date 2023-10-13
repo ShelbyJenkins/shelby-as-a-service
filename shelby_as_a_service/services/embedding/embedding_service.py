@@ -3,22 +3,22 @@ from decimal import Decimal
 from typing import Any, List, Type
 
 import services.text_processing.text as text
+from app_config.app_base import AppBase
 from pydantic import BaseModel
 from services.embedding.embedding_openai import OpenAIEmbedding
-from services.service_base import ServiceBase
 
 
-class EmbeddingService(ServiceBase):
+class EmbeddingService(AppBase):
     MODULE_NAME: str = "embedding_service"
     MODULE_UI_NAME: str = "embedding_service"
     PROVIDER_TYPE: str = "embedding_provider"
     DEFAULT_PROVIDER: Type = OpenAIEmbedding
     REQUIRED_MODULES: List[Type] = [OpenAIEmbedding]
 
-    class ServiceConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
 
-    config: ServiceConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
         super().__init__()

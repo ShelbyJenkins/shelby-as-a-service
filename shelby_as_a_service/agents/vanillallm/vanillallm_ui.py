@@ -2,26 +2,25 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
-from services.llm.llm_service import LLMService, OpenAILLM
 
 
 class VanillaLLMUI:
+    MODULE_NAME: str = "vanillallm_agent"
+    MODULE_UI_NAME: str = "VanillaLLM Agent"
     SETTINGS_PANEL_COL = 2
     CHAT_UI_PANEL_COL = 8
-    AGENT_UI_NAME: str = "VanillaLLM Agent"
 
     service: Type
 
-    @staticmethod
-    def create_chat_ui(agent_instance):
+    @classmethod
+    def create_chat_ui(cls, agent_instance):
         components = {}
 
         with gr.Column(elem_classes="chat_ui_col"):
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=f"Welcome to {agent_instance.MODULE_NAME}",
+                placeholder=f"Welcome to {VanillaLLMUI.MODULE_UI_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
@@ -121,6 +120,8 @@ class VanillaLLMUI:
                                     show_label=False,
                                 )
 
+        cls.create_event_handlers(agent_instance, components)
+
         return components
 
     @staticmethod
@@ -135,44 +136,37 @@ class VanillaLLMUI:
 
         return components
 
-    def create_event_handlers(
-        self,
-        chat_ui_components,
-        chat_ui_components_state,
-    ):
+    @classmethod
+    def create_event_handlers(cls, agent_instance, components):
+        def get_spend():
+            req = f"Request price: ${round(agent_instance.last_request_cost, 4)}"
+            agent_instance.last_request_cost = Decimal("0")
+            tot = f"Total spend: ${round(agent_instance.total_cost, 4)}"
+            return [req, tot]
+
         gr.on(
             triggers=[
-                chat_ui_components["chat_tab_generate_button"].click,
-                chat_ui_components["chat_tab_in_text"].submit,
+                components["chat_tab_generate_button"].click,
+                components["chat_tab_in_text"].submit,
             ],
-            fn=lambda *comp_vals: comp_vals,
-            inputs=list(chat_ui_components.values()),
-            outputs=list(chat_ui_components_state.values()),
-        ).then(
             fn=lambda: "Proooooomptering",
-            outputs=chat_ui_components["chat_tab_status_text"],
+            outputs=components["chat_tab_status_text"],
         ).then(
-            fn=self.webui_sprite.run_chat,
-            inputs=list(chat_ui_components_state.values()),
+            fn=agent_instance.run_chat,
+            inputs=components["chat_tab_in_text"],
             outputs=[
-                chat_ui_components["chat_tab_out_text"],
-                chat_ui_components["chat_tab_in_token_count"],
-                chat_ui_components["chat_tab_out_token_count"],
-                chat_ui_components["chat_tab_total_token_count"],
+                components["chat_tab_out_text"],
+                components["chat_tab_in_token_count"],
+                components["chat_tab_out_token_count"],
+                components["chat_tab_total_token_count"],
             ],
         ).success(
             fn=lambda: "",
-            outputs=chat_ui_components["chat_tab_in_text"],
-        ).success(
-            fn=self.get_spend,
+            outputs=components["chat_tab_in_text"],
+        ).then(
+            fn=get_spend,
             outputs=[
-                chat_ui_components["chat_tab_response_cost"],
-                chat_ui_components["chat_tab_total_cost"],
+                components["chat_tab_response_cost"],
+                components["chat_tab_total_cost"],
             ],
         )
-
-    def get_spend(self):
-        req = f"Request price: ${round(self.webui_sprite.app.last_request_cost, 4)}"
-        self.webui_sprite.app.last_request_cost = Decimal("0")
-        tot = f"Total spend: ${round(self.webui_sprite.app.total_cost, 4)}"
-        return [req, tot]

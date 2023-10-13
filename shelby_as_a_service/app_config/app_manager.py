@@ -47,9 +47,7 @@ class AppManager:
     def create_update_env_file(app_name, secrets=None):
         dir_path = f"apps/{app_name}"
         dot_env_dest_path = os.path.join(dir_path, ".env")
-        dot_env_source_path = (
-            "shelby_as_a_service/app/deployments/template/template.env"
-        )
+        dot_env_source_path = "shelby_as_a_service/app_config/template/template.env"
 
         # Helper function to read env file into a dictionary
         def read_env_to_dict(filepath):
@@ -103,23 +101,14 @@ class AppManager:
         app_name = "base"
         # In the case of local app we check for a default_local_app
         app_config = AppManager.load_app_file("base")
-        default_settings = (
-            app_config.get("sprites", {}).get("webui_sprite", {}).get("optional", {})
-        )
+        default_settings = app_config.get("sprites", {}).get("webui_sprite", {}).get("optional", {})
         if default_settings.get("default_app_enabled") is True:
             existing_app_names = AppManager.check_for_existing_apps()
-            default_local_app_name = default_settings.get(
-                "default_local_app_name", None
-            )
-            if (
-                default_local_app_name is not None
-                and default_local_app_name in existing_app_names
-            ):
+            default_local_app_name = default_settings.get("default_local_app_name", None)
+            if default_local_app_name is not None and default_local_app_name in existing_app_names:
                 app_name = default_local_app_name
             else:
-                print(
-                    f'Default app "{default_local_app_name}" not found. Loading "base" instead.'
-                )
+                print(f'Default app "{default_local_app_name}" not found. Loading "base" instead.')
 
         return app_name
 

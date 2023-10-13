@@ -7,7 +7,6 @@ from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 import services.text_processing.text as text
 
 # from agents.action_agent import ActionAgent
-from agents.agent_base import AgentBase
 from app_config.app_base import AppBase
 from interfaces.webui.ui.ceq_ui import CEQUI
 from pydantic import BaseModel
@@ -18,14 +17,14 @@ from services.llm.llm_service import LLMService
 # endregion
 
 
-class CEQAgent(AgentBase):
+class CEQAgent(AppBase):
     MODULE_NAME: str = "ceq_agent"
-    AGENT_UI_NAME: str = "ceq_agent"
-    AGENT_UI = CEQUI
+    MODULE_UI_NAME: str = "ceq_agent"
+    MODULE_UI = CEQUI
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "ceq_main_prompt.yaml"
     REQUIRED_MODULES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
 
-    class AgentConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
         # data_domain_name: str = "base"
         data_domain_name: Optional[str] = None
@@ -44,7 +43,7 @@ class CEQAgent(AgentBase):
         docs_max_total_tokens: int = 2500
         docs_max_used: int = 5
 
-    config: AgentConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
         super().__init__()

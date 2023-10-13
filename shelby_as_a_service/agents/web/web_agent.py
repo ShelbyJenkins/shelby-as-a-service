@@ -5,7 +5,6 @@ from urllib.parse import urlparse, urlunparse
 
 import gradio as gr
 import services.text_processing.text as text
-from agents.agent_base import AgentBase
 from agents.ingest.ingest_agent import IngestAgent
 from app_config.app_base import AppBase
 from pydantic import BaseModel
@@ -15,13 +14,13 @@ from services.llm.llm_service import LLMService
 #
 
 
-class WebAgent(AgentBase):
+class WebAgent(AppBase):
     MODULE_NAME: str = "web_agent"
-    AGENT_UI_NAME: str = "URL Agent"
+    MODULE_UI_NAME: str = "URL Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "web_prompt.yaml"
     REQUIRED_MODULES: List[Type] = [LLMService, IngestAgent]
 
-    class AgentConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = (
             "Load a URL Data Tab, and we'll access it and use it to generate a response."
         )
@@ -29,10 +28,10 @@ class WebAgent(AgentBase):
         llm_model: str = "gpt-4"
         database_provider: str = "local_filestore_database"
 
-    config: AgentConfigModel
+    config: ModuleConfigModel
 
     def __init__(self):
-        super().__init__()
+        pass
 
     def create_streaming_chat(
         self,

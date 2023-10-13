@@ -44,7 +44,7 @@ class SlackSprite:
         # self.app = AsyncApp(token=self.deployment.secrets["slack_bot_token"])
         self.app = AsyncApp()
 
-        @self.app.command("/query")
+        @self.command("/query")
         async def query_command(ack, body):
             await ack()
             user_id = body["user_id"]
@@ -68,7 +68,7 @@ class SlackSprite:
             random_animal = await self.get_random_animal()
 
             # intial reply in channel
-            response = await self.app.client.chat_postMessage(
+            response = await self.client.chat_postMessage(
                 channel=channel,
                 text=(
                     f"{random_animal} <@{user_id}> relax a moment while we fetch your query: `{query}`"
@@ -87,7 +87,7 @@ class SlackSprite:
             if isinstance(request_response, dict) and "answer_text" in request_response:
                 parsed_output = self.parse_slack_markdown(request_response)
                 # use reply itd to reply in thread
-                await self.app.client.chat_postMessage(
+                await self.client.chat_postMessage(
                     channel=channel,
                     text=f"{parsed_output}",
                     thread_ts=thread_ts,
@@ -96,7 +96,7 @@ class SlackSprite:
                 )
             else:
                 # If not dict, then consider it an error
-                await self.app.client.chat_postMessage(
+                await self.client.chat_postMessage(
                     channel=channel,
                     text=f"{request_response}",
                     thread_ts=thread_ts,
@@ -105,7 +105,7 @@ class SlackSprite:
                 )
                 # log_agent.print_and_log(f'Error: {request_response})')
 
-        @self.app.command("/help")
+        @self.command("/help")
         async def help_command(ack):
             await ack(
                 "Run queries with the `/query` command.\n"
@@ -115,7 +115,7 @@ class SlackSprite:
                 "• Group DMs including the bot: Initiating `/query` or tagging `@shelby-as-a-service`"
             )
 
-        @self.app.event("app_mention")
+        @self.event("app_mention")
         async def bot_mention(ack, event):
             await ack()
             user_id = event["user"]
@@ -127,7 +127,7 @@ class SlackSprite:
             words = query.split()
             if len(words) < 4:
                 # reply in thread
-                await self.app.client.chat_postMessage(
+                await self.client.chat_postMessage(
                     channel=channel,
                     text=(f"Hi <@{user_id}>! Please create a longer query."),
                     thread_ts=thread_ts,
@@ -145,7 +145,7 @@ class SlackSprite:
             random_animal = await self.get_random_animal()
 
             # intial reply in thread
-            await self.app.client.chat_postMessage(
+            await self.client.chat_postMessage(
                 channel=channel,
                 text=(
                     f"{random_animal} <@{user_id}> relax a moment while we fetch your query: `{query}`"
@@ -163,7 +163,7 @@ class SlackSprite:
             if isinstance(request_response, dict) and "answer_text" in request_response:
                 parsed_output = self.parse_slack_markdown(request_response)
                 # reply in thread
-                await self.app.client.chat_postMessage(
+                await self.client.chat_postMessage(
                     channel=channel,
                     text=f"{parsed_output}",
                     thread_ts=thread_ts,
@@ -172,7 +172,7 @@ class SlackSprite:
                 )
             else:
                 # If not dict, then consider it an error
-                await self.app.client.chat_postMessage(
+                await self.client.chat_postMessage(
                     channel=channel,
                     text=f"{request_response}",
                     thread_ts=thread_ts,
@@ -237,7 +237,7 @@ class SlackSprite:
             handler = AsyncSocketModeHandler(
                 app=self.app, app_token=self.deployment.secrets["slack_app_token"]
             )
-            response = await self.app.client.auth_test()
+            response = await self.client.auth_test()
             self.bot_user_id = response["user_id"]
             await handler.start_async()
         except Exception as error:

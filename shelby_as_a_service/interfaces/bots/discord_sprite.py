@@ -43,7 +43,7 @@ class DiscordSprite(SpriteBase):
         super().__init__()
 
         self.log.print_and_log("Starting DiscordSprite.")
-
+        self.set_secrets(self)
         self.ceq_agent = CEQAgent(self)
 
         self.intents = discord.Intents.default()
@@ -239,7 +239,7 @@ class DiscordSprite(SpriteBase):
 
     def run_sprite(self):
         try:
-            self.bot.run(self.app.secrets["discord_bot_token"])
+            self.bot.run(self.secrets["discord_bot_token"])
         except Exception as error:
             # Logs error and sends error to sprite
             print(f"An error occurred in DiscordSprite run_discord_sprite(): {error}\n")

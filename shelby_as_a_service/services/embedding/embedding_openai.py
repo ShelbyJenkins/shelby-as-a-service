@@ -23,17 +23,17 @@ class OpenAIEmbedding(ProviderBase):
         )
     ]
 
-    class ProviderConfigModel(BaseModel):
+    class ModuleConfigModel(BaseModel):
         openai_timeout_seconds: float = 180.0
 
-    config: ProviderConfigModel
+    config: ModuleConfigModel
 
     UI_MODEL_NAMES = ["text-embedding-ada-002"]
     DEFAULT_MODEL: str = "text-embedding-ada-002"
     TYPE_MODEL: str = "openai_embedding_model"
 
     def __init__(self):
-        super().__init__()
+        self.set_secrets(self)
 
     def _get_query_embedding(self, query, model_name=None):
         model = self.get_model(self.TYPE_MODEL, model_name=model_name)
@@ -41,7 +41,7 @@ class OpenAIEmbedding(ProviderBase):
             return None
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
-            openai_api_key=self.app.secrets["openai_api_key"],
+            openai_api_key=self.secrets["openai_api_key"],
             model=model.MODEL_NAME,
             request_timeout=self.config.openai_timeout_seconds,
         )  # type: ignore
@@ -56,7 +56,7 @@ class OpenAIEmbedding(ProviderBase):
             return None
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
-            openai_api_key=self.app.secrets["openai_api_key"],
+            openai_api_key=self.secrets["openai_api_key"],
             model=model.MODEL_NAME,
             request_timeout=self.config.openai_timeout_seconds,
         )  # type: ignore
@@ -79,8 +79,8 @@ class OpenAIEmbedding(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
         # Ensure total_cost_ is a Decimal as well; if it's not already, convert it
-        if not isinstance(self.app.total_cost, Decimal):
-            self.app.total_cost = Decimal(self.app.total_cost)
+        if not isinstance(self.total_cost, Decimal):
+            self.total_cost = Decimal(self.total_cost)
 
-        self.app.total_cost += request_cost
-        print(f"Total cost: ${format(self.app.total_cost, 'f')}")
+        self.total_cost += request_cost
+        print(f"Total cost: ${format(self.total_cost, 'f')}")
