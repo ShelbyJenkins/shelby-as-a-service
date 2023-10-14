@@ -1,0 +1,7 @@
+CLASS_NAME: "TemplateClass"
+FOLDER_NAME: "template"
+MODULE_FILENAME: "module_name"
+TARGET_SPRITES: ["webui_sprite"]
+HAS_VIEW: true
+VIEW_FILENAME: "template_view"
+VIEW_CLASS_NAME: "TemplateUI"

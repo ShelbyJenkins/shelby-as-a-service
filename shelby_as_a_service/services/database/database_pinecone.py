@@ -4,12 +4,12 @@ from typing import Any, Dict, List, Type, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import pinecone
+from app_config.app_base import AppBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
-from services.provider_base import ProviderBase
 
 
-class PineconeDatabase(ProviderBase):
+class PineconeDatabase(AppBase):
     MODULE_NAME: str = "pinecone_database"
     MODULE_UI_NAME: str = "pinecone_database"
     REQUIRED_SECRETS: List[str] = ["pinecone_api_key"]

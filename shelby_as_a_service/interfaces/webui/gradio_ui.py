@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
 from app_config.app_base import AppBase
+from app_config.app_manager import AppManager
 from interfaces.webui.gradio_themes import AtYourServiceTheme
 from interfaces.webui.views.context_index_view import ContextIndexView
 from interfaces.webui.views.main_chat_view import MainChatView
@@ -24,6 +25,10 @@ class GradioUI(AppBase):
         self.main_chat_view = MainChatView(self.webui_sprite)
         self.context_index_view = ContextIndexView(self.webui_sprite)
         self.settings_view = SettingsView(self.webui_sprite)
+
+        AppManager.add_extension_views_to_gradio_ui(
+            self, self.webui_sprite, AppBase.list_of_extension_configs
+        )
 
         self.ui_view_instances = self.get_list_of_module_instances(self, self.UI_VIEWS)
 

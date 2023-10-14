@@ -1,9 +1,0 @@
-  - 
-    role: system
-    content: | 
-      With the given title return a fun emoji. Or choose one at random idc.
-  -   
-    role: user
-    content: 
-
-      

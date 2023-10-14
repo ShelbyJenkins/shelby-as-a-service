@@ -1,8 +1,0 @@
-  - 
-    role: system
-    content: | 
-      Given the story below, generate a 5 word title centering on proper nouns in the story. Cleverness and wit are appreciated.
-  -   
-    role: user
-    content: 
-

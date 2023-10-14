@@ -23,9 +23,10 @@ class AppBase:
     class AppConfigModel(BaseModel):
         app_name: str = "base"
         enabled_sprites: List[str] = ["webui_sprite"]
+        enabled_extensions: List[str] = []
 
     config: AppConfigModel
-
+    list_of_extension_configs: Dict[str, Any]
     secrets: Dict[str, str] = {}
     total_cost: Decimal = Decimal("0")
     last_request_cost: Decimal = Decimal("0")
@@ -44,13 +45,14 @@ class AppBase:
         app_config_file_dict = AppManager.load_app_file(app_name)
         AppBase.config = AppBase.AppConfigModel(**app_config_file_dict.get("app", {}))
 
-        load_dotenv(os.path.join(f"apps/{app_name}/", ".env"))
+        load_dotenv(os.path.join(f"app_config/your_apps/{app_name}", ".env"))
 
         AppBase.log = AppBase.get_logger(logger_name=app_name)
+        AppBase.list_of_extension_configs = AppManager.get_extension_configs()
 
         AppBase.load_sprite_instances(app_config_file_dict)
 
-        AppBase.local_index_dir = f"apps/{app_name}/index"
+        AppBase.local_index_dir = f"app_config/your_apps/{app_name}/index"
         AppBase.index = IndexBase.IndexConfigModel(**app_config_file_dict.get("index", {}))
 
         AppBase.update_config_file_from_loaded_models()
@@ -64,6 +66,9 @@ class AppBase:
                 case "webui_sprite":
                     from interfaces.webui.webui_sprite import WebUISprite
 
+                    AppManager.add_extensions_to_sprite(
+                        AppBase.list_of_extension_configs, WebUISprite
+                    )
                     AppBase.webui_sprite = WebUISprite(app_config_file_dict)
 
                     AppBase.available_sprite_instances.append(AppBase.webui_sprite)
@@ -71,6 +76,7 @@ class AppBase:
                 # case "discord_sprite":
                 #     from interfaces.bots.discord_sprite import DiscordSprite
 
+                # AppManager.add_extensions_to_sprite(AppBase.list_of_extension_configs, DiscordSprite)
                 #     AppBase.discord_sprite = DiscordSprite(app_config_file_dict)
 
                 #     AppBase.available_sprite_instances.append(AppBase.discord_sprite)
@@ -78,12 +84,20 @@ class AppBase:
                 # case "slack_sprite":
                 #     from interfaces.bots.slack_sprite import SlackSprite
 
+                # AppManager.add_extensions_to_sprite(AppBase.list_of_extension_configs, SlackSprite)
                 #     AppBase.slack_sprite = SlackSprite(app_config_file_dict)
 
                 #     AppBase.available_sprite_instances.append(AppBase.slack_sprite)
 
                 case _:
                     print("oops")
+
+    @staticmethod
+    def create_extension_module_instances(parent_instance, module_config_file_dict=None):
+        for module in parent_instance.extension_modules:
+            if module_name := getattr(module, "MODULE_NAME", None):
+                module_instance = module(module_config_file_dict)
+                setattr(parent_instance, module_name, module_instance)
 
     @classmethod
     def get_logger(cls, logger_name: Optional[str] = None) -> Logger:
@@ -149,3 +163,21 @@ class AppBase:
                 return module_instance
             else:
                 return None
+
+    @staticmethod
+    def get_model(provider_instance, requested_model_name=None):
+        model_instance = None
+        available_models = getattr(provider_instance, "AVAILABLE_MODELS", [])
+        if requested_model_name:
+            for model in available_models:
+                if model.MODEL_NAME == requested_model_name:
+                    model_instance = model
+                    break
+        if model_instance is None:
+            for model in available_models:
+                if model.MODEL_NAME == provider_instance.config.model:
+                    model_instance = model
+                    break
+        if model_instance is None:
+            raise ValueError("model_instance must not be None in AppBase")
+        return model_instance

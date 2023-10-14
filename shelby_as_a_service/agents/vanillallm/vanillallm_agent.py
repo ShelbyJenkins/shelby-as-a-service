@@ -8,9 +8,7 @@ from services.llm.llm_service import LLMService
 class VanillaLLM(AppBase):
     MODULE_NAME: str = "vanillallm_agent"
     MODULE_UI_NAME = "VanillaLLM Agent"
-    DEFAULT_PROMPT_TEMPLATE_PATH: str = (
-        "shelby_as_a_service/agents/vanillallm/vanillallm_prompt_templates.yaml"
-    )
+    DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/vanillallm/vanillallm_prompt_templates.yaml"
     REQUIRED_MODULES: List[Type] = [LLMService]
 
     class ModuleConfigModel(BaseModel):

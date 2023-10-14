@@ -1,6 +1,9 @@
+import importlib
 import json
 import os
 from typing import Any, Dict, List, Optional, Type
+
+import yaml
 
 
 class AppManager:
@@ -45,9 +48,9 @@ class AppManager:
 
     @staticmethod
     def create_update_env_file(app_name, secrets=None):
-        dir_path = f"app_config/your_apps{app_name}"
+        dir_path = f"app_config/your_apps/{app_name}"
         dot_env_dest_path = os.path.join(dir_path, ".env")
-        dot_env_source_path = "shelby_as_a_service/app_config/template/template.env"
+        dot_env_source_path = "app_config/template/template.env"
 
         # Helper function to read env file into a dictionary
         def read_env_to_dict(filepath):
@@ -136,3 +139,96 @@ class AppManager:
             encoding="utf-8",
         ) as file:
             json.dump(updated_app_config_dict, file, ensure_ascii=False, indent=4)
+
+    @staticmethod
+    def get_extension_configs():
+        list_of_extension_configs = []
+        extensions_folder = "extensions"
+
+        # Check if the provided path is a valid directory
+        if not os.path.isdir(extensions_folder):
+            print(f"{extensions_folder} is not a valid directory.")
+            print("Creating the 'extensions' directory...")
+
+            # Create the directory
+            os.makedirs(extensions_folder)
+
+            print("No extensions found.")
+            return "No extensions found."
+
+        # Iterate through all items in the directory
+        for item_name in os.listdir("extensions"):
+            item_path = os.path.join("extensions", item_name)
+
+            # Check if the item is a directory
+            if os.path.isdir(item_path):
+                config_path = os.path.join(item_path, "ext_config.yaml")
+
+                # Check if 'ext_config.yaml' exists in the directory
+                if os.path.isfile(config_path):
+                    # Open and load the YAML file
+                    with open(config_path, "r") as file:
+                        try:
+                            list_of_extension_configs.append(yaml.safe_load(file))
+                            # Now config_data is a Python dictionary containing the YAML data
+                            # You can process the data as needed
+                        except yaml.YAMLError as exc:
+                            print(f"Error in configuration file: {exc}")
+        return list_of_extension_configs
+
+    @staticmethod
+    def add_extensions_to_sprite(list_of_extension_configs, sprite_class):
+        sprite_class_name = sprite_class.MODULE_NAME
+        for extension_config in list_of_extension_configs:
+            target_sprites = extension_config.get("TARGET_SPRITES", [])
+            if target_sprites is None:
+                continue
+            if sprite_class_name not in target_sprites:
+                continue
+
+            folder_name = extension_config.get("FOLDER_NAME")
+            module_filename = extension_config.get("MODULE_FILENAME")
+            class_name = extension_config.get("CLASS_NAME")
+            module_name = extension_config.get("MODULE_NAME")
+            if not (folder_name and module_filename and class_name and module_name):
+                print(f"Missing configuration: {folder_name}, {module_filename}, {class_name}")
+                continue
+
+            import_path = f"extensions.{folder_name}.{module_filename}"
+            try:
+                module = importlib.import_module(import_path)
+                cls = getattr(module, class_name)
+                if getattr(sprite_class, "extension_modules", None) is None:
+                    sprite_class.extension_modules = []
+                sprite_class.extension_modules.append(cls)
+            except ImportError:
+                print(f"Failed to import module: {module_name}")
+            except AttributeError:
+                print(f"Failed to find class: {class_name} in module: {module_name}")
+
+    @staticmethod
+    def add_extension_views_to_gradio_ui(gradio_instance, webui_sprite, list_of_extension_configs):
+        for extension_config in list_of_extension_configs:
+            if extension_config.get("HAS_VIEW", False) is False:
+                continue
+
+            folder_name = extension_config.get("FOLDER_NAME")
+            view_filename = extension_config.get("VIEW_FILENAME")
+            view_class_name = extension_config.get("VIEW_CLASS_NAME")
+            module_name = extension_config.get("MODULE_NAME")
+            if not (folder_name and view_filename and view_class_name and module_name):
+                print(f"Missing configuration: {folder_name}, {view_filename}, {view_class_name}")
+                continue
+
+            import_path = f"extensions.{folder_name}.{view_filename}"
+            try:
+                module = importlib.import_module(import_path)
+                cls = getattr(module, view_class_name)
+                gradio_instance.UI_VIEWS.append(cls)
+                view_instance = cls(webui_sprite)
+                setattr(gradio_instance, cls.MODULE_NAME, view_instance)
+
+            except ImportError:
+                print(f"Failed to import module: {module_name}")
+            except AttributeError:
+                print(f"Failed to find class: {view_class_name} in module: {module_name}")

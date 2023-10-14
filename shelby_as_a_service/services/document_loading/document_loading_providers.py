@@ -16,10 +16,9 @@ from langchain.document_loaders import (
 )
 from langchain.schema import Document
 from pydantic import BaseModel
-from services.provider_base import ProviderBase
 
 
-class GenericWebScraper(ProviderBase):
+class GenericWebScraper(AppBase):
     MODULE_NAME: str = "generic_web_scraper"
     MODULE_UI_NAME: str = "Generic Web Scraper"
 
@@ -53,7 +52,7 @@ class GenericWebScraper(ProviderBase):
         return components
 
 
-class GenericRecursiveWebScraper(ProviderBase):
+class GenericRecursiveWebScraper(AppBase):
     MODULE_NAME: str = "generic_recursive_web_scraper"
     MODULE_UI_NAME: str = "Generic Resursive Web Scraper"
     REQUIRED_SECRETS: List[str] = []

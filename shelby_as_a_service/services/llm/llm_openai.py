@@ -7,13 +7,13 @@ import interfaces.webui.gradio_helpers as GradioHelper
 import openai
 import services.prompt_templates.prompt_templates as PromptTemplates
 import services.text_processing.text as TextProcess
+from app_config.app_base import AppBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel, Field
-from services.provider_base import ProviderBase
 from typing_extensions import Annotated
 
 
-class OpenAILLM(ProviderBase):
+class OpenAILLM(AppBase):
     MODULE_NAME: str = "openai_llm"
     MODULE_UI_NAME: str = "OpenAI LLM"
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
@@ -100,6 +100,7 @@ class OpenAILLM(ProviderBase):
                 response_token_string,
                 total_token_string,
             ]
+            return None
 
     def _check_response(self, response, model):
         # Check if keys exist in dictionary
@@ -133,10 +134,10 @@ class OpenAILLM(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        self.total_cost += request_cost
-        self.last_request_cost = request_cost
+        AppBase.total_cost += request_cost
+        AppBase.last_request_cost = request_cost
         print(f"Request cost: ${format(request_cost, 'f')}")
-        print(f"Total cost: ${format(self.total_cost, 'f')}")
+        print(f"Total cost: ${format(AppBase.total_cost, 'f')}")
 
     def _calculate_cost_streaming(self, total_token_count, model):
         # Convert numbers to Decimal
@@ -150,9 +151,9 @@ class OpenAILLM(ProviderBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        self.total_cost += request_cost
-        self.last_request_cost = request_cost
-        print(f"Total cost: ${format(self.total_cost, 'f')}")
+        AppBase.total_cost += request_cost
+        AppBase.last_request_cost = request_cost
+        print(f"Total cost: ${format(AppBase.total_cost, 'f')}")
 
     def _create_streaming_chat(
         self, prompt, request_token_count, model
@@ -196,6 +197,7 @@ class OpenAILLM(ProviderBase):
                     total_token_count=total_token_count,
                     model=model,
                 )
+                return None
 
     def _prep_chat(
         self, query, prompt_template_path=None, documents=None, model=None

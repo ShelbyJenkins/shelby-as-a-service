@@ -133,9 +133,9 @@ class MainChatView(AppBase):
 
     def create_event_handlers(self, components):
         def get_spend():
-            req = f"Request price: ${round(self.vanillallm_agent.last_request_cost, 4)}"
-            self.vanillallm_agent.last_request_cost = Decimal("0")
-            tot = f"Total spend: ${round(self.vanillallm_agent.total_cost, 4)}"
+            req = f"Request price: ${round(AppBase.last_request_cost, 4)}"
+            AppBase.last_request_cost = Decimal("0")
+            tot = f"Total spend: ${round(AppBase.total_cost, 4)}"
             return [req, tot]
 
         gr.on(

@@ -8,10 +8,9 @@ from app_config.app_base import AppBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 from services.database.database_pinecone import PineconeDatabase
-from services.provider_base import ProviderBase
 
 
-class LocalFileStoreDatabase(ProviderBase):
+class LocalFileStoreDatabase(AppBase):
     MODULE_NAME: str = "local_filestore_database"
     MODULE_UI_NAME: str = "local_filestore_database"
     REQUIRED_SECRETS: List[str] = []

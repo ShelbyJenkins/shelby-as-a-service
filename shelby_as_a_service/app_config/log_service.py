@@ -1,9 +1,6 @@
 import logging
 import os
 import threading
-from typing import Any, Optional
-
-from pydantic import BaseModel, validator
 
 
 class Logger:
@@ -15,10 +12,8 @@ class Logger:
 
     def __init__(self, logger_name) -> None:
         if logger_name is None:
-            raise ValueError(
-                "logger_name must be set to create the default log_file_path"
-            )
-        log_dir = f"apps/{logger_name}/logs"
+            raise ValueError("logger_name must be set to create the default log_file_path")
+        log_dir = f"app_config/your_apps/{logger_name}/logs"
         os.makedirs(log_dir, exist_ok=True)
         self.log_file_path = os.path.join(log_dir, f"{logger_name}.md")
         self.logger = logging.getLogger(logger_name)
@@ -70,9 +65,7 @@ class Logger:
             content = file.read()
 
         formatted_message = self.formatter.format(
-            logging.makeLogRecord(
-                {"msg": message, "levelno": logging.INFO, "levelname": "INFO"}
-            )
+            logging.makeLogRecord({"msg": message, "levelno": logging.INFO, "levelname": "INFO"})
         )
 
         with open(self.log_file_path, "w") as file:
