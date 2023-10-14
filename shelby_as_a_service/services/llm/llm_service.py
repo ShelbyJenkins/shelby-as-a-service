@@ -15,7 +15,7 @@ class LLMService(AppBase):
     # For intialization
     REQUIRED_MODULES: List[Type] = [OpenAILLM]
     # For interface
-    AVAILABLE_PROVIDERS: List[Type] = [OpenAILLM]
+    UI_MODULES: List[Type] = [OpenAILLM]
 
     class ModuleConfigModel(BaseModel):
         llm_provider: str = "openai_llm"
@@ -31,7 +31,7 @@ class LLMService(AppBase):
 
         self.openai_llm = OpenAILLM(module_config_file_dict, **kwargs)
 
-        self.llm_providers = self.get_list_of_module_instances(self, self.AVAILABLE_PROVIDERS)
+        self.llm_providers = self.get_list_of_module_instances(self, self.UI_MODULES)
 
     def create_chat(
         self,

@@ -24,7 +24,7 @@ class AtYourServiceTheme(Base):
         box-sizing: border-box;
         flex-direction: row;
     }
-    #settings_panel_col {
+    #SETTINGS_UI_COL {
         height: 100vh;
         display: flex;
         box-sizing: border-box;
@@ -34,19 +34,19 @@ class AtYourServiceTheme(Base):
         border-right-width: 4px !important; 
     }
     
-    #chat_ui_panel_col {
+    #primary_ui_col {
         height: 100vh;
         display: flex;
         flex-direction: col;
         box-sizing: border-box;
     }
-    .chat_ui_row {
+    .primary_ui_row {
         height: 100%;
         display: flex;
         box-sizing: border-box;
         flex-direction: column;
     }
-    .chat_ui_col > div:first-child {
+    .primary_ui_col > div:first-child {
         display: flex;
         flex-direction: column;
         flex-grow: 1 !important;

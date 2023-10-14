@@ -5,11 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "shelby_as_a_service",
+            "name": "Python: Shelby as a Service",
             "type": "python",
             "request": "launch",
-            "program": "/workspaces/shelby-as-a-service/shelby_as_a_service/run_me.py",
-            // "console": "internalConsole",
+            "program": "${workspaceFolder}/shelby_as_a_service/run_me.py",
+            "cwd": "${workspaceFolder}/shelby_as_a_service",
             "console": "integratedTerminal",
             "justMyCode": false
         }

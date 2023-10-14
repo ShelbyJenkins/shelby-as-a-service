@@ -15,7 +15,7 @@ class DocLoadingService(AppBase):
     MODULE_NAME: str = "doc_loading_service"
     MODULE_UI_NAME: str = "Document Loading Service"
     REQUIRED_MODULES: List[Type] = [GenericWebScraper]
-    AVAILABLE_PROVIDERS: List[Type] = [
+    UI_MODULES: List[Type] = [
         GenericWebScraper,
         GenericRecursiveWebScraper,
         # OpenAPILoader,
@@ -39,9 +39,7 @@ class DocLoadingService(AppBase):
             module_config_file_dict, **kwargs
         )
 
-        self.doc_loading_providers = self.get_list_of_module_instances(
-            self, self.AVAILABLE_PROVIDERS
-        )
+        self.doc_loading_providers = self.get_list_of_module_instances(self, self.UI_MODULES)
 
     def load(self, data_source, doc_loading_provider=None):
         provider = self.get_requested_module_instance(

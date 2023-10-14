@@ -61,7 +61,7 @@ class DatabaseService(AppBase):
     MODULE_UI_NAME: str = "Database Service"
 
     REQUIRED_MODULES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
-    AVAILABLE_PROVIDERS: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
+    UI_MODULES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
 
     class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
@@ -76,7 +76,7 @@ class DatabaseService(AppBase):
         self.local_filestore_database = LocalFileStoreDatabase(module_config_file_dict, **kwargs)
         self.pinecone_database = PineconeDatabase(module_config_file_dict, **kwargs)
 
-        self.database_providers = self.get_list_of_module_instances(self, self.AVAILABLE_PROVIDERS)
+        self.database_providers = self.get_list_of_module_instances(self, self.UI_MODULES)
 
     def query_index(
         self,

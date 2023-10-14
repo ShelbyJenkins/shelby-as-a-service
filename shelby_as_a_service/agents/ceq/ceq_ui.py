@@ -7,16 +7,16 @@ import interfaces.webui.gradio_helpers as GradioHelper
 class CEQUI:
     MODULE_NAME: str = "ceq_agent"
     MODULE_UI_NAME: str = "Context Enhanced Querying"
-    SETTINGS_PANEL_COL = 4
-    CHAT_UI_PANEL_COL = 6
+    SETTINGS_UI_COL = 4
+    PRIMARY_UI_COL = 6
 
     service: Type
 
     @classmethod
-    def create_chat_ui(cls, agent_instance):
+    def create_primary_ui(cls, agent_instance):
         components = {}
 
-        with gr.Column(elem_classes="chat_ui_col"):
+        with gr.Column(elem_classes="primary_ui_col"):
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,

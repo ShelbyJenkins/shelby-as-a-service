@@ -4,7 +4,7 @@ shelby-as-a-service.code-workspace
 logs/
 **/__pycache__/
 .mypy_cache/
-apps/*
+shelby_as_a_service/app_config/your_apps/*
 !template.env
 content_aggregator/
 

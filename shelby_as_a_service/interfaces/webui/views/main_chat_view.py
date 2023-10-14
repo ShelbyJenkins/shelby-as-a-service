@@ -2,25 +2,27 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
+from app_config.app_base import AppBase
 
 
-class VanillaLLMUI:
-    MODULE_NAME: str = "vanillallm_agent"
-    MODULE_UI_NAME: str = "VanillaLLM Agent"
+class MainChatView(AppBase):
+    MODULE_NAME: str = "main_chat_view"
+    MODULE_UI_NAME: str = "Main Chat"
     SETTINGS_UI_COL = 2
     PRIMARY_UI_COL = 8
 
-    service: Type
+    def __init__(self, webui_sprite):
+        self.webui_sprite = webui_sprite
+        self.vanillallm_agent = self.webui_sprite.vanillallm_agent
 
-    @classmethod
-    def create_primary_ui(cls, agent_instance):
+    def create_primary_ui(self):
         components = {}
 
         with gr.Column(elem_classes="primary_ui_col"):
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=f"Welcome to {VanillaLLMUI.MODULE_UI_NAME}",
+                placeholder=f"Welcome to {MainChatView.MODULE_UI_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
@@ -53,7 +55,7 @@ class VanillaLLMUI:
                                 max_lines=1,
                                 show_label=False,
                                 placeholder="...status",
-                                elem_id=f"{agent_instance.MODULE_NAME}_chat_tab_status_text",
+                                elem_id=f"{MainChatView.MODULE_NAME}_chat_tab_status_text",
                             )
                         with gr.Row():
                             components["chat_tab_stop_button"] = gr.Button(
@@ -120,24 +122,20 @@ class VanillaLLMUI:
                                     show_label=False,
                                 )
 
-        cls.create_event_handlers(agent_instance, components)
+        self.create_event_handlers(components)
 
         return components
 
-    @staticmethod
-    def create_settings_ui(agent_instance):
+    def create_settings_ui(self):
         with gr.Column():
-            for service in agent_instance.REQUIRED_MODULES:
-                service_instance = getattr(agent_instance, service.MODULE_NAME, None)
+            for module_instance in self.vanillallm_agent.required_module_instances:
+                module_instance.create_settings_ui()
 
-                service_instance.create_settings_ui()
-
-    @classmethod
-    def create_event_handlers(cls, agent_instance, components):
+    def create_event_handlers(self, components):
         def get_spend():
-            req = f"Request price: ${round(agent_instance.last_request_cost, 4)}"
-            agent_instance.last_request_cost = Decimal("0")
-            tot = f"Total spend: ${round(agent_instance.total_cost, 4)}"
+            req = f"Request price: ${round(self.vanillallm_agent.last_request_cost, 4)}"
+            self.vanillallm_agent.last_request_cost = Decimal("0")
+            tot = f"Total spend: ${round(self.vanillallm_agent.total_cost, 4)}"
             return [req, tot]
 
         gr.on(
@@ -148,7 +146,7 @@ class VanillaLLMUI:
             fn=lambda: "Proooooomptering",
             outputs=components["chat_tab_status_text"],
         ).then(
-            fn=agent_instance.run_chat,
+            fn=self.vanillallm_agent.run_chat,
             inputs=components["chat_tab_in_text"],
             outputs=[
                 components["chat_tab_out_text"],

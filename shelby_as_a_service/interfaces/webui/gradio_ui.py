@@ -1,41 +1,35 @@
 import asyncio
 import threading
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
 from app_config.app_base import AppBase
 from interfaces.webui.gradio_themes import AtYourServiceTheme
+from interfaces.webui.views.context_index_view import ContextIndexView
+from interfaces.webui.views.main_chat_view import MainChatView
+from interfaces.webui.views.settings_view import SettingsView
 
 
-class GradioUI:
+class GradioUI(AppBase):
     gradio_ui: Dict
     update_settings_file = False
-    settings_panel_col_scaling = 2
-    chat_ui_panel_col_scaling = 8
+    settings_ui_col_scaling = 2
+    primary_ui_col_scaling = 8
+    UI_VIEWS: List[Type] = [MainChatView, ContextIndexView, SettingsView]
 
     def __init__(self, webui_sprite):
         self.webui_sprite = webui_sprite
-        self.required_module_instances = webui_sprite.required_module_instances
 
-        self.available_agents_ui_names = []
-        for agent in self.required_module_instances:
-            self.available_agents_ui_names.append(agent.MODULE_UI_NAME)
+        self.main_chat_view = MainChatView(self.webui_sprite)
+        self.context_index_view = ContextIndexView(self.webui_sprite)
+        self.settings_view = SettingsView(self.webui_sprite)
 
-        self.gradio_ui = {}
-        self.gradio_ui["gradio_agents"] = {}
-        self.gradio_agents = self.gradio_ui["gradio_agents"]
-
-    def comp_values_to_dict(self, *values) -> Dict[str, Any]:
-        agent_name = values[-1]
-        ui_type = values[-2]
-        comps_keys = self.gradio_ui["gradio_agents"][agent_name][ui_type]["components"].keys()
-        return {k: v for k, v in zip(comps_keys, values)}
+        self.ui_view_instances = self.get_list_of_module_instances(self, self.UI_VIEWS)
 
     def create_gradio_interface(self):
-        all_nav_tabs = []
-        all_chat_ui_rows = []
+        all_setting_ui_tabs = []
+        all_primary_ui_rows = []
 
         with gr.Blocks(
             theme=AtYourServiceTheme(),
@@ -43,25 +37,24 @@ class GradioUI:
         ) as webui_client:
             with gr.Row(elem_id="main_row"):
                 with gr.Column(
-                    elem_id="settings_panel_col", scale=self.settings_panel_col_scaling
-                ) as settings_panel_col:
-                    for agent_instance in self.required_module_instances:
-                        all_nav_tabs.append(self.settings_ui_creator(agent_instance))
+                    elem_id="settings_ui_col", scale=self.settings_ui_col_scaling
+                ) as settings_ui_col:
+                    for view_instance in self.ui_view_instances:
+                        all_setting_ui_tabs.append(self.settings_ui_creator(view_instance))
 
                 with gr.Column(
-                    elem_id="chat_ui_panel_col", scale=self.chat_ui_panel_col_scaling
-                ) as chat_ui_panel_col:
-                    for agent_instance in self.required_module_instances:
-                        all_chat_ui_rows.append(self.chat_ui_creator(agent_instance))
+                    elem_id="primary_ui_col", scale=self.primary_ui_col_scaling
+                ) as primary_ui_col:
+                    for view_instance in self.ui_view_instances:
+                        all_primary_ui_rows.append(self.primary_ui_creator(view_instance))
 
             self.create_nav_events(
-                all_nav_tabs, all_chat_ui_rows, settings_panel_col, chat_ui_panel_col
+                all_setting_ui_tabs, all_primary_ui_rows, settings_ui_col, primary_ui_col
             )
+
             webui_client.load(
-                fn=lambda: self.set_agent_view(
-                    requested_agent_view=self.webui_sprite.config.current_agent_ui_name
-                ),
-                outputs=all_chat_ui_rows + [settings_panel_col, chat_ui_panel_col],
+                fn=lambda: self.set_agent_view(requested_view="Main Chat"),
+                outputs=all_primary_ui_rows + [settings_ui_col, primary_ui_col],
             )
 
             threading.Thread(target=asyncio.run, args=(self.check_for_updates(),)).start()
@@ -70,30 +63,28 @@ class GradioUI:
             # webui_client.launch(prevent_thread_lock=True)
             webui_client.launch()
 
-    def chat_ui_creator(self, agent_instance):
-        agent_name = agent_instance.MODULE_NAME
-        agent_ui_class = agent_instance.MODULE_UI
+    def primary_ui_creator(self, view_instance):
+        view_name = view_instance.MODULE_NAME
 
         with gr.Row(
-            elem_classes="chat_ui_row",
-            elem_id=f"{agent_name}_chat_ui_row",
+            elem_classes="primary_ui_row",
+            elem_id=f"{view_name}_primary_ui_row",
             visible=False,
-        ) as chat_ui_row:
-            agent_ui_class.create_chat_ui(agent_instance)
+        ) as primary_ui_row:
+            view_instance.create_primary_ui()
 
-        return chat_ui_row
+        return primary_ui_row
 
     @staticmethod
-    def settings_ui_creator(agent_instance):
-        agent_name = agent_instance.MODULE_NAME
-        agent_ui_class = agent_instance.MODULE_UI
-        agent_ui_name = agent_ui_class.MODULE_UI_NAME
+    def settings_ui_creator(view_instance):
+        agent_name = view_instance.MODULE_NAME
+        agent_ui_name = view_instance.MODULE_UI_NAME
 
         with gr.Tab(
             label=agent_ui_name,
             elem_id=f"{agent_name}_settings_ui_tab",
         ) as agent_nav_tab:
-            agent_ui_class.create_settings_ui(agent_instance)
+            view_instance.create_settings_ui()
 
         return agent_nav_tab
 
@@ -120,14 +111,14 @@ class GradioUI:
             )
 
     def create_nav_events(
-        self, all_nav_tabs, all_chat_ui_rows, settings_panel_col, chat_ui_panel_col
+        self, all_setting_ui_tabs, all_primary_ui_rows, settings_ui_col, primary_ui_col
     ):
         outputs = []
-        outputs += all_chat_ui_rows
-        outputs.append(settings_panel_col)
-        outputs.append(chat_ui_panel_col)
+        outputs += all_primary_ui_rows
+        outputs.append(settings_ui_col)
+        outputs.append(primary_ui_col)
 
-        for agent_nav_tab in all_nav_tabs:
+        for agent_nav_tab in all_setting_ui_tabs:
             agent_nav_tab.select(
                 fn=self.get_nav_evt,
                 inputs=None,
@@ -138,22 +129,22 @@ class GradioUI:
         output = self.set_agent_view(evt.value)
         return output
 
-    def set_agent_view(self, requested_agent_view: str):
+    def set_agent_view(self, requested_view: str):
         output = []
         settings_ui_scale = 1
-        chat_ui_scale = 1
+        primary_ui_scale = 1
 
-        for agent_instance in self.required_module_instances:
-            if requested_agent_view == agent_instance.MODULE_UI_NAME:
+        for view_instance in self.ui_view_instances:
+            if requested_view == view_instance.MODULE_UI_NAME:
                 output.append(gr.Row(visible=True))
-                self.webui_sprite.config.current_agent_ui_name = agent_instance.MODULE_UI_NAME
-                settings_ui_scale = agent_instance.MODULE_UI.SETTINGS_PANEL_COL
-                chat_ui_scale = agent_instance.MODULE_UI.CHAT_UI_PANEL_COL
+                self.webui_sprite.config.current_ui_view_name = view_instance.MODULE_UI_NAME
+                settings_ui_scale = view_instance.SETTINGS_UI_COL
+                primary_ui_scale = view_instance.PRIMARY_UI_COL
             else:
                 output.append(gr.Row(visible=False))
 
         output.append(gr.Column(scale=settings_ui_scale))
-        output.append(gr.Column(scale=chat_ui_scale))
+        output.append(gr.Column(scale=primary_ui_scale))
         GradioUI.update_settings_file = True
         return output
 

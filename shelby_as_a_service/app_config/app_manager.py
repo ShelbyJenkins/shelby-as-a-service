@@ -14,8 +14,8 @@ class AppManager:
     @staticmethod
     def check_for_existing_apps():
         existing_app_names = []
-        for app in os.listdir("apps"):
-            app_path = os.path.join("apps", app)
+        for app in os.listdir("app_config/your_apps"):
+            app_path = os.path.join("app_config/your_apps", app)
             if os.path.isdir(app_path):
                 if "app_config.json" in os.listdir(app_path):
                     existing_app_names.append(app)
@@ -28,7 +28,7 @@ class AppManager:
         Does not overwrite existing apps.
         To start fresh delete the app and then use this function.
         """
-        dir_path = f"apps/{app_name}"
+        dir_path = f"app_config/your_apps/{app_name}"
 
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
@@ -45,7 +45,7 @@ class AppManager:
 
     @staticmethod
     def create_update_env_file(app_name, secrets=None):
-        dir_path = f"apps/{app_name}"
+        dir_path = f"app_config/your_apps{app_name}"
         dot_env_dest_path = os.path.join(dir_path, ".env")
         dot_env_source_path = "shelby_as_a_service/app_config/template/template.env"
 
@@ -116,7 +116,7 @@ class AppManager:
     def load_app_file(app_name) -> Dict[str, Any]:
         try:
             with open(
-                f"apps/{app_name}/app_config.json",
+                f"app_config/your_apps/{app_name}/app_config.json",
                 "r",
                 encoding="utf-8",
             ) as stream:
@@ -131,7 +131,7 @@ class AppManager:
     def save_app_file(app_name, updated_app_config_dict):
         # Save the updated configuration
         with open(
-            f"apps/{app_name}/app_config.json",
+            f"app_config/your_apps/{app_name}/app_config.json",
             "w",
             encoding="utf-8",
         ) as file:

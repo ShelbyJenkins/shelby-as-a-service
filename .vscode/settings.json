@@ -13,4 +13,5 @@
         "--line-length",
         "100"
     ],
+    "terminal.integrated.cwd": "${workspaceFolder}/shelby_as_a_service"
 }

@@ -1,9 +1,5 @@
-import types
 from typing import Any, Dict, Generator, List, Optional, Type, Union
 
-import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
-from agents.vanillallm.vanillallm_ui import VanillaLLMUI
 from app_config.app_base import AppBase
 from pydantic import BaseModel
 from services.llm.llm_service import LLMService
@@ -11,8 +7,7 @@ from services.llm.llm_service import LLMService
 
 class VanillaLLM(AppBase):
     MODULE_NAME: str = "vanillallm_agent"
-    MODULE_UI = VanillaLLMUI
-    MODULE_UI_NAME: str = VanillaLLMUI.MODULE_UI_NAME
+    MODULE_UI_NAME = "VanillaLLM Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = (
         "shelby_as_a_service/agents/vanillallm/vanillallm_prompt_templates.yaml"
     )

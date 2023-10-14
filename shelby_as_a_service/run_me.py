@@ -26,5 +26,4 @@ def main():
     AppBase.run_sprites()
 
 
-if __name__ == "__main__":
-    main()
+main()

@@ -4,10 +4,10 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from app_config.app_manager import AppManager
+from app_config.context_index.index_base import IndexBase
 from app_config.log_service import Logger
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from services.index.index_base import IndexBase
 
 
 class AppBase:
