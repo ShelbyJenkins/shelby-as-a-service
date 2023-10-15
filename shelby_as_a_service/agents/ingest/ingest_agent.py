@@ -1,7 +1,5 @@
 from typing import Any, Dict, List, Optional, Type
 
-from agents.ingest.ingest_ui import IngestUI
-
 # from modules.index.data_model import DataModels
 from app_config.app_base import AppBase
 from pydantic import BaseModel
@@ -11,10 +9,9 @@ from services.document_loading.document_loading_service import DocLoadingService
 
 class IngestAgent(AppBase):
     MODULE_NAME: str = "ingest_agent"
-    MODULE_UI: Type = IngestUI
-    MODULE_UI_NAME: str = IngestUI.MODULE_UI_NAME
-    REQUIRED_MODULES: List[Type] = [DocLoadingService]
-    # REQUIRED_MODULES: List[Type] = [DocLoadingService, DatabaseService]
+    MODULE_UI_NAME: str = "ingest_agent"
+    # REQUIRED_MODULES: List[Type] = [DocLoadingService]
+    REQUIRED_MODULES: List[Type] = [DocLoadingService, DatabaseService]
 
     class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = (
@@ -36,6 +33,9 @@ class IngestAgent(AppBase):
         )
         self.database_service = DatabaseService(
             module_config_file_dict, database_provider="local_filestore_database"
+        )
+        self.required_module_instances = self.get_list_of_module_instances(
+            self, self.REQUIRED_MODULES
         )
 
     def ingest_docs(self):
@@ -191,32 +191,29 @@ class IngestAgent(AppBase):
 
         self.log.print_and_log(f"Final index stats: {self.vectorstore.describe_index_stats()}")
 
-    # def load_single_website(self, url):
-    #     data_source = DataSourceModel(
-    #         data_source_name=None,
-    #         data_source_description=None,
-    #         data_source_filter_url=None,
-    #         data_source_ingest_provider="generic_web_scraper",
-    #         data_source_database_provider="local_filestore_database",
-    #         data_source_url=url,
-    #     )
-    #     data_domain = DataDomainModel(
-    #         data_domain_name="web_agent",
-    #         data_domain_database_provider="local_filestore_database",
-    #         data_domain_sources=[data_source],
-    #     )
-    #     documents_list = []
-    #     for data_source in data_domain.data_domain_sources:
-    #         documents_iterator = self.ingest_service.load(data_source)
-    #         if documents_iterator is not None:
-    #             try:
-    #                 documents_list = list(documents_iterator)
-    #             except TypeError:
-    #                 print(f"Error: Object {documents_iterator} is not iterable")
-    #         else:
-    #             print("Error: documents_iterator is None")
-    #         if documents_list:
-    #             self.database_service.write_documents_to_database(
-    #                 documents_list, data_domain, data_source
-    #             )
-    #             return documents_list
+    def ingest_from_ui(self, components: Dict[str, Any], *values):
+        ui_state = {k: v for k, v in zip(components.keys(), values)}
+        data_domain = ui_state.get("data_domain_drp", None)
+        data_source = ui_state.get("data_source_drp", None)
+        url = ui_state.get("url_textbox", None)
+        preset = ui_state.get("source_preset", None)
+        # get data domain
+        # get data source, if it doesn't exist create it
+        # if use custom check box is not clicked
+        # get source preset
+
+        documents_list = []
+        for data_source in data_domain.data_domain_sources:
+            documents_iterator = self.doc_loading_service.load(data_source)
+            if documents_iterator is not None:
+                try:
+                    documents_list = list(documents_iterator)
+                except TypeError:
+                    print(f"Error: Object {documents_iterator} is not iterable")
+            else:
+                print("Error: documents_iterator is None")
+            if documents_list:
+                self.database_service.write_documents_to_database(
+                    documents_list, data_domain, data_source
+                )
+                return documents_list

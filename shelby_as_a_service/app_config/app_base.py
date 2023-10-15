@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from app_config.app_manager import AppManager
-from app_config.context_index.index_base import IndexBase
+from app_config.context_index.index_base import ContextIndexService
 from app_config.log_service import Logger
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -18,15 +18,17 @@ class AppBase:
     slack_sprite: Type
     available_sprite_instances: List[Any] = []
     log: Logger
-    index: IndexBase.IndexConfigModel
+    context_index_service = ContextIndexService
+    the_context_index: ContextIndexService.TheContextIndex
 
     class AppConfigModel(BaseModel):
         app_name: str = "base"
         enabled_sprites: List[str] = ["webui_sprite"]
         enabled_extensions: List[str] = []
+        disabled_extensions: List[str] = []
 
-    config: AppConfigModel
-    list_of_extension_configs: Dict[str, Any]
+    app_config: AppConfigModel
+    list_of_extension_configs: List[Any]
     secrets: Dict[str, str] = {}
     total_cost: Decimal = Decimal("0")
     last_request_cost: Decimal = Decimal("0")
@@ -43,17 +45,20 @@ class AppBase:
             app_name = AppManager.load_webui_sprite_default_app()
 
         app_config_file_dict = AppManager.load_app_file(app_name)
-        AppBase.config = AppBase.AppConfigModel(**app_config_file_dict.get("app", {}))
+        AppBase.app_config = AppBase.AppConfigModel(**app_config_file_dict.get("app", {}))
 
         load_dotenv(os.path.join(f"app_config/your_apps/{app_name}", ".env"))
 
         AppBase.log = AppBase.get_logger(logger_name=app_name)
+
         AppBase.list_of_extension_configs = AppManager.get_extension_configs()
 
-        AppBase.load_sprite_instances(app_config_file_dict)
-
         AppBase.local_index_dir = f"app_config/your_apps/{app_name}/index"
-        AppBase.index = IndexBase.IndexConfigModel(**app_config_file_dict.get("index", {}))
+        AppBase.the_context_index = ContextIndexService.TheContextIndex(
+            **app_config_file_dict.get("index", {})
+        )
+
+        AppBase.load_sprite_instances(app_config_file_dict)
 
         AppBase.update_config_file_from_loaded_models()
 
@@ -114,7 +119,7 @@ class AppBase:
         if hasattr(class_instance, "REQUIRED_SECRETS") and class_instance.REQUIRED_SECRETS:
             for secret in class_instance.REQUIRED_SECRETS:
                 env_secret = None
-                secret_str = f"{AppBase.config.app_name}_{secret}".upper()
+                secret_str = f"{AppBase.app_config.app_name}_{secret}".upper()
                 env_secret = os.environ.get(secret_str, None)
                 if env_secret:
                     AppBase.secrets[secret] = env_secret
@@ -124,13 +129,13 @@ class AppBase:
     @classmethod
     def run_sprites(cls):
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for sprite_name in cls.config.enabled_sprites:
+            for sprite_name in AppBase.app_config.enabled_sprites:
                 sprite = getattr(cls, sprite_name)
                 executor.submit(sprite.run_sprite())
 
     @classmethod
     def update_config_file_from_loaded_models(cls):
-        # old_config_dict = AppManager.load_app_file(AppBase.config.app_name)
+        # old_config_dict = AppManager.load_app_file(AppBase.app_config.app_name)
         def recurse(module_instance, config_dict):
             config_dict[module_instance.MODULE_NAME] = module_instance.config.model_dump()
             module_config_dict = config_dict[module_instance.MODULE_NAME]
@@ -140,14 +145,14 @@ class AppBase:
                     recurse(child_module_instance, module_config_dict)
 
         app_config_dict = {}
-        app_config_dict["app"] = AppBase.config.model_dump()
+        app_config_dict["app"] = AppBase.app_config.model_dump()
 
-        app_config_dict["index"] = AppBase.index.model_dump()
+        app_config_dict["index"] = AppBase.the_context_index.model_dump()
 
         for sprite in AppBase.available_sprite_instances:
             recurse(sprite, app_config_dict)
 
-        AppManager.save_app_file(AppBase.config.app_name, app_config_dict)
+        AppManager.save_app_file(AppBase.app_config.app_name, app_config_dict)
 
     @staticmethod
     def get_list_of_module_instances(parent_class, available_modules):

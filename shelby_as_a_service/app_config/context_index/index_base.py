@@ -5,12 +5,17 @@ from pydantic import BaseModel
 # from modules.index.data_loaders import DataLoaders
 
 
-class DataSourceDocumentModel(BaseModel):
+class ChunkModel(BaseModel):
     pass
 
 
-class DataSourceModel(BaseModel):
-    data_source_name: str = "default_data_source_name"
+class DocumentModel(BaseModel):
+    pass
+
+
+class DataSource(BaseModel):
+    data_source_name: str = "default_data_source"
+    data_source_ui_name: str = "default data source template"
     data_source_description: str = "default_data_source_description"
 
     data_source_doc_type: Optional[str] = None
@@ -24,25 +29,21 @@ class DataSourceModel(BaseModel):
     retrieval_enabled: bool = True
 
 
-class DataDomainModel(BaseModel):
-    data_domain_name: str = "default_data_domain_name"
+class DataDomain(BaseModel):
+    data_domain_name: str = "default_data_domain"
+    data_domain_ui_name: str = "default index topic"
     data_domain_description: str = "data_domain_description"
-    data_domain_sources: List[DataSourceModel] = [DataSourceModel()]
+    data_domain_sources: List[DataSource] = [DataSource()]
     data_domain_database_provider: str = "local_filestore_database"
 
     update_enabled: bool = True
     retrieval_enabled: bool = True
 
 
-class IndexBase:
-    CLASS_CONFIG_TYPE: str = "index"
-
-    class IndexConfigModel(BaseModel):
+class ContextIndexService:
+    class TheContextIndex(BaseModel):
         index_name: str = "default_index_name"
-        index_data_domains: List[DataDomainModel] = [DataDomainModel()]
+        index_data_domains: List[DataDomain] = [DataDomain()]
         default_index_database_provider: str = "local_filestore_database"
 
         update_enabled: bool = True
-        retrieval_enabled: bool = True
-
-    config: IndexConfigModel

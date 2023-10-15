@@ -154,7 +154,7 @@ class AppManager:
             os.makedirs(extensions_folder)
 
             print("No extensions found.")
-            return "No extensions found."
+            return []
 
         # Iterate through all items in the directory
         for item_name in os.listdir("extensions"):
@@ -201,10 +201,12 @@ class AppManager:
                 if getattr(sprite_class, "extension_modules", None) is None:
                     sprite_class.extension_modules = []
                 sprite_class.extension_modules.append(cls)
-            except ImportError:
-                print(f"Failed to import module: {module_name}")
-            except AttributeError:
-                print(f"Failed to find class: {class_name} in module: {module_name}")
+            except ImportError as e:
+                print(f"Failed to import module: {import_path}. Error: {str(e)}")
+            except AttributeError as e:
+                print(
+                    f"Failed to find class: {class_name} in module: {import_path}. Error: {str(e)}"
+                )
 
     @staticmethod
     def add_extension_views_to_gradio_ui(gradio_instance, webui_sprite, list_of_extension_configs):
@@ -228,7 +230,9 @@ class AppManager:
                 view_instance = cls(webui_sprite)
                 setattr(gradio_instance, cls.MODULE_NAME, view_instance)
 
-            except ImportError:
-                print(f"Failed to import module: {module_name}")
-            except AttributeError:
-                print(f"Failed to find class: {view_class_name} in module: {module_name}")
+            except ImportError as e:
+                print(f"Failed to import module: {import_path}. Error: {str(e)}")
+            except AttributeError as e:
+                print(
+                    f"Failed to find class: {view_class_name} in module: {import_path}. Error: {str(e)}"
+                )

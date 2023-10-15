@@ -42,10 +42,11 @@ class WebUISprite(AppBase):
         self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
 
         self.vanillallm_agent = VanillaLLM(module_config_file_dict)
+        self.ingest_agent = IngestAgent(module_config_file_dict)
         # self.ceq_agent = CEQAgent(module_config_file_dict)
-        # self.ingest_agent = IngestAgent(module_config_file_dict)
 
         self.create_extension_module_instances(self, module_config_file_dict)
+
         self.gradio_ui = GradioUI(self)
 
     def _log(self, message):
