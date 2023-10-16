@@ -1,13 +1,13 @@
 from typing import Any, Dict, List, Optional, Type
 
 # from modules.index.data_model import DataModels
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 
 
-class IngestAgent(AppBase):
+class IngestAgent(ModuleBase):
     MODULE_NAME: str = "ingest_agent"
     MODULE_UI_NAME: str = "ingest_agent"
     # REQUIRED_MODULES: List[Type] = [DocLoadingService]
@@ -25,17 +25,8 @@ class IngestAgent(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-
-        self.doc_loading_service = DocLoadingService(
-            module_config_file_dict, doc_loading_provider=self.config.doc_loading_provider
-        )
-        self.database_service = DatabaseService(
-            module_config_file_dict, database_provider="local_filestore_database"
-        )
-        self.required_module_instances = self.get_list_of_module_instances(
-            self, self.REQUIRED_MODULES
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
         )
 
     def ingest_docs(self):

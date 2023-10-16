@@ -2,7 +2,7 @@ from typing import Any, Iterator, List, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel, Field
 from services.document_loading.document_loading_providers import (
@@ -11,7 +11,7 @@ from services.document_loading.document_loading_providers import (
 )
 
 
-class DocLoadingService(AppBase):
+class DocLoadingService(ModuleBase):
     MODULE_NAME: str = "doc_loading_service"
     MODULE_UI_NAME: str = "Document Loading Service"
     REQUIRED_MODULES: List[Type] = [GenericWebScraper]
@@ -29,17 +29,12 @@ class DocLoadingService(AppBase):
             extra = "ignore"
 
     config: ModuleConfigModel
+    doc_loading_providers: List[Any]
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-
-        self.generic_web_scraper = GenericWebScraper(module_config_file_dict, **kwargs)
-        self.generic_recursive_web_scraper = GenericRecursiveWebScraper(
-            module_config_file_dict, **kwargs
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
         )
-
-        self.doc_loading_providers = self.get_list_of_module_instances(self, self.UI_MODULES)
 
     def load(self, data_source, doc_loading_provider=None):
         provider = self.get_requested_module_instance(

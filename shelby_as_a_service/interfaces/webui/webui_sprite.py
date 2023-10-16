@@ -11,14 +11,14 @@ from agents.ceq.ceq_agent import CEQAgent
 from agents.ingest.ingest_agent import IngestAgent
 from agents.vanillallm.vanillallm_agent import VanillaLLM
 from agents.web.web_agent import WebAgent
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 
 # endregion
 
 
-class WebUISprite(AppBase):
+class WebUISprite(ModuleBase):
     MODULE_NAME: str = "webui_sprite"
     MODULE_UI_NAME: str = "webui_sprite"
     REQUIRED_MODULES: List[Type] = [VanillaLLM]
@@ -37,15 +37,9 @@ class WebUISprite(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        # super().__init__()
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-
-        self.vanillallm_agent = VanillaLLM(module_config_file_dict)
-        self.ingest_agent = IngestAgent(module_config_file_dict)
-        # self.ceq_agent = CEQAgent(module_config_file_dict)
-
-        self.create_extension_module_instances(self, module_config_file_dict)
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
         self.gradio_ui = GradioUI(self)
 

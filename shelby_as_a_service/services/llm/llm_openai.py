@@ -7,13 +7,13 @@ import interfaces.webui.gradio_helpers as GradioHelper
 import openai
 import services.prompt_templates.prompt_templates as PromptTemplates
 import services.text_processing.text as TextProcess
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
 
-class OpenAILLM(AppBase):
+class OpenAILLM(ModuleBase):
     MODULE_NAME: str = "openai_llm"
     MODULE_UI_NAME: str = "OpenAI LLM"
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
@@ -51,9 +51,9 @@ class OpenAILLM(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-        self.set_secrets(self)
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
     def create_chat(
         self,
@@ -72,10 +72,14 @@ class OpenAILLM(AppBase):
             model=model,
         )
         if max_tokens is None:
-            max_tokens = model.TOKENS_MAX - request_token_count - 500
+            max_tokens = self.config.max_tokens
+        if max_tokens > model.TOKENS_MAX:
+            max_tokens = model.TOKENS_MAX - request_token_count - 200
+        else:
+            max_tokens = max_tokens - request_token_count - 200
 
         if (self.config.stream and stream is None) or (stream is True):
-            yield from self._create_streaming_chat(prompt, request_token_count, model)
+            yield from self._create_streaming_chat(prompt, max_tokens, request_token_count, model)
         if stream is None:
             stream = False
         if logit_bias is None:
@@ -165,14 +169,13 @@ class OpenAILLM(AppBase):
         request_cost = round(request_cost, 10)
         print(f"Request cost: ${format(request_cost, 'f')}")
 
-        AppBase.total_cost += request_cost
-        AppBase.last_request_cost = request_cost
-        print(f"Total cost: ${format(AppBase.total_cost, 'f')}")
+        self.total_cost += request_cost
+        self.last_request_cost = request_cost
+        print(f"Total cost: ${format(self.total_cost, 'f')}")
 
     def _create_streaming_chat(
-        self, prompt, request_token_count, model
+        self, prompt, max_tokens, request_token_count, model
     ) -> Generator[List[str], None, None]:
-        max_tokens = model.TOKENS_MAX - request_token_count
         stream = openai.ChatCompletion.create(
             api_key=self.secrets["openai_api_key"],
             messages=prompt,

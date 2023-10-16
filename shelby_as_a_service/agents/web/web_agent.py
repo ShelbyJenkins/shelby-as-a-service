@@ -6,7 +6,7 @@ from urllib.parse import urlparse, urlunparse
 import gradio as gr
 import services.text_processing.text as text
 from agents.ingest.ingest_agent import IngestAgent
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from pydantic import BaseModel
 from services.llm.llm_service import LLMService
 
@@ -14,7 +14,7 @@ from services.llm.llm_service import LLMService
 #
 
 
-class WebAgent(AppBase):
+class WebAgent(ModuleBase):
     MODULE_NAME: str = "web_agent"
     MODULE_UI_NAME: str = "URL Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "web_prompt.yaml"

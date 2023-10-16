@@ -6,13 +6,13 @@ from typing import Any, Dict, List, Optional, Type
 import yaml
 
 
-class AppManager:
+class ConfigManager:
     @staticmethod
     def check_and_create_base():
-        existing_app_names = AppManager.check_for_existing_apps()
+        existing_app_names = ConfigManager.check_for_existing_apps()
         if "base" not in existing_app_names:
-            AppManager.create_app("base")
-            existing_app_names = AppManager.check_for_existing_apps()
+            ConfigManager.create_app("base")
+            existing_app_names = ConfigManager.check_for_existing_apps()
 
     @staticmethod
     def check_for_existing_apps():
@@ -44,7 +44,7 @@ class AppManager:
             with open(app_config_dest_path, "w", encoding="utf-8") as file:
                 file.write("{}")
 
-        AppManager.create_update_env_file(app_name)
+        ConfigManager.create_update_env_file(app_name)
 
     @staticmethod
     def create_update_env_file(app_name, secrets=None):
@@ -100,13 +100,13 @@ class AppManager:
                 file.write(f"{key}={value}\n")
 
     @staticmethod
-    def load_webui_sprite_default_app():
+    def load_webui_sprite_default_config():
         app_name = "base"
         # In the case of local app we check for a default_local_app
-        app_config = AppManager.load_app_file("base")
+        app_config = ConfigManager.load_app_config("base")
         default_settings = app_config.get("sprites", {}).get("webui_sprite", {}).get("optional", {})
         if default_settings.get("default_app_enabled") is True:
-            existing_app_names = AppManager.check_for_existing_apps()
+            existing_app_names = ConfigManager.check_for_existing_apps()
             default_local_app_name = default_settings.get("default_local_app_name", None)
             if default_local_app_name is not None and default_local_app_name in existing_app_names:
                 app_name = default_local_app_name
@@ -116,7 +116,7 @@ class AppManager:
         return app_name
 
     @staticmethod
-    def load_app_file(app_name) -> Dict[str, Any]:
+    def load_app_config(app_name) -> Dict[str, Any]:
         try:
             with open(
                 f"app_config/your_apps/{app_name}/app_config.json",
@@ -131,7 +131,7 @@ class AppManager:
         return config_from_file
 
     @staticmethod
-    def save_app_file(app_name, updated_app_config_dict):
+    def save_app_config(app_name, updated_app_config_dict):
         # Save the updated configuration
         with open(
             f"app_config/your_apps/{app_name}/app_config.json",
@@ -236,3 +236,25 @@ class AppManager:
                 print(
                     f"Failed to find class: {view_class_name} in module: {import_path}. Error: {str(e)}"
                 )
+
+    @staticmethod
+    def update_config_file_from_loaded_models():
+        from app_config.app_base import AppBase
+
+        def recurse(module_instance, config_dict):
+            config_dict[module_instance.MODULE_NAME] = module_instance.config.model_dump()
+            module_config_dict = config_dict[module_instance.MODULE_NAME]
+            if required_modules := getattr(module_instance, "REQUIRED_MODULES", None):
+                for child_module in required_modules:
+                    child_module_instance = getattr(module_instance, child_module.MODULE_NAME)
+                    recurse(child_module_instance, module_config_dict)
+
+        app_config_dict = {}
+        app_config_dict["app"] = AppBase.app_config.model_dump()
+
+        app_config_dict["index"] = AppBase.the_context_index.model_dump()
+
+        for sprite in AppBase.available_sprite_instances:
+            recurse(sprite, app_config_dict)
+
+        ConfigManager.save_app_config(AppBase.app_config.app_name, app_config_dict)

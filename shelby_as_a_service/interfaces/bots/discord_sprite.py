@@ -43,7 +43,6 @@ class DiscordSprite(SpriteBase):
         super().__init__()
 
         self.log.print_and_log("Starting DiscordSprite.")
-        self.set_secrets(self)
         self.ceq_agent = CEQAgent(self)
 
         self.intents = discord.Intents.default()

@@ -2,10 +2,10 @@ from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 
 
-class SettingsView(AppBase):
+class SettingsView(ModuleBase):
     MODULE_NAME: str = "settings_view"
     MODULE_UI_NAME: str = "Settings"
     SETTINGS_UI_COL = 4

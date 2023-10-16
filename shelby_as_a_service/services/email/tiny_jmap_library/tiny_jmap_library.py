@@ -3,13 +3,13 @@ import types
 from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import requests
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 from services.llm.llm_openai import OpenAILLM
 
 
-class TinyJMAPClient(AppBase):
+class TinyJMAPClient(ModuleBase):
     """The tiniest JMAP client you can imagine."""
 
     MODULE_NAME: str = "email_service"
@@ -33,9 +33,9 @@ class TinyJMAPClient(AppBase):
 
     def __init__(self, config_file_dict={}, **kwargs):
         """Initialize using a hostname, username and bearer token"""
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-        self.set_secrets(self)
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
         self.session = None
         self.api_url = None
         self.account_id = None

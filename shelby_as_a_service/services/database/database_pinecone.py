@@ -4,12 +4,12 @@ from typing import Any, Dict, List, Type, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import pinecone
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 
 
-class PineconeDatabase(AppBase):
+class PineconeDatabase(ModuleBase):
     MODULE_NAME: str = "pinecone_database"
     MODULE_UI_NAME: str = "pinecone_database"
     REQUIRED_SECRETS: List[str] = ["pinecone_api_key"]
@@ -37,16 +37,15 @@ class PineconeDatabase(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-        self.set_secrets(self)
-
-        pinecone_api_key = self.secrets["pinecone_api_key"]
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
         self.index_name = "shelby-as-a-service"
         self.index_env = "us-central1-gcp"
+
         pinecone.init(
-            api_key=pinecone_api_key,
+            api_key=self.secrets["pinecone_api_key"],
             environment=self.index_env,
         )
         self.pinecone = pinecone

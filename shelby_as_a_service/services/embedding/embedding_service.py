@@ -5,14 +5,15 @@ from typing import Any, List, Type
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import services.text_processing.text as text
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from pydantic import BaseModel
 from services.embedding.embedding_openai import OpenAIEmbedding
 
 
-class EmbeddingService(AppBase):
+class EmbeddingService(ModuleBase):
     MODULE_NAME: str = "embedding_service"
     MODULE_UI_NAME: str = "embedding_service"
+    PROVIDERS_TYPE: str = "embedding_providers"
     REQUIRED_MODULES: List[Type] = [OpenAIEmbedding]
 
     class ModuleConfigModel(BaseModel):
@@ -20,12 +21,12 @@ class EmbeddingService(AppBase):
         embedding_provider: str = "openai_embedding"
 
     config: ModuleConfigModel
+    embedding_providers: List[Any]
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-        self.openai_embedding = OpenAIEmbedding(module_config_file_dict, **kwargs)
-        self.embedding_providers = self.get_list_of_module_instances(self, self.REQUIRED_MODULES)
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
     def get_query_embedding(self, query):
         provider = self.get_requested_module_instance(self.embedding_providers, "openai_embedding")

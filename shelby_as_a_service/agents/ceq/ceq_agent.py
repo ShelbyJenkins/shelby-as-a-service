@@ -4,14 +4,14 @@ from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 import services.text_processing.text as text
 from agents.ceq.ceq_ui import CEQUI
 from agents.ingest.ingest_agent import IngestAgent
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 from services.embedding.embedding_service import EmbeddingService
 from services.llm.llm_service import LLMService
 
 
-class CEQAgent(AppBase):
+class CEQAgent(ModuleBase):
     MODULE_NAME: str = "ceq_agent"
     MODULE_UI_NAME: str = "Context Enhanced Querying"
     MODULE_UI = CEQUI
@@ -37,27 +37,8 @@ class CEQAgent(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-
-        self.ingest_agent = IngestAgent(
-            module_config_file_dict,
-            llm_provider="openai_llm",
-            model="gpt-4",
-            database_provider="local_filestore_database",
-        )
-        self.llm_service = LLMService(
-            module_config_file_dict, llm_provider="openai_llm", model="gpt-4"
-        )
-        # self.embedding_service = EmbeddingService(
-        #     module_config_file_dict, llm_provider="openai_embedding", model="gpt-4"
-        # )
-        # self.database_service = DatabaseService(
-        #     module_config_file_dict, llm_provider="pinecone_database"
-        # )
-
-        self.required_module_instances = self.get_list_of_module_instances(
-            self, self.REQUIRED_MODULES
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
         )
 
     def run_chat(self, chat_in) -> Generator[List[str], None, None]:

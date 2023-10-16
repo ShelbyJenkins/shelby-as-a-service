@@ -68,7 +68,7 @@ def get_module_ui_name_from_str(available_modules, requested_module):
 #     else:
 #         class_instance = getattr(self, settings_components[0])
 
-#     AppManager.update_app_json_from_file(
+#     ConfigManager.update_app_json_from_file(
 #         self.app, self.app_name, class_instance
 #     )
 #     output_message = "Config settings saved to file."
@@ -87,7 +87,7 @@ def get_module_ui_name_from_str(available_modules, requested_module):
 #     for component in secrets_components:
 #         output.append(component.update(value="", placeholder=component.placeholder))
 
-#     AppManager.create_update_env_file(self.app_name, self.secrets)
+#     ConfigManager.create_update_env_file(self.app_name, self.secrets)
 
 #     output_message = "Secrets saved to .env file and loaded into memory."
 #     self._log(output_message)
@@ -125,7 +125,7 @@ def get_module_ui_name_from_str(available_modules, requested_module):
 # def _load_new_app_from_file(self, load_app_name=None):
 #     """Loads new app to app object."""
 
-#     self.existing_app_names_ = AppManager.check_for_existing_apps()
+#     self.existing_app_names_ = ConfigManager.check_for_existing_apps()
 
 #     if load_app_name is not None:
 #         if load_app_name not in self.existing_app_names_:
@@ -164,14 +164,14 @@ def get_module_ui_name_from_str(available_modules, requested_module):
 #         self._log(output_message)
 #     else:
 #         if not self.existing_app_names_:
-#             self.existing_app_names_ = AppManager.check_for_existing_apps()
+#             self.existing_app_names_ = ConfigManager.check_for_existing_apps()
 #         if new_app_name in self.existing_app_names_:
 #             output_message = "That app already exists. Please delete it first"
 #             self._log(output_message)
 #         else:
-#             AppManager().create_app(new_app_name)
-#             AppManager().update_app_json_from_file(self.app, new_app_name)
-#             self.existing_app_names_ = AppManager.check_for_existing_apps()
+#             ConfigManager().create_app(new_app_name)
+#             ConfigManager().update_app_json_from_file(self.app, new_app_name)
+#             self.existing_app_names_ = ConfigManager.check_for_existing_apps()
 #             output_message = f" app '{new_app_name}' created"
 #             self._log(output_message)
 
@@ -209,7 +209,7 @@ def get_module_ui_name_from_str(available_modules, requested_module):
 #             output_message = f"app: '{delete_app_name}' not found."
 #             self._log(output_message)
 
-#         self.existing_app_names_ = AppManager.check_for_existing_apps()
+#         self.existing_app_names_ = ConfigManager.check_for_existing_apps()
 
 #     return (
 #         gr.Dropdown.update(choices=self.existing_app_names_),

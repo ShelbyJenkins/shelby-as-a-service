@@ -4,15 +4,16 @@ from typing import Any, List, Type
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import services.text_processing.text as TextProcess
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 from services.database.database_pinecone import PineconeDatabase
 
 
-class LocalFileStoreDatabase(AppBase):
+class LocalFileStoreDatabase(ModuleBase):
     MODULE_NAME: str = "local_filestore_database"
     MODULE_UI_NAME: str = "local_filestore_database"
+
     REQUIRED_SECRETS: List[str] = []
 
     class ModuleConfigModel(BaseModel):
@@ -21,8 +22,9 @@ class LocalFileStoreDatabase(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
     def _write_documents_to_database(self, documents, data_domain, data_source):
         data_domain_name_file_path = os.path.join(
@@ -55,10 +57,10 @@ class LocalFileStoreDatabase(AppBase):
         return components
 
 
-class DatabaseService(AppBase):
+class DatabaseService(ModuleBase):
     MODULE_NAME: str = "database_service"
     MODULE_UI_NAME: str = "Database Service"
-
+    PROVIDERS_TYPE: str = "database_providers"
     REQUIRED_MODULES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
     UI_MODULES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
 
@@ -67,15 +69,12 @@ class DatabaseService(AppBase):
         database_provider: str = "local_filestore_database"
 
     config: ModuleConfigModel
+    database_providers: List[Any]
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-
-        self.local_filestore_database = LocalFileStoreDatabase(module_config_file_dict, **kwargs)
-        self.pinecone_database = PineconeDatabase(module_config_file_dict, **kwargs)
-
-        self.database_providers = self.get_list_of_module_instances(self, self.UI_MODULES)
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
     def query_index(
         self,

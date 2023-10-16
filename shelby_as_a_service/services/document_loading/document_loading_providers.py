@@ -5,7 +5,7 @@ from typing import Any, Iterator, List, Optional, Type
 
 import gradio as gr
 import services.text_processing.text as TextProcess
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from bs4 import BeautifulSoup
 from interfaces.webui.gradio_ui import GradioUI
 from langchain.document_loaders import (
@@ -18,7 +18,7 @@ from langchain.schema import Document
 from pydantic import BaseModel
 
 
-class GenericWebScraper(AppBase):
+class GenericWebScraper(ModuleBase):
     MODULE_NAME: str = "generic_web_scraper"
     MODULE_UI_NAME: str = "Generic Web Scraper"
 
@@ -29,8 +29,9 @@ class GenericWebScraper(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
     def _load(self, url) -> Iterator[Document]:
         documents = WebBaseLoader(web_path=url).load()
@@ -52,7 +53,7 @@ class GenericWebScraper(AppBase):
         return components
 
 
-class GenericRecursiveWebScraper(AppBase):
+class GenericRecursiveWebScraper(ModuleBase):
     MODULE_NAME: str = "generic_recursive_web_scraper"
     MODULE_UI_NAME: str = "Generic Resursive Web Scraper"
     REQUIRED_SECRETS: List[str] = []
@@ -68,8 +69,9 @@ class GenericRecursiveWebScraper(AppBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:

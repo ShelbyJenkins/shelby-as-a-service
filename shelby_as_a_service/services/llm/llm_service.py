@@ -3,15 +3,16 @@ from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 from services.llm.llm_openai import OpenAILLM
 
 
-class LLMService(AppBase):
+class LLMService(ModuleBase):
     MODULE_NAME: str = "llm_service"
     MODULE_UI_NAME: str = "llm_service"
+    PROVIDERS_TYPE: str = "llm_providers"
     # For intialization
     REQUIRED_MODULES: List[Type] = [OpenAILLM]
     # For interface
@@ -24,14 +25,12 @@ class LLMService(AppBase):
             extra = "ignore"
 
     config: ModuleConfigModel
+    llm_providers: List[Any]
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-
-        self.openai_llm = OpenAILLM(module_config_file_dict, **kwargs)
-
-        self.llm_providers = self.get_list_of_module_instances(self, self.UI_MODULES)
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
     def create_chat(
         self,
@@ -74,6 +73,7 @@ class LLMService(AppBase):
                     label="LLM Provider",
                     container=True,
                 )
+
                 for provider_instance in self.llm_providers:
                     provider_instance.create_ui()
 

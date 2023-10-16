@@ -4,15 +4,15 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
-from app_config.app_base import AppBase
-from app_config.app_manager import AppManager
+from app_config.config_manager import ConfigManager
+from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_themes import AtYourServiceTheme
 from interfaces.webui.views.context_index_view import ContextIndexView
 from interfaces.webui.views.main_chat_view import MainChatView
 from interfaces.webui.views.settings_view import SettingsView
 
 
-class GradioUI(AppBase):
+class GradioUI(ModuleBase):
     gradio_ui: Dict
     update_settings_file = False
     settings_ui_col_scaling = 2
@@ -21,16 +21,17 @@ class GradioUI(AppBase):
 
     def __init__(self, webui_sprite):
         self.webui_sprite = webui_sprite
-
+        self.ui_view_instances = []
         self.main_chat_view = MainChatView(self.webui_sprite)
+        self.ui_view_instances.append(self.main_chat_view)
         self.context_index_view = ContextIndexView(self.webui_sprite)
+        self.ui_view_instances.append(self.context_index_view)
         self.settings_view = SettingsView(self.webui_sprite)
+        self.ui_view_instances.append(self.settings_view)
 
-        AppManager.add_extension_views_to_gradio_ui(
-            self, self.webui_sprite, AppBase.list_of_extension_configs
+        ConfigManager.add_extension_views_to_gradio_ui(
+            self, self.webui_sprite, self.list_of_extension_configs
         )
-
-        self.ui_view_instances = self.get_list_of_module_instances(self, self.UI_VIEWS)
 
     def create_gradio_interface(self):
         all_setting_ui_tabs = []
@@ -158,4 +159,4 @@ class GradioUI(AppBase):
             await asyncio.sleep(5)  # non-blocking sleep
             if GradioUI.update_settings_file:
                 GradioUI.update_settings_file = False
-                AppBase.update_config_file_from_loaded_models()
+                ConfigManager.update_config_file_from_loaded_models()

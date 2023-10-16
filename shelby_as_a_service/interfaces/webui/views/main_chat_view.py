@@ -2,10 +2,10 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 
 
-class MainChatView(AppBase):
+class MainChatView(ModuleBase):
     MODULE_NAME: str = "main_chat_view"
     MODULE_UI_NAME: str = "Main Chat"
     SETTINGS_UI_COL = 2
@@ -128,14 +128,14 @@ class MainChatView(AppBase):
 
     def create_settings_ui(self):
         with gr.Column():
-            for module_instance in self.vanillallm_agent.required_module_instances:
+            for module_instance in self.vanillallm_agent.list_of_module_instances:
                 module_instance.create_settings_ui()
 
     def create_event_handlers(self, components):
         def get_spend():
-            req = f"Request price: ${round(AppBase.last_request_cost, 4)}"
-            AppBase.last_request_cost = Decimal("0")
-            tot = f"Total spend: ${round(AppBase.total_cost, 4)}"
+            req = f"Request price: ${round(self.last_request_cost, 4)}"
+            self.last_request_cost = Decimal("0")
+            tot = f"Total spend: ${round(self.total_cost, 4)}"
             return [req, tot]
 
         gr.on(

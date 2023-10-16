@@ -2,10 +2,10 @@ from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 
 
-class ContextIndexView(AppBase):
+class ContextIndexView(ModuleBase):
     MODULE_NAME: str = "context_index_view"
     MODULE_UI_NAME: str = "Context Index"
     SETTINGS_UI_COL = 4
@@ -15,8 +15,8 @@ class ContextIndexView(AppBase):
 
     def __init__(self, webui_sprite):
         self.webui_sprite = webui_sprite
-        self.ingest_agent = self.webui_sprite.ingest_agent
-        self.the_context_index = AppBase.the_context_index
+        # self.ingest_agent = self.webui_sprite.ingest_agent
+        self.the_context_index = self.the_context_index
         self.components = {}
 
     def create_primary_ui(self):

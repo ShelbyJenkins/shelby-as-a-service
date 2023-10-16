@@ -2,12 +2,12 @@ from decimal import Decimal
 from typing import Any, List, Type
 
 import services.text_processing.text as text
-from app_config.app_base import AppBase
+from app_config.module_base import ModuleBase
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
 
 
-class OpenAIEmbedding(AppBase):
+class OpenAIEmbedding(ModuleBase):
     MODULE_NAME: str = "openai_embedding"
     MODULE_UI_NAME: str = "openai_embedding"
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
@@ -35,9 +35,9 @@ class OpenAIEmbedding(AppBase):
     TYPE_MODEL: str = "openai_embedding_model"
 
     def __init__(self, config_file_dict={}, **kwargs):
-        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
-        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
-        self.set_secrets(self)
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
 
     def _get_query_embedding(self, query, model_name=None):
         model = self.get_model(self, requested_model_name=model_name)

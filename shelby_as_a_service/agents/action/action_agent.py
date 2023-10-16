@@ -16,7 +16,7 @@ from utils.app_base import AppBase
 # endregion
 
 
-class ActionAgent(AppBase):
+class ActionAgent(ModuleBase):
     # ActionAgent
     action_llm_model: str = "gpt-4"
     # QueryAgent
@@ -51,9 +51,7 @@ class ActionAgent(AppBase):
         # Chooses workflow
         # Currently disabled
         with open(
-            os.path.join(
-                "shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"
-            ),
+            os.path.join("shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -72,9 +70,7 @@ class ActionAgent(AppBase):
         # Creates a dic of tokens equivalent to 0-n where n is the number of action items with a logit bias of 100
         # This forces GPT to choose one.
         logit_bias_weight = 100
-        logit_bias = {
-            str(k): logit_bias_weight for k in range(15, 15 + len(actions) + 1)
-        }
+        logit_bias = {str(k): logit_bias_weight for k in range(15, 15 + len(actions) + 1)}
 
         response = openai.ChatCompletion.create(
             api_key=self.secrets["openai_api_key"],
@@ -96,9 +92,7 @@ class ActionAgent(AppBase):
         # Chooses topic
         # If no matching topic found, returns 0.
         with open(
-            os.path.join(
-                "shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"
-            ),
+            os.path.join("shelby_as_service/prompt_templates/", "action_topic_constraint.yaml"),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -123,10 +117,7 @@ class ActionAgent(AppBase):
                 role["content"] = prompt_message
 
         logit_bias_weight = 100
-        logit_bias = {
-            str(k): logit_bias_weight
-            for k in range(15, 15 + len(self.data_domains) + 1)
-        }
+        logit_bias = {str(k): logit_bias_weight for k in range(15, 15 + len(self.data_domains) + 1)}
 
         response = openai.ChatCompletion.create(
             api_key=self.secrets["openai_api_key"],
@@ -182,9 +173,7 @@ class ActionAgent(AppBase):
 
     def keyword_generator(self, query):
         with open(
-            os.path.join(
-                "shelby_as_service/prompt_templates/", "ceq_keyword_generator.yaml"
-            ),
+            os.path.join("shelby_as_service/prompt_templates/", "ceq_keyword_generator.yaml"),
             "r",
             encoding="utf-8",
         ) as stream:
@@ -238,18 +227,14 @@ class ActionAgent(AppBase):
 
         logit_bias_weight = 100
         # 0-9
-        logit_bias = {
-            str(k): logit_bias_weight for k in range(15, 15 + len(documents) + 1)
-        }
+        logit_bias = {str(k): logit_bias_weight for k in range(15, 15 + len(documents) + 1)}
         # \n
         logit_bias["198"] = logit_bias_weight
 
         # Loop over the list of dictionaries in data['prompt_template']
         for role in prompt_template:
             if role["role"] == "user":  # If the 'role' is 'user'
-                role[
-                    "content"
-                ] = prompt_message  # Replace the 'content' with 'prompt_message'
+                role["content"] = prompt_message  # Replace the 'content' with 'prompt_message'
 
         response = openai.ChatCompletion.create(
             api_key=self.secrets["openai_api_key"],
