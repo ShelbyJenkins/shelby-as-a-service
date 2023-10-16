@@ -65,7 +65,7 @@ class GradioUI(AppBase):
             threading.Thread(target=asyncio.run, args=(self.check_for_updates(),)).start()
 
             webui_client.queue()
-            # webui_client.launch(prevent_thread_lock=True)
+            webui_client.launch(prevent_thread_lock=True)
             webui_client.launch()
 
     def primary_ui_creator(self, view_instance):

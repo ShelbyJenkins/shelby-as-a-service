@@ -1,6 +1,7 @@
 import argparse
 
 from app_config.app_base import AppBase
+from extensions.content_aggregator.aggregator_agent import AggregatorAgent
 
 
 def main():

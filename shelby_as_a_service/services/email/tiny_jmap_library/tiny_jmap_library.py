@@ -1,25 +1,49 @@
 import json
+import types
+from typing import Any, Dict, Generator, List, Optional, Type, Union
+
 import requests
+from app_config.app_base import AppBase
+from interfaces.webui.gradio_ui import GradioUI
+from pydantic import BaseModel
+from services.llm.llm_openai import OpenAILLM
 
 
-class TinyJMAPClient:
+class TinyJMAPClient(AppBase):
     """The tiniest JMAP client you can imagine."""
 
-    def __init__(self, hostname, username, token):
-        """Initialize using a hostname, username and bearer token"""
-        assert len(hostname) > 0
-        assert len(username) > 0
-        assert len(token) > 0
+    MODULE_NAME: str = "email_service"
+    MODULE_UI_NAME: str = "email_service"
+    # For intialization
+    REQUIRED_SECRETS: List[str] = [
+        "JMAP_USERNAME",
+        "JMAP_TOKEN",
+    ]
 
-        self.hostname = hostname
-        self.username = username
-        self.token = token
+    class ModuleConfigModel(BaseModel):
+        pass
+
+    class Config:
+        extra = "ignore"
+
+    config: ModuleConfigModel
+    hostname: str = "api.fastmail.com"
+    username: str
+    token: str
+
+    def __init__(self, config_file_dict={}, **kwargs):
+        """Initialize using a hostname, username and bearer token"""
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
+        self.set_secrets(self)
         self.session = None
         self.api_url = None
         self.account_id = None
         self.identity_id = None
 
     def get_session(self):
+        self.username = AppBase.secrets["JMAP_USERNAME"]
+        self.token = AppBase.secrets["JMAP_TOKEN"]
         """Return the JMAP Session Resource as a Python dict"""
         if self.session:
             return self.session
@@ -57,9 +81,7 @@ class TinyJMAPClient:
                     "urn:ietf:params:jmap:core",
                     "urn:ietf:params:jmap:submission",
                 ],
-                "methodCalls": [
-                    ["Identity/get", {"accountId": self.get_account_id()}, "i"]
-                ],
+                "methodCalls": [["Identity/get", {"accountId": self.get_account_id()}, "i"]],
             }
         )
 
@@ -86,3 +108,10 @@ class TinyJMAPClient:
         )
         res.raise_for_status()
         return res.json()
+
+    def create_settings_ui(self):
+        components = {}
+
+        pass
+
+        return components

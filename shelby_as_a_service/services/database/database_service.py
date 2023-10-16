@@ -79,24 +79,31 @@ class DatabaseService(AppBase):
 
     def query_index(
         self,
-        search_terms,
+        search_terms=None,
+        ids=None,
         retrieve_n_docs=None,
         data_domain_name=None,
         database_provider=None,
     ):
-        provider = self.get_provider(database_provider)
+        provider = self.get_requested_module_instance(self.database_providers, database_provider)
         if provider:
-            return provider._query_index(search_terms, retrieve_n_docs, data_domain_name)
+            return provider._query_index(
+                search_terms=search_terms,
+                ids=ids,
+                retrieve_n_docs=retrieve_n_docs,
+                data_domain_name=data_domain_name,
+            )
         else:
             print("rnr")
 
     def write_documents_to_database(
         self,
         documents,
-        data_domain,
-        data_source,
+        data_domain=None,
+        data_source=None,
+        database_provider=None,
     ):
-        provider = self.get_provider(data_source.data_source_database_provider)
+        provider = self.get_requested_module_instance(self.database_providers, database_provider)
         if provider:
             return provider._write_documents_to_database(documents, data_domain, data_source)
         else:

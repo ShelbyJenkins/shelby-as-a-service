@@ -166,8 +166,8 @@ class AppBase:
         for module_instance in available_module_instances:
             if module_instance.MODULE_NAME == requested_module:
                 return module_instance
-            else:
-                return None
+
+        return None
 
     @staticmethod
     def get_model(provider_instance, requested_model_name=None):

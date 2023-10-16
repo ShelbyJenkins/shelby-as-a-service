@@ -8,11 +8,15 @@ import yaml
 def create_openai_prompt(query, prompt_template_path, documents=None) -> List[Dict[str, str]]:
     prompt_template = load_prompt_template(prompt_template_path)
     document_string = create_document_string(documents)
-    if document_string:
-        user_content = "Documents: " + document_string + " Query: " + query
-    else:
+    if query:
         user_content = "Query: " + query
+    else:
+        user_content = ""
+    if document_string:
+        user_content = "Documents: " + document_string + query
 
+    if prompt_template is None:
+        prompt_template = ""
     return [
         {"role": "system", "content": prompt_template},
         {"role": "user", "content": user_content},
@@ -44,6 +48,8 @@ def create_document_string(documents=None):
 
 
 def load_prompt_template(prompt_template_path):
+    if prompt_template_path is None:
+        return None
     with open(
         prompt_template_path,
         "r",

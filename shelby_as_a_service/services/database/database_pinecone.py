@@ -41,9 +41,7 @@ class PineconeDatabase(AppBase):
         self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
         self.set_secrets(self)
 
-    def setup_index(self, pinecone_api_key=None):
-        if pinecone_api_key is None:
-            pinecone_api_key = self.secrets["pinecone_api_key"]
+        pinecone_api_key = self.secrets["pinecone_api_key"]
 
         self.index_name = "shelby-as-a-service"
         self.index_env = "us-central1-gcp"
@@ -51,20 +49,31 @@ class PineconeDatabase(AppBase):
             api_key=pinecone_api_key,
             environment=self.index_env,
         )
+        self.pinecone = pinecone
         self.pinecone_index = pinecone.Index(self.index_name)
 
     def _query_index(
-        self, dense_embedding, retrieve_n_docs=None, data_domain_name=None
+        self,
+        search_terms,
+        retrieve_n_docs=None,
+        data_domain_name=None,
+        ids=None,
     ) -> List[Any]:
-        def _query_namespace(dense_embedding, top_k, namespace, filter=None):
-            response = self.pinecone_index.query(
-                top_k=top_k,
-                include_values=False,
+        def _query_namespace(search_terms, top_k, namespace, filter=None, ids=None):
+            response = self.pinecone_index.fetch(
                 namespace=namespace,
-                include_metadata=True,
-                filter=filter,  # type: ignore
-                vector=dense_embedding,
+                ids=ids,
             )
+            return response
+            # response = self.pinecone_index.query(
+            #     top_k=top_k,
+            #     include_values=False,
+            #     namespace=namespace,
+            #     include_metadata=True,
+            #     filter=filter,  # type: ignore
+            #     vector=search_terms,
+            #     id=ids,
+            # )
             returned_documents = []
             for m in response.matches:
                 response = {
@@ -88,14 +97,14 @@ class PineconeDatabase(AppBase):
 
         if data_domain_name:
             namespace = data_domain_name
-            returned_documents = _query_namespace(dense_embedding, top_k, namespace, filter)
+            returned_documents = _query_namespace(search_terms, top_k, namespace, filter, ids)
         # If we don't have a namespace, just search all available namespaces
         else:
             returned_documents = []
             for data_domain in self.index.index_data_domains:
                 if namespace := getattr(data_domain, "data_domain_name", None):
                     returned_documents.extend(
-                        _query_namespace(dense_embedding, top_k, namespace, filter)
+                        _query_namespace(search_terms, top_k, namespace, filter)
                     )
 
         return returned_documents

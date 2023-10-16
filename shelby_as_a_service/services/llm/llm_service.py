@@ -35,11 +35,14 @@ class LLMService(AppBase):
 
     def create_chat(
         self,
-        query,
+        query=None,
         prompt_template_path=None,
         documents=None,
         llm_provider=None,
         model=None,
+        logit_bias=None,
+        max_tokens=None,
+        stream=None,
     ) -> Generator[List[str], None, None]:
         if llm_provider is None:
             llm_provider = self.config.llm_provider
@@ -51,6 +54,9 @@ class LLMService(AppBase):
                 prompt_template_path=prompt_template_path,
                 documents=documents,
                 model=model,
+                logit_bias=logit_bias,
+                max_tokens=max_tokens,
+                stream=stream,
             )
         else:
             return None

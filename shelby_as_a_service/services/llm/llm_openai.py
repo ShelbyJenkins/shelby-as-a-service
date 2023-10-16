@@ -39,7 +39,7 @@ class OpenAILLM(AppBase):
     class ModuleConfigModel(BaseModel):
         model: str = "gpt-3.5-turbo"
         frequency_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
-        max_tokens: Annotated[int, Field(ge=0, le=65536)] = 16384
+        max_tokens: Annotated[int, Field(ge=0, le=65536)] = 8192
         presence_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
         stream: bool = True
         temperature: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
@@ -56,7 +56,14 @@ class OpenAILLM(AppBase):
         self.set_secrets(self)
 
     def create_chat(
-        self, query, prompt_template_path=None, documents=None, model=None
+        self,
+        query=None,
+        prompt_template_path=None,
+        documents=None,
+        model=None,
+        max_tokens=None,
+        logit_bias=None,
+        stream=None,
     ) -> Union[Generator[List[str], None, None], List[str]]:
         prompt, model, request_token_count = self._prep_chat(
             query=query,
@@ -64,22 +71,28 @@ class OpenAILLM(AppBase):
             documents=documents,
             model=model,
         )
+        if max_tokens is None:
+            max_tokens = model.TOKENS_MAX - request_token_count - 500
 
-        if self.config.stream:
+        if (self.config.stream and stream is None) or (stream is True):
             yield from self._create_streaming_chat(prompt, request_token_count, model)
-        else:
+        if stream is None:
+            stream = False
+        if logit_bias is None:
+            logit_bias = {}
+
+        if self.config.stream is False or stream is False:
             response = openai.ChatCompletion.create(
                 api_key=self.secrets["openai_api_key"],
                 messages=prompt,
                 model=model.MODEL_NAME,
                 frequency_penalty=self.config.frequency_penalty,
-                max_tokens=self.config.max_tokens,
+                max_tokens=max_tokens,
                 presence_penalty=self.config.presence_penalty,
-                stream=False,
                 temperature=self.config.temperature,
                 top_p=self.config.top_p,
+                logit_bias=logit_bias,
             )
-
             (
                 prompt_response,
                 total_prompt_tokens,
@@ -100,6 +113,7 @@ class OpenAILLM(AppBase):
                 response_token_string,
                 total_token_string,
             ]
+
             return None
 
     def _check_response(self, response, model):
@@ -158,12 +172,13 @@ class OpenAILLM(AppBase):
     def _create_streaming_chat(
         self, prompt, request_token_count, model
     ) -> Generator[List[str], None, None]:
+        max_tokens = model.TOKENS_MAX - request_token_count
         stream = openai.ChatCompletion.create(
             api_key=self.secrets["openai_api_key"],
             messages=prompt,
             model=model.MODEL_NAME,
             frequency_penalty=self.config.frequency_penalty,
-            max_tokens=self.config.max_tokens,
+            max_tokens=max_tokens,
             presence_penalty=self.config.presence_penalty,
             stream=True,
             temperature=self.config.temperature,

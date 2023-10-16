@@ -24,7 +24,9 @@ class OpenAIEmbedding(AppBase):
     ]
 
     class ModuleConfigModel(BaseModel):
-        openai_timeout_seconds: float = 180.0
+        model: str = "text-embedding-ada-002"
+        chunk_size: int = 10
+        openai_timeout_seconds: float = 180
 
     config: ModuleConfigModel
 
@@ -32,11 +34,13 @@ class OpenAIEmbedding(AppBase):
     DEFAULT_MODEL: str = "text-embedding-ada-002"
     TYPE_MODEL: str = "openai_embedding_model"
 
-    def __init__(self):
+    def __init__(self, config_file_dict={}, **kwargs):
+        module_config_file_dict = config_file_dict.get(self.MODULE_NAME, {})
+        self.config = self.ModuleConfigModel(**{**kwargs, **module_config_file_dict})
         self.set_secrets(self)
 
     def _get_query_embedding(self, query, model_name=None):
-        model = self.get_model(self.TYPE_MODEL, model_name=model_name)
+        model = self.get_model(self, requested_model_name=model_name)
         if model is None:
             return None
         embedding_retriever = OpenAIEmbeddings(
@@ -51,7 +55,7 @@ class OpenAIEmbedding(AppBase):
         return query_embedding
 
     def _get_documents_embedding(self, documents, model_name=None):
-        model = self.get_model(self.TYPE_MODEL, model_name=model_name)
+        model = self.get_model(self, requested_model_name=model_name)
         if model is None:
             return None
         embedding_retriever = OpenAIEmbeddings(
@@ -60,10 +64,10 @@ class OpenAIEmbedding(AppBase):
             model=model.MODEL_NAME,
             request_timeout=self.config.openai_timeout_seconds,
         )  # type: ignore
-        query_embedding = embedding_retriever.embed_query(documents)
+        doc_embeddings = embedding_retriever.embed_documents(documents)
         # self._calculate_cost(query, model)
         self.log.print_and_log("Embeddings retrieved")
-        return query_embedding
+        return doc_embeddings
 
     def _calculate_cost(self, query, model):
         token_count = text.tiktoken_len(query, model.MODEL_NAME)
