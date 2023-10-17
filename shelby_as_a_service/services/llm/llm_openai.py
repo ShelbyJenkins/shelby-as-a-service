@@ -23,7 +23,7 @@ class OpenAILLM(ModuleBase):
         TOKENS_MAX: int
         COST_PER_K: float
         frequency_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
-        max_tokens: Annotated[int, Field(ge=0, le=16384)] = 8192
+        max_tokens: Annotated[int, Field(ge=0, le=16384)] = 4096
         presence_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
         stream: bool = True
         temperature: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
@@ -56,60 +56,59 @@ class OpenAILLM(ModuleBase):
         query=None,
         prompt_template_path=None,
         documents=None,
-        model=None,
+        llm_model=None,
         max_tokens=None,
         logit_bias=None,
         stream=None,
     ):
-        prompt, model, request_token_count = self._prep_chat(
+        prompt, llm_model, total_prompt_tokens = self._prep_chat(
             query=query,
             prompt_template_path=prompt_template_path,
             documents=documents,
-            model=model,
+            llm_model=llm_model,
         )
         if max_tokens is None:
-            max_tokens = model.max_tokens
-        if max_tokens > model.TOKENS_MAX:
-            max_tokens = model.TOKENS_MAX - request_token_count - 200
+            max_tokens = llm_model.max_tokens
+        if max_tokens > llm_model.TOKENS_MAX:
+            max_tokens = llm_model.TOKENS_MAX - total_prompt_tokens
         else:
-            max_tokens = max_tokens - request_token_count - 200
+            max_tokens = max_tokens - total_prompt_tokens
 
-        if (model.stream and stream is None) or (stream is True):
-            yield from self._create_streaming_chat(prompt, max_tokens, request_token_count, model)
-        if stream is None:
-            stream = False
-        if logit_bias is None:
-            logit_bias = {}
+        if (llm_model.stream and stream is None) or (stream is True):
+            yield from self._create_streaming_chat(prompt, max_tokens, total_prompt_tokens, llm_model)
+        else:
+            if logit_bias is None:
+                logit_bias = {}
 
-        if model.stream is False or stream is False:
             response = openai.ChatCompletion.create(
                 api_key=self.secrets["openai_api_key"],
                 messages=prompt,
-                model=model.MODEL_NAME,
-                frequency_penalty=model.frequency_penalty,
+                model=llm_model.MODEL_NAME,
+                frequency_penalty=llm_model.frequency_penalty,
                 max_tokens=max_tokens,
-                presence_penalty=model.presence_penalty,
-                temperature=model.temperature,
-                top_p=model.top_p,
+                presence_penalty=llm_model.presence_penalty,
+                temperature=llm_model.temperature,
+                top_p=llm_model.top_p,
                 logit_bias=logit_bias,
             )
-            # (
-            #     prompt_response,
-            #     total_prompt_tokens,
-            #     total_completion_tokens,
-            #     token_count,
-            # ) = self._check_response(response, model)
+            (
+                prompt_response,
+                total_prompt_tokens,
+                total_completion_tokens,
+                total_token_count,
+            ) = self._check_response(response, llm_model)
 
-            # if not prompt_response:
-            #     return None
+            response = {
+                "response_content_string": prompt_response,
+                "total_prompt_tokens": total_prompt_tokens,
+                "total_completion_tokens": total_completion_tokens,
+                "total_token_count": total_token_count,
+                "model_name": llm_model.MODEL_NAME,
+            }
+            yield response
+            return response
 
-            # request_token_string = f"Request token count: {total_prompt_tokens}"
-            # response_token_string = f"Response token count: {total_completion_tokens}"
-            # total_token_string = f"Total token count: {token_count}"
-
-            yield response.get("choices", [{}])[0].get("message", {}).get("content")
-
-    def _check_response(self, response, model):
+    def _check_response(self, response, llm_model):
         # Check if keys exist in dictionary
         parsed_response = response.get("choices", [{}])[0].get("message", {}).get("content")
 
@@ -119,36 +118,19 @@ class OpenAILLM(ModuleBase):
         if not parsed_response:
             raise ValueError(f"Error in response: {response}")
 
-        token_count = total_prompt_tokens + total_completion_tokens
-        self._calculate_cost(token_count, model=model)
+        total_token_count = total_prompt_tokens + total_completion_tokens
+        self._calculate_cost(total_token_count, llm_model=llm_model)
 
         return (
             parsed_response,
             total_prompt_tokens,
             total_completion_tokens,
-            token_count,
+            total_token_count,
         )
 
-    def _calculate_cost(self, token_count, model):
+    def _calculate_cost(self, total_token_count, llm_model):
         # Convert numbers to Decimal
-        COST_PER_K_decimal = Decimal(model.COST_PER_K)
-        token_count_decimal = Decimal(token_count)
-
-        # Perform the calculation using Decimal objects
-        request_cost = COST_PER_K_decimal * (token_count_decimal / 1000)
-
-        # If you still wish to round (even though Decimal is precise), you can do so
-        request_cost = round(request_cost, 10)
-        print(f"Request cost: ${format(request_cost, 'f')}")
-
-        self.total_cost += request_cost
-        self.last_request_cost = request_cost
-        print(f"Request cost: ${format(request_cost, 'f')}")
-        print(f"Total cost: ${format(self.total_cost, 'f')}")
-
-    def _calculate_cost_streaming(self, total_token_count, model):
-        # Convert numbers to Decimal
-        COST_PER_K_decimal = Decimal(model.COST_PER_K)
+        COST_PER_K_decimal = Decimal(llm_model.COST_PER_K)
         token_count_decimal = Decimal(total_token_count)
 
         # Perform the calculation using Decimal objects
@@ -160,47 +142,60 @@ class OpenAILLM(ModuleBase):
 
         self.total_cost += request_cost
         self.last_request_cost = request_cost
+        print(f"Request cost: ${format(request_cost, 'f')}")
         print(f"Total cost: ${format(self.total_cost, 'f')}")
 
-    def _create_streaming_chat(self, prompt, max_tokens, request_token_count, model):
+    def _create_streaming_chat(self, prompt, max_tokens, total_prompt_tokens, llm_model):
         stream = openai.ChatCompletion.create(
             api_key=self.secrets["openai_api_key"],
             messages=prompt,
-            model=model.MODEL_NAME,
-            frequency_penalty=model.frequency_penalty,
+            model=llm_model.MODEL_NAME,
+            frequency_penalty=llm_model.frequency_penalty,
             max_tokens=max_tokens,
-            presence_penalty=model.presence_penalty,
+            presence_penalty=llm_model.presence_penalty,
             stream=True,
-            temperature=model.temperature,
-            top_p=model.top_p,
+            temperature=llm_model.temperature,
+            top_p=llm_model.top_p,
         )
 
         chunk = {}
-        partial_message = ""
-        request_token_string = f"Request token count: {request_token_count}"
-        response_token_count = 0
-        total_token_count = request_token_count
+        response_content_string = ""
+        total_completion_tokens = 0
+        total_token_count = total_prompt_tokens
         for chunk in stream:
             delta_content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
             if len(delta_content) != 0:
-                chunk_token_count = TextProcess.tiktoken_len(delta_content, model.MODEL_NAME)
-                response_token_count += chunk_token_count
-                response_token_string = f"Response token count: {response_token_count}"
+                chunk_token_count = TextProcess.tiktoken_len(delta_content, llm_model.MODEL_NAME)
+                total_completion_tokens += chunk_token_count
                 total_token_count += chunk_token_count
-                total_token_string = f"Total token count: {total_token_count}"
 
-                partial_message += delta_content
-                yield partial_message
+                response_content_string += delta_content
 
+                response = {
+                    "response_content_string": response_content_string,
+                    "total_prompt_tokens": total_prompt_tokens,
+                    "total_completion_tokens": total_completion_tokens,
+                    "total_token_count": total_token_count,
+                    "model_name": llm_model.MODEL_NAME,
+                }
+                yield response
             finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
             if finish_reason:
-                self._calculate_cost_streaming(
+                self._calculate_cost(
                     total_token_count=total_token_count,
-                    model=model,
+                    llm_model=llm_model,
                 )
+                response = {
+                    "response_content_string": response_content_string,
+                    "total_prompt_tokens": total_prompt_tokens,
+                    "total_completion_tokens": total_completion_tokens,
+                    "total_token_count": total_token_count,
+                    "model_name": llm_model.MODEL_NAME,
+                }
+                return response
 
-    def _prep_chat(self, query, prompt_template_path=None, documents=None, model=None):
-        model = self.get_model(self, requested_model_name=model)
+    def _prep_chat(self, query, prompt_template_path=None, documents=None, llm_model=None):
+        llm_model = self.get_model(self, requested_model_name=llm_model)
 
         prompt = PromptTemplates.create_openai_prompt(
             query=query,
@@ -213,11 +208,11 @@ class OpenAILLM(ModuleBase):
             role = entry.get("role", "")
             content = entry.get("content", "")
             result += f"{role}: {content}\n"
-        request_token_count = TextProcess.tiktoken_len(result, encoding_model=model.MODEL_NAME)
+        total_prompt_tokens = TextProcess.tiktoken_len(result, encoding_model=llm_model.MODEL_NAME)
 
-        if prompt is None or model is None or request_token_count is None:
-            raise ValueError(f"Error with input values - prompt: {prompt}, model: {model}, request_token_count: {request_token_count}")
-        return prompt, model, request_token_count
+        if prompt is None or llm_model is None or total_prompt_tokens is None:
+            raise ValueError(f"Error with input values - prompt: {prompt}, model: {llm_model}, total_prompt_tokens: {total_prompt_tokens}")
+        return prompt, llm_model, total_prompt_tokens
 
     def create_settings_ui(self):
         model_dropdown = gr.Dropdown(

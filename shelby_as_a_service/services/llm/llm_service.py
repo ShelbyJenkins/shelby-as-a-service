@@ -32,7 +32,7 @@ class LLMService(ModuleBase):
         prompt_template_path=None,
         documents=None,
         llm_provider=None,
-        model=None,
+        llm_model=None,
         logit_bias=None,
         max_tokens=None,
         stream=None,
@@ -42,17 +42,25 @@ class LLMService(ModuleBase):
 
         provider_instance = self.get_requested_module_instance(self.llm_providers, llm_provider)
         if provider_instance:
-            yield from provider_instance.create_chat(
+            response = {}
+            for response in provider_instance.create_chat(
                 query=query,
                 prompt_template_path=prompt_template_path,
                 documents=documents,
-                model=model,
+                llm_model=llm_model,
                 logit_bias=logit_bias,
                 max_tokens=max_tokens,
                 stream=stream,
-            )
-        else:
-            return None
+            ):
+                yield response
+
+            return {
+                "response_content_string": response["response_content_string"],
+                "total_prompt_tokens": f"Request token count: {response['total_prompt_tokens']}",
+                "total_completion_tokens": f"Response token count: {response['total_completion_tokens']}",
+                "total_token_count": f"Total token count: {response['total_token_count']}",
+                "model_name": response["model_name"],
+            }
 
     def create_settings_ui(self):
         components = {}
@@ -67,6 +75,6 @@ class LLMService(ModuleBase):
         for provider_instance in self.llm_providers:
             provider_instance.create_settings_ui()
 
-        GradioHelper.create_settings_event_listener(self, components)
+        GradioHelper.create_settings_event_listener(self.config, components)
 
         return components

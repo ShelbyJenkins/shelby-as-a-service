@@ -19,10 +19,12 @@ class OpenAIEmbedding(ModuleBase):
         TOKENS_MAX: int
         COST_PER_K: float
 
-    MODEL_DEFINITIONS: dict[str, Any] = {"text-embedding-ada-002": {"MODEL_NAME": "text-embedding-ada-002", "TOKENS_MAX": 8192, "COST_PER_K": 0.0001}}
+    MODEL_DEFINITIONS: dict[str, Any] = {
+        "text-embedding-ada-002": {"MODEL_NAME": "text-embedding-ada-002", "TOKENS_MAX": 8192, "COST_PER_K": 0.0001}
+    }
 
     class ModuleConfigModel(BaseModel):
-        current_model_name: str = "text-emedding-ada-002"
+        current_model_name: str = "text-embedding-ada-002"
         available_models: dict[str, "OpenAIEmbedding.ModelConfig"]
 
     config: ModuleConfigModel

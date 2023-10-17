@@ -13,6 +13,15 @@ def tiktoken_len(document, encoding_model="text-embedding-ada-002"):
     return len(tokens)
 
 
+def tiktoken_len_of_document_list(documents):
+    token_count = 0
+    for document in documents:
+        tokens = 0
+        tokens += tiktoken_len(document["content"])
+        token_count += tokens
+    return token_count
+
+
 def get_document_content(document):
     # Check attributes
     for attr in ["page_content", "content"]:
@@ -49,9 +58,7 @@ def strip_unwanted_chars(text):
         str: The stripped text.
     """
     # Define which chars can be kept; Alpha-numeric chars, punctuation, and whitespaces.
-    allowed_chars = (
-        string.ascii_letters + string.digits + string.punctuation + string.whitespace
-    )
+    allowed_chars = string.ascii_letters + string.digits + string.punctuation + string.whitespace
 
     # Remove unwanted chars using regex.
     stripped_text = re.sub(f"[^{re.escape(allowed_chars)}]", "", text)
@@ -132,11 +139,7 @@ def extract_and_clean_title(document, url=None):
     """
 
     # Use metadata from doc or initialize as empty dictionary
-    metadata = (
-        document.metadata
-        if hasattr(document, "metadata")
-        else document.get("metadata", {})
-    )
+    metadata = document.metadata if hasattr(document, "metadata") else document.get("metadata", {})
     title = metadata.title if hasattr(metadata, "title") else metadata.get("title", {})
 
     # If title is absent in metadata, attempt to derive it from provided URL or 'loc' in metadata

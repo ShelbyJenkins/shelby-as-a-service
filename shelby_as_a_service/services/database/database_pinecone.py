@@ -16,11 +16,11 @@ class PineconeDatabase(ModuleBase):
     class ModuleConfigModel(BaseModel):
         index_env: str = "us-central1-gcp"
         index_name: str = "shelby-as-a-service"
-        embedding_max_chunk_size: int = 8191
         vectorstore_dimension: int = 1536
         vectorstore_upsert_batch_size: int = 20
         vectorstore_metric: str = "cosine"
         vectorstore_pod_type: str = "p1"
+
         preprocessor_min_length: int = 150
         #  text_splitter_goal_length: int = 500
         text_splitter_goal_length: int = 750
@@ -240,5 +240,6 @@ class PineconeDatabase(ModuleBase):
                     label="indexed_metadata",
                     interactive=True,
                 )
-            GradioHelper.create_settings_event_listener(self, components)
+                GradioHelper.create_settings_event_listener(self.config, components)
+
         return components

@@ -32,7 +32,9 @@ class MainChatView(ModuleBase):
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
-        self.current_agent_instance = self.get_requested_module_instance(self.list_of_module_instances, self.config.current_agent_name)
+        self.current_agent_instance = self.get_requested_module_instance(
+            self.list_of_module_instances, self.config.current_agent_name
+        )
 
     def run_chat(self, chat_in):
         self.log.print_and_log(f"Running query: {chat_in}")
@@ -41,7 +43,6 @@ class MainChatView(ModuleBase):
             chat_in=chat_in,
         )
         yield from response
-        return None
 
     def create_primary_ui(self):
         components = {}
@@ -158,49 +159,36 @@ class MainChatView(ModuleBase):
         components = {}
 
         with gr.Column():
-            agent_radio = gr.Radio(
-                value=self.config.current_agent_ui_name,
-                choices=self.list_of_module_ui_names,
-            )
-
             agent_settings_list = []
-
+            self.config.current_agent_ui_name
             for agent_instance in self.list_of_module_instances:
-                ui_name = agent_instance.MODULE_UI_NAME
-                if ui_name == self.config.current_agent_ui_name:
-                    visibility = True
-                else:
-                    visibility = False
-                with gr.Accordion(label=agent_instance.MODULE_UI_NAME, open=True, visible=visibility) as agent_settings:
-                    with gr.Tab(label="Retrieval Settings"):
-                        agent_instance.create_settings_ui()
-                    for module_instance in agent_instance.list_of_module_instances:
-                        with gr.Tab(label=module_instance.MODULE_UI_NAME):
-                            module_instance.create_settings_ui()
+                with gr.Tab(label=agent_instance.MODULE_UI_NAME) as agent_settings:
+                    agent_instance.create_settings_ui()
 
                 agent_settings_list.append(agent_settings)
 
-        def set_current_agent(requsted_agent):
-            output = []
-            for module_instance in self.list_of_module_instances:
-                ui_name = module_instance.MODULE_UI_NAME
-                if ui_name == requsted_agent:
-                    self.config.current_agent_name = module_instance.MODULE_NAME
-                    self.config.current_agent_ui_name = ui_name
-                    self.current_agent_instance = module_instance
-                    ModuleBase.update_settings_file = True
-                    output.append(gr.Accordion(label=ui_name, visible=True))
-                else:
-                    output.append(gr.Accordion(label=ui_name, visible=False))
-            return output
+        def create_nav_events(agent_settings_list):
+            def set_agent_view(requested_agent: str):
+                for agent in self.list_of_module_instances:
+                    if requested_agent == agent.MODULE_UI_NAME:
+                        self.config.current_agent_name = agent.MODULE_NAME
+                        self.config.current_agent_ui_name = agent.MODULE_UI_NAME
+                        self.current_agent_instance = agent
 
-        agent_radio.change(
-            fn=set_current_agent,
-            inputs=agent_radio,
-            outputs=agent_settings_list,
-        )
+                ModuleBase.update_settings_file = True
 
-        GradioHelper.create_settings_event_listener(self, components)
+            def get_nav_evt(evt: gr.SelectData):
+                output = set_agent_view(evt.value)
+                return output
+
+            for agent_nav_tab in agent_settings_list:
+                agent_nav_tab.select(
+                    fn=get_nav_evt,
+                )
+
+        create_nav_events(agent_settings_list)
+
+        GradioHelper.create_settings_event_listener(self.config, components)
 
     def create_event_handlers(self, components):
         def get_spend():

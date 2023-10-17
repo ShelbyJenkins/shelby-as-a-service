@@ -42,7 +42,8 @@ class GenericWebScraper(ModuleBase):
                     label="Continue On Failure",
                     interactive=True,
                 )
-            GradioHelper.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self.config, components)
+
         return components
 
 
@@ -111,7 +112,8 @@ class GenericRecursiveWebScraper(ModuleBase):
                     info="IDK",
                     interactive=True,
                 )
-            GradioHelper.create_settings_event_listener(self, components)
+                GradioHelper.create_settings_event_listener(self.config, components)
+
         return components
 
     # class OpenAPILoader(ServiceBase):

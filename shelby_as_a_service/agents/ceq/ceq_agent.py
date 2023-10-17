@@ -14,206 +14,89 @@ class CEQAgent(ModuleBase):
     MODULE_NAME: str = "ceq_agent"
     MODULE_UI_NAME: str = "Context Enhanced Querying"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/ceq/ceq_prompt_templates.yaml"
-    DATA_DOMAIN_NONE_FOUND_MESSAGE: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
-    REQUIRED_MODULES: List[Type] = [LLMService, RetrievalAgent]
+    DATA_DOMAIN_NONE_FOUND_MESSAGE: str = (
+        "Query not related to any supported data domains (aka topics). Supported data domains are:"
+    )
+    REQUIRED_MODULES: List[Type] = [RetrievalAgent, LLMService]
 
     class ModuleConfigModel(BaseModel):
         enabled_data_domains: list[str] = ["all"]
-        docs_max_token_length: int = 1200
-        docs_max_total_tokens: int = 2500
-        docs_max_used: int = 5
-        keyword_generator_enabled: bool = False
-        doc_relevancy_check_enabled: bool = False
 
         class Config:
             extra = "ignore"
 
     config: ModuleConfigModel
     llm_service: LLMService
+    retrieval_agent: RetrievalAgent
+    list_of_module_instances: list
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
-    def run_chat(self, chat_in):
-        response = self.llm_service.create_chat(
+    def run_chat(
+        self,
+        chat_in,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        stream: Optional[bool] = None,
+        sprite_name: Optional[str] = "webui_sprite",
+    ):
+        documents = self.retrieval_agent.get_documents(query=chat_in, enabled_data_domains=self.config.enabled_data_domains)
+
+        previous_response: Optional[dict] = None
+        final_response: Optional[dict] = None
+        for current_response in self.llm_service.create_chat(
             query=chat_in,
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
-        )
-        yield from response
+            documents=documents,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            max_tokens=max_tokens,
+            stream=stream,
+        ):
+            if previous_response is not None:
+                yield previous_response["response_content_string"]
+            if current_response is not None:
+                previous_response = current_response
 
-    def run_context_enriched_query(self, chat_in):
-        # try:
+        final_response = previous_response
 
-        # if self.data_domain_constraints_enabled:
-        # self.data_domain_name, response = self.select_data_domain(query)
-        #     if response:
-        #         return response
-        # self.log.print_and_log(f"Running query: {query}")
-        query_to_embed = query
-        # if self.keyword_generator_enabled:
-        #     query_to_embed = self.action_agent.keyword_generator(query)
-        #     self.log.print_and_log(
-        #         f"ceq_keyword_generator response: {query_to_embed}"
-        #     )
+        llm_model_name = final_response.get("model_name", None) or "unknown llm model"  # type: ignore
+        response_content_string = final_response.get("response_content_string", None)  # type: ignore
 
-        query_embedding = self.embedding_service.get_query_embedding(query_to_embed)
+        full_response = self.ceq_append_meta(response_content_string, documents, llm_model_name)
 
-        returned_documents = self.database_service.query_index(query_embedding, self.retrieve_n_docs, self.data_domain_name)
+        if sprite_name == "webui_sprite":
+            yield self.parse_local_markdown(full_response)
+        else:
+            return full_response
 
-        # if self.doc_relevancy_check_enabled:
-        #     if (
-        #         returned_documents := (
-        #             ActionAgent.doc_relevancy_check(query, returned_documents)
-        #         )
-        #     ) is None:
-        #         raise ValueError(
-        #         "No supporting documents found. Currently we don't support queries without supporting context."
-        #     )
-
-        parsed_documents = self.ceq_parse_documents(returned_documents)
-
-        if not parsed_documents:
-            raise ValueError("No supporting documents found. Currently we don't support queries without supporting context.")
-
-        self.log.print_and_log("Sending prompt to LLM")
-        return prompt_template_path, parsed_documents
-
-    def ceq_parse_documents(self, returned_documents=None):
-        def _docs_tiktoken_len(documents):
-            token_count = 0
-            for document in documents:
-                tokens = 0
-                tokens += text.tiktoken_len(document["content"])
-
-                token_count += tokens
-            return token_count
-
-        if not returned_documents:
-            self.log.print_and_log("No supporting documents after initial query!")
-            return None
-
-        # Count the number of 'hard' and 'soft' documents
-        hard_count = sum(1 for doc in returned_documents if doc["doc_type"] == "hard")
-        soft_count = sum(1 for doc in returned_documents if doc["doc_type"] == "soft")
-
-        # Sort the list by score
-        sorted_documents = sorted(returned_documents, key=lambda x: x["score"], reverse=True)
-
-        for i, document in enumerate(sorted_documents, start=1):
-            token_count = text.tiktoken_len(document["content"])
-            if token_count > self.docs_max_total_tokens:
-                sorted_documents.pop(i - 1)
-                continue
-            document["token_count"] = token_count
-            document["doc_num"] = i
-
-        embeddings_tokens = _docs_tiktoken_len(sorted_documents)
-
-        self.log.print_and_log(f"context docs token count: {embeddings_tokens}")
-        iterations = 0
-        original_documents_count = len(sorted_documents)
-        while embeddings_tokens > self.docs_max_total_tokens:
-            if iterations >= original_documents_count:
-                break
-            # Find the index of the document with the highest token_count that exceeds ceq_docs_max_token_length
-            max_token_count_idx = max(
-                (idx for idx, document in enumerate(sorted_documents) if document["token_count"] > self.docs_max_token_length),
-                key=lambda idx: sorted_documents[idx]["token_count"],
-                default=None,
-            )
-            # If a document was found that meets the conditions, remove it from the list
-            if max_token_count_idx is not None:
-                doc_type = sorted_documents[max_token_count_idx]["doc_type"]
-                if doc_type == "soft":
-                    soft_count -= 1
-                else:
-                    hard_count -= 1
-                sorted_documents.pop(max_token_count_idx)
-                # break ?
-            # Remove the lowest scoring 'soft' document if there is more than one,
-            elif soft_count > 1:
-                for idx, document in reversed(list(enumerate(sorted_documents))):
-                    if document["doc_type"] == "soft":
-                        sorted_documents.pop(idx)
-                        soft_count -= 1
-                        break
-            # otherwise remove the lowest scoring 'hard' document
-            elif hard_count > 1:
-                for idx, document in reversed(list(enumerate(sorted_documents))):
-                    if document["doc_type"] == "hard":
-                        sorted_documents.pop(idx)
-                        hard_count -= 1
-                        break
-            else:
-                # Find the index of the document with the highest token_count
-                max_token_count_idx = max(
-                    range(len(sorted_documents)),
-                    key=lambda idx: sorted_documents[idx]["token_count"],
-                )
-                # Remove the document with the highest token_count from the list
-                sorted_documents.pop(max_token_count_idx)
-
-            embeddings_tokens = _docs_tiktoken_len(sorted_documents)
-            self.log.print_and_log("removed lowest scoring embedding doc .")
-            self.log.print_and_log(f"context docs token count: {embeddings_tokens}")
-            iterations += 1
-        self.log.print_and_log(f"number of context docs now: {len(sorted_documents)}")
-        # Same as above but removes based on total count of docs instead of token count.
-        while len(sorted_documents) > self.docs_max_used:
-            if soft_count > 1:
-                for idx, document in reversed(list(enumerate(sorted_documents))):
-                    if document["doc_type"] == "soft":
-                        sorted_documents.pop(idx)
-                        soft_count -= 1
-                        break
-            elif hard_count > 1:
-                for idx, document in reversed(list(enumerate(sorted_documents))):
-                    if document["doc_type"] == "hard":
-                        sorted_documents.pop(idx)
-                        hard_count -= 1
-                        break
-            # sself.log.print_and_log("removed lowest scoring embedding doc.")
-
-        for i, document in enumerate(sorted_documents, start=1):
-            document["doc_num"] = i
-
-        final_documents_list = []
-        for parsed_document in sorted_documents:
-            final_documents_list.append(parsed_document["url"])
-        self.log.print_and_log(f"{len(sorted_documents)} documents returned after parsing: {final_documents_list}")
-
-        if not sorted_documents:
-            self.log.print_and_log("No supporting documents after parsing!")
-            return None
-
-        return sorted_documents
-
-    def ceq_append_meta(self, input_text, parsed_documents) -> Dict[str, str]:
+    def ceq_append_meta(self, response_content_string: str, documents: list[dict], llm_model_name) -> dict[str, str]:
         # Covering LLM doc notations cases
         # The modified pattern now includes optional opening parentheses or brackets before "Document"
         # and optional closing parentheses or brackets after the number
         pattern = r"[\[\(]?Document\s*\[?(\d+)\]?\)?[\]\)]?"
-        formatted_text = re.sub(pattern, r"[\1]", input_text, flags=re.IGNORECASE)
+        formatted_text = re.sub(pattern, r"[\1]", response_content_string, flags=re.IGNORECASE)
 
         # This finds all instances of [n] in the LLM response
         pattern_num = r"\[\d\]"
         matches = re.findall(pattern_num, formatted_text)
-        print(matches)
 
         if not matches:
-            self.log.print_and_log("No supporting docs.")
+            # self.log.print_and_log("No supporting docs.")
             answer_obj = {
-                "answer_text": input_text,
-                "llm": self.llm_model,
+                "response_content_string": response_content_string,
+                "llm": llm_model_name,
                 "documents": [],
             }
             return answer_obj
-        print(matches)
 
         # Formatted text has all mutations of documents n replaced with [n]
+
         answer_obj = {
-            "answer_text": formatted_text,
-            "llm": self.llm_model,
+            "response_content_string": formatted_text,
+            "llm": llm_model_name,
             "documents": [],
         }
 
@@ -225,70 +108,50 @@ class CEQAgent(ModuleBase):
                 # Subtract 1 to get the correct index in the list
                 doc_index = doc_num - 1
                 # Access the document from the list using the index
-                if 0 <= doc_index < len(parsed_documents):
+                if 0 <= doc_index < len(documents):
                     document = {
-                        "doc_num": parsed_documents[doc_index]["doc_num"],
-                        "url": parsed_documents[doc_index]["url"].replace(" ", "-"),
-                        "title": parsed_documents[doc_index]["title"],
+                        "doc_num": documents[doc_index]["doc_num"],
+                        "url": documents[doc_index]["url"].replace(" ", "-"),
+                        "title": documents[doc_index]["title"],
                     }
                     answer_obj["documents"].append(document)
                 else:
                     pass
                     self.log.print_and_log(f"Document{doc_num} not found in the list.")
 
-        self.log.print_and_log(f"response with metadata: {answer_obj}")
+        # self.log.print_and_log(f"response with metadata: {answer_obj}")
 
         return answer_obj
 
+    def parse_local_markdown(self, full_response) -> str:
+        # Should move this to text processing module
+        markdown_string = ""
+        # Start with the answer text
+        if response_content_string := full_response.get("response_content_string", None):
+            markdown_string += f"{response_content_string}\n\n"
+        # Add the sources header if there are any documents
+        if documents := full_response.get("documents", None):
+            markdown_string += "**Sources:**\n"
+            # For each document, add a numbered list item with the title and URL
+            for doc in documents:
+                markdown_string += f"[{doc['doc_num']}] **{doc['title']}**: <{doc['url']}>\n"
+        else:
+            markdown_string += "No related documents found.\n"
+
+        return markdown_string
+
     def create_settings_ui(self):
         components = {}
-        with gr.Accordion(label="Retrival Settings", open=True):
-            components["enabled_data_domains"] = gr.Dropdown(
-                show_label=False,
-                choices=["tatum", "None", "all", "Custom"],
-                value="all",
-                label="Enabled Data Domains",
-                multiselect=True,
-                info="Select which data domains to enable.",
-            )
-            components["docs_max_token_length"] = gr.Number(
-                value=self.config.docs_max_token_length,
-                label="Maximum Document Token Length",
-                show_label=False,
-                minimum=1,
-                maximum=2000,
-                step=1,
-                info="Maximum number of tokens allowed in a document.",
-            )
-            components["docs_max_total_tokens"] = gr.Number(
-                value=self.config.docs_max_total_tokens,
-                label="Maximum Total Tokens",
-                show_label=False,
-                minimum=1,
-                maximum=5000,
-                step=1,
-                info="Maximum number of tokens allowed in all documents.",
-            )
-            components["docs_max_used"] = gr.Number(
-                value=self.config.docs_max_used,
-                label="Maximum Number of Documents Used",
-                show_label=False,
-                minimum=1,
-                maximum=10,
-                step=1,
-                info="Maximum number of documents allowed to be used.",
-            )
 
-        with gr.Accordion(label="Smart Settings", open=True):
-            components["doc_relevancy_check_enabled"] = gr.Checkbox(
-                value=self.config.doc_relevancy_check_enabled,
-                label="Document Relevancy Check",
-                interactive=True,
-            )
-            components["keyword_generator_enabled"] = gr.Checkbox(
-                value=self.config.keyword_generator_enabled,
-                label="Keyword Generator",
-                interactive=True,
-            )
-
+        components["enabled_data_domains"] = gr.Dropdown(
+            show_label=False,
+            choices=["tatum", "None", "all", "Custom"],
+            value="all",
+            label="Enabled Data Domains",
+            multiselect=True,
+            info="Select which data domains to enable.",
+        )
+        for module_instance in self.list_of_module_instances:
+            with gr.Tab(label=module_instance.MODULE_UI_NAME):
+                module_instance.create_settings_ui()
         GradioHelper.create_settings_event_listener(self.config, components)

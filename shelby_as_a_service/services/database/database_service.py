@@ -28,20 +28,23 @@ class DatabaseService(ModuleBase):
 
     def query_index(
         self,
-        search_terms=None,
-        retrieve_n_docs=None,
-        data_domain_name=None,
+        search_terms,
+        retrieve_n_docs,
+        data_domain_name,
         database_provider=None,
     ):
+        if database_provider is None:
+            database_provider = self.config.database_provider
         provider = self.get_requested_module_instance(self.database_providers, database_provider)
         if provider:
-            return provider._query_index(
+            return provider.query_index(
                 search_terms=search_terms,
                 retrieve_n_docs=retrieve_n_docs,
                 data_domain_name=data_domain_name,
             )
         else:
             print("rnr")
+            return []
 
     def fetch_by_ids(
         self,
@@ -59,6 +62,7 @@ class DatabaseService(ModuleBase):
             )
         else:
             print("rnr")
+            return []
 
     def write_documents_to_database(
         self,
@@ -86,6 +90,6 @@ class DatabaseService(ModuleBase):
             for provider_instance in self.database_providers:
                 provider_instance.create_settings_ui()
 
-            GradioHelper.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self.config, components)
 
         return components

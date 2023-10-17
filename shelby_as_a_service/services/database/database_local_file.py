@@ -47,5 +47,6 @@ class LocalFileStoreDatabase(ModuleBase):
                     label="max_response_tokens",
                     interactive=True,
                 )
-            GradioHelper.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self.config, components)
+
         return components
