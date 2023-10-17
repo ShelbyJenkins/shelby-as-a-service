@@ -49,7 +49,7 @@ class GenericWebScraper(ModuleBase):
                     label="Continue On Failure",
                     interactive=True,
                 )
-            GradioUI.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self, components)
         return components
 
 
@@ -120,7 +120,7 @@ class GenericRecursiveWebScraper(ModuleBase):
                     info="IDK",
                     interactive=True,
                 )
-            GradioUI.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self, components)
         return components
 
     # class OpenAPILoader(ServiceBase):

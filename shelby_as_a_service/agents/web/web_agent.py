@@ -40,7 +40,7 @@ class WebAgent(ModuleBase):
         documents=None,
         llm_provider=None,
         llm_model=None,
-    ) -> Generator[List[str], None, None]:
+    ):
         self.log.print_and_log(f"Running query: {query}")
 
         if user_prompt_template_path:

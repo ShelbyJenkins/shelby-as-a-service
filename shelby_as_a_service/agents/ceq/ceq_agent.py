@@ -2,26 +2,22 @@ import re
 from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 
 import services.text_processing.text as text
-from agents.ceq.ceq_ui import CEQUI
-from agents.ingest.ingest_agent import IngestAgent
+
+# from agents.ingest.ingest_agent import IngestAgent
 from app_config.module_base import ModuleBase
 from pydantic import BaseModel
-from services.database.database_service import DatabaseService
-from services.embedding.embedding_service import EmbeddingService
 from services.llm.llm_service import LLMService
 
 
 class CEQAgent(ModuleBase):
     MODULE_NAME: str = "ceq_agent"
     MODULE_UI_NAME: str = "Context Enhanced Querying"
-    MODULE_UI = CEQUI
-    DEFAULT_PROMPT_TEMPLATE_PATH: str = "shelby_as_a_service/agents/ceq/ceq_main_prompt.yaml"
-    REQUIRED_MODULES: List[Type] = [LLMService, IngestAgent]
-    # REQUIRED_MODULES: List[Type] = [LLMService, EmbeddingService, DatabaseService]
+    DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/ceq/ceq_prompt_templates.yaml"
+    REQUIRED_MODULES: List[Type] = [LLMService]
+    # REQUIRED_MODULES: List[Type] = [LLMService, EmbeddingService, DatabaseService, IngestAgent]
 
     class ModuleConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
-
         data_domain_constraints_enabled: bool = False
         data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
         keyword_generator_enabled: bool = False
@@ -35,22 +31,23 @@ class CEQAgent(ModuleBase):
             extra = "ignore"
 
     config: ModuleConfigModel
+    llm_service: LLMService
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
+            module_instance=self,
+            config_file_dict=config_file_dict,
+            **kwargs,
         )
 
-    def run_chat(self, chat_in) -> Generator[List[str], None, None]:
-        self.log.print_and_log(f"Running query: {chat_in}")
-
+    def run_chat(self, chat_in):
         response = self.llm_service.create_chat(
             query=chat_in,
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
         )
         yield from response
 
-    def run_context_enriched_query(self, chat_in) -> Generator[List[str], None, None]:
+    def run_context_enriched_query(self, chat_in):
         # try:
 
         # if self.data_domain_constraints_enabled:

@@ -233,5 +233,5 @@ class PineconeDatabase(ModuleBase):
                     label="indexed_metadata",
                     interactive=True,
                 )
-            GradioUI.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self, components)
         return components

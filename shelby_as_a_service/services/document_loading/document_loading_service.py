@@ -60,6 +60,6 @@ class DocLoadingService(ModuleBase):
             for provider_instance in self.doc_loading_providers:
                 provider_instance.create_ui()
 
-            GradioUI.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self, components)
 
         return components

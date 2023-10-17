@@ -4,14 +4,13 @@ from typing import Any, Dict, Generator, List, Optional, Type, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from app_config.module_base import ModuleBase
-from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 from services.llm.llm_openai import OpenAILLM
 
 
 class LLMService(ModuleBase):
     MODULE_NAME: str = "llm_service"
-    MODULE_UI_NAME: str = "llm_service"
+    MODULE_UI_NAME: str = "LLM Settings"
     PROVIDERS_TYPE: str = "llm_providers"
     # For intialization
     REQUIRED_MODULES: List[Type] = [OpenAILLM]
@@ -42,7 +41,7 @@ class LLMService(ModuleBase):
         logit_bias=None,
         max_tokens=None,
         stream=None,
-    ) -> Generator[List[str], None, None]:
+    ):
         if llm_provider is None:
             llm_provider = self.config.llm_provider
 
@@ -63,20 +62,18 @@ class LLMService(ModuleBase):
     def create_settings_ui(self):
         components = {}
 
-        with gr.Column():
-            with gr.Accordion(label="LLM Settings", open=False):
-                components["llm_provider"] = gr.Dropdown(
-                    value=GradioHelper.get_module_ui_name_from_str(
-                        self.llm_providers, self.config.llm_provider
-                    ),
-                    choices=GradioHelper.get_list_of_module_ui_names(self.llm_providers),
-                    label="LLM Provider",
-                    container=True,
-                )
+        components["llm_provider"] = gr.Dropdown(
+            value=GradioHelper.get_module_ui_name_from_str(
+                self.llm_providers, self.config.llm_provider
+            ),
+            choices=GradioHelper.get_list_of_module_ui_names(self.llm_providers),
+            label="LLM Provider",
+            container=True,
+        )
 
-                for provider_instance in self.llm_providers:
-                    provider_instance.create_ui()
+        for provider_instance in self.llm_providers:
+            provider_instance.create_ui()
 
-            GradioUI.create_settings_event_listener(self, components)
+        GradioHelper.create_settings_event_listener(self, components)
 
         return components

@@ -1,16 +1,12 @@
 # region
-
 import asyncio
+import threading
 import time
 from collections import defaultdict
 from typing import Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from agents.ceq.ceq_agent import CEQAgent
-from agents.ingest.ingest_agent import IngestAgent
-from agents.vanillallm.vanillallm_agent import VanillaLLM
-from agents.web.web_agent import WebAgent
 from app_config.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
@@ -21,7 +17,7 @@ from pydantic import BaseModel
 class WebUISprite(ModuleBase):
     MODULE_NAME: str = "webui_sprite"
     MODULE_UI_NAME: str = "webui_sprite"
-    REQUIRED_MODULES: List[Type] = [VanillaLLM]
+    REQUIRED_MODULES: List[Type] = [GradioUI]
     # REQUIRED_MODULES: List[Type] = [VanillaLLM, CEQAgent, WebAgent]
 
     class ModuleConfigModel(BaseModel):
@@ -35,13 +31,13 @@ class WebUISprite(ModuleBase):
             extra = "ignore"
 
     config: ModuleConfigModel
+    gradio_ui: Any
 
     def __init__(self, config_file_dict={}, **kwargs):
+        GradioUI.webui_sprite = self
         self.setup_module_instance(
             module_instance=self, config_file_dict=config_file_dict, **kwargs
         )
-
-        self.gradio_ui = GradioUI(self)
 
     def _log(self, message):
         self.log.print_and_log_gradio(message)

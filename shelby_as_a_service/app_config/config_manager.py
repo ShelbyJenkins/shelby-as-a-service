@@ -209,7 +209,7 @@ class ConfigManager:
                 )
 
     @staticmethod
-    def add_extension_views_to_gradio_ui(gradio_instance, webui_sprite, list_of_extension_configs):
+    def add_extension_views_to_gradio_ui(gradio_instance, list_of_extension_configs):
         for extension_config in list_of_extension_configs:
             if extension_config.get("HAS_VIEW", False) is False:
                 continue
@@ -227,8 +227,6 @@ class ConfigManager:
                 module = importlib.import_module(import_path)
                 cls = getattr(module, view_class_name)
                 gradio_instance.UI_VIEWS.append(cls)
-                view_instance = cls(webui_sprite)
-                setattr(gradio_instance, cls.MODULE_NAME, view_instance)
 
             except ImportError as e:
                 print(f"Failed to import module: {import_path}. Error: {str(e)}")
@@ -244,8 +242,19 @@ class ConfigManager:
         def recurse(module_instance, config_dict):
             config_dict[module_instance.MODULE_NAME] = module_instance.config.model_dump()
             module_config_dict = config_dict[module_instance.MODULE_NAME]
+
             if required_modules := getattr(module_instance, "REQUIRED_MODULES", None):
                 for child_module in required_modules:
+                    child_module_instance = getattr(module_instance, child_module.MODULE_NAME)
+                    recurse(child_module_instance, module_config_dict)
+
+            if extension_modules := getattr(module_instance, "extension_modules", None):
+                for child_module in extension_modules:
+                    child_module_instance = getattr(module_instance, child_module.MODULE_NAME)
+                    recurse(child_module_instance, module_config_dict)
+
+            if ui_views := getattr(module_instance, "UI_VIEWS", None):
+                for child_module in ui_views:
                     child_module_instance = getattr(module_instance, child_module.MODULE_NAME)
                     recurse(child_module_instance, module_config_dict)
 

@@ -18,6 +18,7 @@ class VanillaLLM(ModuleBase):
             extra = "ignore"
 
     config: ModuleConfigModel
+    llm_service: LLMService
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_module_instance(
@@ -28,9 +29,7 @@ class VanillaLLM(ModuleBase):
             **kwargs,
         )
 
-    def run_chat(self, chat_in) -> Generator[List[str], None, None]:
-        self.log.print_and_log(f"Running query: {chat_in}")
-
+    def run_chat(self, chat_in):
         response = self.llm_service.create_chat(
             query=chat_in,
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,

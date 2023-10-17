@@ -70,9 +70,9 @@ class AppBase:
                 case "webui_sprite":
                     from interfaces.webui.webui_sprite import WebUISprite
 
-                    ConfigManager.add_extensions_to_sprite(
-                        AppBase.list_of_extension_configs, WebUISprite
-                    )
+                    # ConfigManager.add_extensions_to_sprite(
+                    #     AppBase.list_of_extension_configs, WebUISprite
+                    # )
                     AppBase.webui_sprite = WebUISprite(app_config_file_dict)
 
                     AppBase.available_sprite_instances.append(AppBase.webui_sprite)

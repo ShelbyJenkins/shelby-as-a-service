@@ -1,8 +1,12 @@
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 import gradio as gr
+import interfaces.webui.gradio_helpers as GradioHelper
+from agents.ceq.ceq_agent import CEQAgent
+from agents.vanillallm.vanillallm_agent import VanillaLLM
 from app_config.module_base import ModuleBase
+from pydantic import BaseModel
 
 
 class MainChatView(ModuleBase):
@@ -10,10 +14,38 @@ class MainChatView(ModuleBase):
     MODULE_UI_NAME: str = "Main Chat"
     SETTINGS_UI_COL = 2
     PRIMARY_UI_COL = 8
+    REQUIRED_MODULES: list[Type] = [VanillaLLM, CEQAgent]
 
-    def __init__(self, webui_sprite):
-        self.webui_sprite = webui_sprite
-        self.vanillallm_agent = self.webui_sprite.vanillallm_agent
+    class ModuleConfigModel(BaseModel):
+        current_agent_name: str = "vanillallm_agent"
+        current_agent_ui_name: str = "VanillaLLM Agent"
+
+        class Config:
+            extra = "ignore"
+
+    config: ModuleConfigModel
+    list_of_module_ui_names: list
+    list_of_module_instances: list
+    vanillallm_agent: Any
+    current_agent_instance: Any
+
+    def __init__(self, config_file_dict={}, **kwargs):
+        self.setup_module_instance(
+            module_instance=self, config_file_dict=config_file_dict, **kwargs
+        )
+
+        self.current_agent_instance = self.get_requested_module_instance(
+            self.list_of_module_instances, self.config.current_agent_name
+        )
+
+    def run_chat(self, chat_in):
+        self.log.print_and_log(f"Running query: {chat_in}")
+
+        response = self.current_agent_instance.run_chat(
+            chat_in=chat_in,
+        )
+        yield from response
+        return None
 
     def create_primary_ui(self):
         components = {}
@@ -127,9 +159,51 @@ class MainChatView(ModuleBase):
         return components
 
     def create_settings_ui(self):
+        components = {}
+
         with gr.Column():
-            for module_instance in self.vanillallm_agent.list_of_module_instances:
-                module_instance.create_settings_ui()
+            agent_radio = gr.Radio(
+                value=self.config.current_agent_ui_name,
+                choices=self.list_of_module_ui_names,
+            )
+
+            agent_settings_list = []
+
+            for agent_instance in self.list_of_module_instances:
+                ui_name = agent_instance.MODULE_UI_NAME
+                if ui_name == self.config.current_agent_ui_name:
+                    visibility = True
+                else:
+                    visibility = False
+                with gr.Accordion(
+                    label=agent_instance.MODULE_UI_NAME, open=True, visible=visibility
+                ) as agent_settings:
+                    for module_instance in agent_instance.list_of_module_instances:
+                        module_instance.create_settings_ui()
+
+                agent_settings_list.append(agent_settings)
+
+        def set_current_agent(requsted_agent):
+            output = []
+            for module_instance in self.list_of_module_instances:
+                ui_name = module_instance.MODULE_UI_NAME
+                if ui_name == requsted_agent:
+                    self.config.current_agent_name = module_instance.MODULE_NAME
+                    self.config.current_agent_ui_name = ui_name
+                    self.current_agent_instance = module_instance
+                    ModuleBase.update_settings_file = True
+                    output.append(gr.Accordion(label=ui_name, visible=True))
+                else:
+                    output.append(gr.Accordion(label=ui_name, visible=False))
+            return output
+
+        agent_radio.change(
+            fn=set_current_agent,
+            inputs=agent_radio,
+            outputs=agent_settings_list,
+        )
+
+        GradioHelper.create_settings_event_listener(self, components)
 
     def create_event_handlers(self, components):
         def get_spend():
@@ -146,21 +220,23 @@ class MainChatView(ModuleBase):
             fn=lambda: "Proooooomptering",
             outputs=components["chat_tab_status_text"],
         ).then(
-            fn=self.vanillallm_agent.run_chat,
+            fn=self.run_chat,
             inputs=components["chat_tab_in_text"],
             outputs=[
                 components["chat_tab_out_text"],
-                components["chat_tab_in_token_count"],
-                components["chat_tab_out_token_count"],
-                components["chat_tab_total_token_count"],
             ],
         ).success(
             fn=lambda: "",
             outputs=components["chat_tab_in_text"],
-        ).then(
-            fn=get_spend,
-            outputs=[
-                components["chat_tab_response_cost"],
-                components["chat_tab_total_cost"],
-            ],
         )
+
+        # components["chat_tab_in_token_count"],
+        # components["chat_tab_out_token_count"],
+        # components["chat_tab_total_token_count"],
+        # ).then(
+        #     fn=get_spend,
+        #     outputs=[
+        #         components["chat_tab_response_cost"],
+        #         components["chat_tab_total_cost"],
+        #     ],
+        # )

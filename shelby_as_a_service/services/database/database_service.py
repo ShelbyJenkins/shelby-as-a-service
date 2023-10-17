@@ -53,7 +53,7 @@ class LocalFileStoreDatabase(ModuleBase):
                     label="max_response_tokens",
                     interactive=True,
                 )
-            GradioUI.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self, components)
         return components
 
 
@@ -123,6 +123,6 @@ class DatabaseService(ModuleBase):
             for provider_instance in self.database_providers:
                 provider_instance.create_ui()
 
-            GradioUI.create_settings_event_listener(self, components)
+            GradioHelper.create_settings_event_listener(self, components)
 
         return components

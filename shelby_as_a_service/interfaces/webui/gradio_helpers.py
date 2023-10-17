@@ -1,6 +1,32 @@
 from typing import Any, Dict, List, Optional
 
 import gradio as gr
+from app_config.module_base import ModuleBase
+
+
+def create_settings_event_listener(config_model, components):
+    def update_config_classes(*values):
+        ui_state = {k: v for k, v in zip(components.keys(), values)}
+        current_values = config_model.model_dump()
+        current_values.update(ui_state)
+        for key, value in current_values.items():
+            if hasattr(config_model, key):
+                setattr(config_model, key, value)
+
+        ModuleBase.update_settings_file = True
+
+    components_to_monitor = []
+    for _, component in components.items():
+        if isinstance(component, gr.State) or isinstance(component, gr.Button):
+            continue
+        else:
+            components_to_monitor.append(component)
+
+    for component in components_to_monitor:
+        component.change(
+            fn=update_config_classes,
+            inputs=components_to_monitor,
+        )
 
 
 def list_available(class_model) -> Optional[List[Any]]:
