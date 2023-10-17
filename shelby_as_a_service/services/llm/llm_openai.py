@@ -219,75 +219,73 @@ class OpenAILLM(ModuleBase):
             raise ValueError(f"Error with input values - prompt: {prompt}, model: {model}, request_token_count: {request_token_count}")
         return prompt, model, request_token_count
 
-    def create_ui(self):
-        components = {}
-        with gr.Accordion(label="OpenAI", open=True):
-            model_dropdown = gr.Dropdown(
-                value=self.config.current_model_name,
-                choices=self.llm_models,
-                label="OpenAI LLM Model",
-                interactive=True,
-            )
+    def create_settings_ui(self):
+        model_dropdown = gr.Dropdown(
+            value=self.config.current_model_name,
+            choices=self.llm_models,
+            label="OpenAI LLM Model",
+            interactive=True,
+        )
 
-            models_list = []
-            for model_name, model in self.config.available_models.items():
-                model_compoments = {}
+        models_list = []
+        for model_name, model in self.config.available_models.items():
+            model_compoments = {}
 
-                if self.config.current_model_name == model_name:
-                    visibility = True
-                else:
-                    visibility = False
+            if self.config.current_model_name == model_name:
+                visibility = True
+            else:
+                visibility = False
 
-                with gr.Group(label=model_name, open=True, visible=visibility) as model_settings:
-                    model_compoments["max_tokens"] = gr.Slider(
-                        minimum=0,
-                        maximum=model.TOKENS_MAX,
-                        value=model.max_tokens,
-                        step=1,
-                        label="Max Tokens",
+            with gr.Group(label=model_name, open=True, visible=visibility) as model_settings:
+                model_compoments["max_tokens"] = gr.Slider(
+                    minimum=0,
+                    maximum=model.TOKENS_MAX,
+                    value=model.max_tokens,
+                    step=1,
+                    label="Max Tokens",
+                    interactive=True,
+                )
+                model_compoments["stream"] = gr.Checkbox(
+                    value=model.stream,
+                    label="Stream Response",
+                    interactive=True,
+                )
+                with gr.Accordion(label="Advanced Settings", open=False):
+                    model_compoments["frequency_penalty"] = gr.Slider(
+                        minimum=-2.0,
+                        maximum=2.0,
+                        value=model.frequency_penalty,
+                        step=0.05,
+                        label="Frequency Penalty",
                         interactive=True,
                     )
-                    model_compoments["stream"] = gr.Checkbox(
-                        value=model.stream,
-                        label="Stream Response",
+                    model_compoments["presence_penalty"] = gr.Slider(
+                        minimum=-2.0,
+                        maximum=2.0,
+                        value=model.presence_penalty,
+                        step=0.05,
+                        label="Presence Penalty",
                         interactive=True,
                     )
-                    with gr.Accordion(label="Advanced Settings", open=False):
-                        model_compoments["frequency_penalty"] = gr.Slider(
-                            minimum=-2.0,
-                            maximum=2.0,
-                            value=model.frequency_penalty,
-                            step=0.05,
-                            label="Frequency Penalty",
-                            interactive=True,
-                        )
-                        model_compoments["presence_penalty"] = gr.Slider(
-                            minimum=-2.0,
-                            maximum=2.0,
-                            value=model.presence_penalty,
-                            step=0.05,
-                            label="Presence Penalty",
-                            interactive=True,
-                        )
-                        model_compoments["temperature"] = gr.Slider(
-                            minimum=0.0,
-                            maximum=2.0,
-                            value=model.temperature,
-                            step=0.05,
-                            label="Temperature",
-                            interactive=True,
-                        )
-                        model_compoments["top_p"] = gr.Slider(
-                            minimum=0.0,
-                            maximum=2.0,
-                            value=model.top_p,
-                            step=0.05,
-                            label="Top P",
-                            interactive=True,
-                        )
+                    model_compoments["temperature"] = gr.Slider(
+                        minimum=0.0,
+                        maximum=2.0,
+                        value=model.temperature,
+                        step=0.05,
+                        label="Temperature",
+                        interactive=True,
+                    )
+                    model_compoments["top_p"] = gr.Slider(
+                        minimum=0.0,
+                        maximum=2.0,
+                        value=model.top_p,
+                        step=0.05,
+                        label="Top P",
+                        interactive=True,
+                    )
 
-                models_list.append(model_settings)
-                GradioHelper.create_settings_event_listener(model, model_compoments)
+            models_list.append(model_settings)
+            GradioHelper.create_settings_event_listener(model, model_compoments)
 
         model_dropdown.change(
             fn=self.set_current_model,

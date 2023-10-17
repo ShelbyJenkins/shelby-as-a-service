@@ -30,13 +30,9 @@ class MainChatView(ModuleBase):
     current_agent_instance: Any
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
-        self.current_agent_instance = self.get_requested_module_instance(
-            self.list_of_module_instances, self.config.current_agent_name
-        )
+        self.current_agent_instance = self.get_requested_module_instance(self.list_of_module_instances, self.config.current_agent_name)
 
     def run_chat(self, chat_in):
         self.log.print_and_log(f"Running query: {chat_in}")
@@ -175,11 +171,12 @@ class MainChatView(ModuleBase):
                     visibility = True
                 else:
                     visibility = False
-                with gr.Accordion(
-                    label=agent_instance.MODULE_UI_NAME, open=True, visible=visibility
-                ) as agent_settings:
+                with gr.Accordion(label=agent_instance.MODULE_UI_NAME, open=True, visible=visibility) as agent_settings:
+                    with gr.Tab(label="Retrieval Settings"):
+                        agent_instance.create_settings_ui()
                     for module_instance in agent_instance.list_of_module_instances:
-                        module_instance.create_settings_ui()
+                        with gr.Tab(label=module_instance.MODULE_UI_NAME):
+                            module_instance.create_settings_ui()
 
                 agent_settings_list.append(agent_settings)
 

@@ -12,10 +12,7 @@ class LLMService(ModuleBase):
     MODULE_NAME: str = "llm_service"
     MODULE_UI_NAME: str = "LLM Settings"
     PROVIDERS_TYPE: str = "llm_providers"
-    # For intialization
     REQUIRED_MODULES: List[Type] = [OpenAILLM]
-    # For interface
-    UI_MODULES: List[Type] = [OpenAILLM]
 
     class ModuleConfigModel(BaseModel):
         llm_provider: str = "openai_llm"
@@ -27,9 +24,7 @@ class LLMService(ModuleBase):
     llm_providers: List[Any]
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def create_chat(
         self,
@@ -63,16 +58,14 @@ class LLMService(ModuleBase):
         components = {}
 
         components["llm_provider"] = gr.Dropdown(
-            value=GradioHelper.get_module_ui_name_from_str(
-                self.llm_providers, self.config.llm_provider
-            ),
+            value=GradioHelper.get_module_ui_name_from_str(self.llm_providers, self.config.llm_provider),
             choices=GradioHelper.get_list_of_module_ui_names(self.llm_providers),
             label="LLM Provider",
             container=True,
         )
 
         for provider_instance in self.llm_providers:
-            provider_instance.create_ui()
+            provider_instance.create_settings_ui()
 
         GradioHelper.create_settings_event_listener(self, components)
 

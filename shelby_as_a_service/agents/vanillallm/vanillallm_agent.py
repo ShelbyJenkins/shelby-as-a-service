@@ -35,3 +35,6 @@ class VanillaLLM(ModuleBase):
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
         )
         yield from response
+
+    def create_settings_ui(self):
+        pass

@@ -8,12 +8,7 @@ import services.text_processing.text as TextProcess
 from app_config.module_base import ModuleBase
 from bs4 import BeautifulSoup
 from interfaces.webui.gradio_ui import GradioUI
-from langchain.document_loaders import (
-    GitbookLoader,
-    RecursiveUrlLoader,
-    SitemapLoader,
-    WebBaseLoader,
-)
+from langchain.document_loaders import GitbookLoader, RecursiveUrlLoader, SitemapLoader, WebBaseLoader
 from langchain.schema import Document
 from pydantic import BaseModel
 
@@ -29,9 +24,7 @@ class GenericWebScraper(ModuleBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def _load(self, url) -> Iterator[Document]:
         documents = WebBaseLoader(web_path=url).load()
@@ -40,7 +33,7 @@ class GenericWebScraper(ModuleBase):
 
         return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
-    def create_ui(self):
+    def create_settings_ui(self):
         components = {}
         with gr.Accordion(label="Generic Web Scraper", open=True):
             with gr.Column():
@@ -69,9 +62,7 @@ class GenericRecursiveWebScraper(ModuleBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:
@@ -86,7 +77,7 @@ class GenericRecursiveWebScraper(ModuleBase):
 
         return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
-    def create_ui(self):
+    def create_settings_ui(self):
         components = {}
         with gr.Accordion(label=self.MODULE_NAME, open=False):
             with gr.Column():

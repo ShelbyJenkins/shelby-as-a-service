@@ -5,7 +5,6 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import pinecone
 from app_config.module_base import ModuleBase
-from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 
 
@@ -16,6 +15,7 @@ class PineconeDatabase(ModuleBase):
 
     class ModuleConfigModel(BaseModel):
         index_env: str = "us-central1-gcp"
+        index_name: str = "shelby-as-a-service"
         embedding_max_chunk_size: int = 8191
         vectorstore_dimension: int = 1536
         vectorstore_upsert_batch_size: int = 20
@@ -37,43 +37,38 @@ class PineconeDatabase(ModuleBase):
     config: ModuleConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
-
-        self.index_name = "shelby-as-a-service"
-        self.index_env = "us-central1-gcp"
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
         pinecone.init(
             api_key=self.secrets["pinecone_api_key"],
-            environment=self.index_env,
+            environment=self.config.index_env,
         )
         self.pinecone = pinecone
-        self.pinecone_index = pinecone.Index(self.index_name)
+        self.pinecone_index = pinecone.Index(self.config.index_name)
 
-    def _query_index(
+    def query_index(
         self,
         search_terms,
         retrieve_n_docs=None,
         data_domain_name=None,
-        ids=None,
     ) -> List[Any]:
-        def _query_namespace(search_terms, top_k, namespace, filter=None, ids=None):
-            response = self.pinecone_index.fetch(
+        if retrieve_n_docs is None:
+            top_k = self.config.retrieve_n_docs
+        else:
+            top_k = retrieve_n_docs
+
+        def _query_namespace(search_terms, top_k, namespace, filter=None):
+            response = self.pinecone_index.query(
+                top_k=top_k,
+                include_values=False,
                 namespace=namespace,
-                ids=ids,
+                include_metadata=True,
+                filter=filter,  # type: ignore
+                vector=search_terms,
             )
-            return response
-            # response = self.pinecone_index.query(
-            #     top_k=top_k,
-            #     include_values=False,
-            #     namespace=namespace,
-            #     include_metadata=True,
-            #     filter=filter,  # type: ignore
-            #     vector=search_terms,
-            #     id=ids,
-            # )
+
             returned_documents = []
+
             for m in response.matches:
                 response = {
                     "content": m.metadata["content"],
@@ -89,22 +84,15 @@ class PineconeDatabase(ModuleBase):
 
         filter = None  # Need to implement
 
-        if retrieve_n_docs is None:
-            top_k = self.config.retrieve_n_docs
-        else:
-            top_k = retrieve_n_docs
-
         if data_domain_name:
             namespace = data_domain_name
-            returned_documents = _query_namespace(search_terms, top_k, namespace, filter, ids)
+            returned_documents = _query_namespace(search_terms, top_k, namespace, filter)
         # If we don't have a namespace, just search all available namespaces
         else:
             returned_documents = []
             for data_domain in self.index.index_data_domains:
                 if namespace := getattr(data_domain, "data_domain_name", None):
-                    returned_documents.extend(
-                        _query_namespace(search_terms, top_k, namespace, filter)
-                    )
+                    returned_documents.extend(_query_namespace(search_terms, top_k, namespace, filter))
 
         return returned_documents
 
@@ -149,6 +137,25 @@ class PineconeDatabase(ModuleBase):
         #     }
         #     returned_documents.append(response)
 
+    def fetch_by_ids(self, ids, namespace=None) -> List[Any]:
+        response = self.pinecone_index.fetch(
+            namespace=namespace,
+            ids=ids,
+        )
+        returned_documents = []
+        for m in response.matches:
+            response = {
+                "content": m.metadata["content"],
+                "title": m.metadata["title"],
+                "url": m.metadata["url"],
+                "doc_type": m.metadata["doc_type"],
+                "score": m.score,
+                "id": m.id,
+            }
+            returned_documents.append(response)
+
+        return returned_documents
+
     def delete_pinecone_index(self):
         print(f"Deleting index {self.index_name}")
         stats = self.pinecone_index.describe_index_stats()
@@ -169,7 +176,7 @@ class PineconeDatabase(ModuleBase):
         self.pinecone_index.delete(deleteAll="true", namespace=self.app_name)
         print(self.pinecone_index.describe_index_stats())
 
-    def _clear_pinecone_data_source(self, data_source):
+    def clear_pinecone_data_source(self, data_source):
         data_source.pinecone_index.delete(
             namespace=self.app_name,
             delete_all=False,
@@ -198,7 +205,7 @@ class PineconeDatabase(ModuleBase):
             metadata_config=metadata_config,
         )
 
-    def create_ui(self):
+    def create_settings_ui(self):
         components = {}
         with gr.Accordion(label=self.MODULE_UI_NAME, open=True):
             with gr.Column():

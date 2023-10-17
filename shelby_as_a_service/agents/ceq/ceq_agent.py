@@ -1,9 +1,10 @@
 import re
 from typing import Any, Dict, Generator, List, Optional, Tuple, Type
 
+import gradio as gr
+import interfaces.webui.gradio_helpers as GradioHelper
 import services.text_processing.text as text
-
-# from agents.ingest.ingest_agent import IngestAgent
+from agents.retrieval.retrieval_agent import RetrievalAgent
 from app_config.module_base import ModuleBase
 from pydantic import BaseModel
 from services.llm.llm_service import LLMService
@@ -13,19 +14,16 @@ class CEQAgent(ModuleBase):
     MODULE_NAME: str = "ceq_agent"
     MODULE_UI_NAME: str = "Context Enhanced Querying"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/ceq/ceq_prompt_templates.yaml"
-    REQUIRED_MODULES: List[Type] = [LLMService]
-    # REQUIRED_MODULES: List[Type] = [LLMService, EmbeddingService, DatabaseService, IngestAgent]
+    DATA_DOMAIN_NONE_FOUND_MESSAGE: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
+    REQUIRED_MODULES: List[Type] = [LLMService, RetrievalAgent]
 
     class ModuleConfigModel(BaseModel):
-        agent_select_status_message: str = "Search index to find docs related to request."
-        data_domain_constraints_enabled: bool = False
-        data_domain_none_found_message: str = "Query not related to any supported data domains (aka topics). Supported data domains are:"
-        keyword_generator_enabled: bool = False
-        doc_relevancy_check_enabled: bool = False
-        retrieve_n_docs: int = 5
+        enabled_data_domains: list[str] = ["all"]
         docs_max_token_length: int = 1200
         docs_max_total_tokens: int = 2500
         docs_max_used: int = 5
+        keyword_generator_enabled: bool = False
+        doc_relevancy_check_enabled: bool = False
 
         class Config:
             extra = "ignore"
@@ -34,11 +32,7 @@ class CEQAgent(ModuleBase):
     llm_service: LLMService
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self,
-            config_file_dict=config_file_dict,
-            **kwargs,
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def run_chat(self, chat_in):
         response = self.llm_service.create_chat(
@@ -64,9 +58,7 @@ class CEQAgent(ModuleBase):
 
         query_embedding = self.embedding_service.get_query_embedding(query_to_embed)
 
-        returned_documents = self.database_service.query_index(
-            query_embedding, self.retrieve_n_docs, self.data_domain_name
-        )
+        returned_documents = self.database_service.query_index(query_embedding, self.retrieve_n_docs, self.data_domain_name)
 
         # if self.doc_relevancy_check_enabled:
         #     if (
@@ -81,9 +73,7 @@ class CEQAgent(ModuleBase):
         parsed_documents = self.ceq_parse_documents(returned_documents)
 
         if not parsed_documents:
-            raise ValueError(
-                "No supporting documents found. Currently we don't support queries without supporting context."
-            )
+            raise ValueError("No supporting documents found. Currently we don't support queries without supporting context.")
 
         self.log.print_and_log("Sending prompt to LLM")
         return prompt_template_path, parsed_documents
@@ -127,11 +117,7 @@ class CEQAgent(ModuleBase):
                 break
             # Find the index of the document with the highest token_count that exceeds ceq_docs_max_token_length
             max_token_count_idx = max(
-                (
-                    idx
-                    for idx, document in enumerate(sorted_documents)
-                    if document["token_count"] > self.docs_max_token_length
-                ),
+                (idx for idx, document in enumerate(sorted_documents) if document["token_count"] > self.docs_max_token_length),
                 key=lambda idx: sorted_documents[idx]["token_count"],
                 default=None,
             )
@@ -194,9 +180,7 @@ class CEQAgent(ModuleBase):
         final_documents_list = []
         for parsed_document in sorted_documents:
             final_documents_list.append(parsed_document["url"])
-        self.log.print_and_log(
-            f"{len(sorted_documents)} documents returned after parsing: {final_documents_list}"
-        )
+        self.log.print_and_log(f"{len(sorted_documents)} documents returned after parsing: {final_documents_list}")
 
         if not sorted_documents:
             self.log.print_and_log("No supporting documents after parsing!")
@@ -255,3 +239,56 @@ class CEQAgent(ModuleBase):
         self.log.print_and_log(f"response with metadata: {answer_obj}")
 
         return answer_obj
+
+    def create_settings_ui(self):
+        components = {}
+        with gr.Accordion(label="Retrival Settings", open=True):
+            components["enabled_data_domains"] = gr.Dropdown(
+                show_label=False,
+                choices=["tatum", "None", "all", "Custom"],
+                value="all",
+                label="Enabled Data Domains",
+                multiselect=True,
+                info="Select which data domains to enable.",
+            )
+            components["docs_max_token_length"] = gr.Number(
+                value=self.config.docs_max_token_length,
+                label="Maximum Document Token Length",
+                show_label=False,
+                minimum=1,
+                maximum=2000,
+                step=1,
+                info="Maximum number of tokens allowed in a document.",
+            )
+            components["docs_max_total_tokens"] = gr.Number(
+                value=self.config.docs_max_total_tokens,
+                label="Maximum Total Tokens",
+                show_label=False,
+                minimum=1,
+                maximum=5000,
+                step=1,
+                info="Maximum number of tokens allowed in all documents.",
+            )
+            components["docs_max_used"] = gr.Number(
+                value=self.config.docs_max_used,
+                label="Maximum Number of Documents Used",
+                show_label=False,
+                minimum=1,
+                maximum=10,
+                step=1,
+                info="Maximum number of documents allowed to be used.",
+            )
+
+        with gr.Accordion(label="Smart Settings", open=True):
+            components["doc_relevancy_check_enabled"] = gr.Checkbox(
+                value=self.config.doc_relevancy_check_enabled,
+                label="Document Relevancy Check",
+                interactive=True,
+            )
+            components["keyword_generator_enabled"] = gr.Checkbox(
+                value=self.config.keyword_generator_enabled,
+                label="Keyword Generator",
+                interactive=True,
+            )
+
+        GradioHelper.create_settings_event_listener(self.config, components)

@@ -9,64 +9,64 @@ from pydantic import BaseModel
 
 class OpenAIEmbedding(ModuleBase):
     MODULE_NAME: str = "openai_embedding"
-    MODULE_UI_NAME: str = "openai_embedding"
+    MODULE_UI_NAME: str = "OpenAI Embedding"
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
+    MODELS_TYPE: str = "embedding_models"
+    OPENAI_TIMEOUT_SECONDS: float = 180
 
-    class OpenAIEmbeddingModel(BaseModel):
+    class ModelConfig(BaseModel):
         MODEL_NAME: str
         TOKENS_MAX: int
         COST_PER_K: float
 
-    AVAILABLE_MODELS: List[OpenAIEmbeddingModel] = [
-        OpenAIEmbeddingModel(
-            MODEL_NAME="text-embedding-ada-002", TOKENS_MAX=8192, COST_PER_K=0.0001
-        )
-    ]
+    MODEL_DEFINITIONS: dict[str, Any] = {"text-embedding-ada-002": {"MODEL_NAME": "text-embedding-ada-002", "TOKENS_MAX": 8192, "COST_PER_K": 0.0001}}
 
     class ModuleConfigModel(BaseModel):
-        model: str = "text-embedding-ada-002"
-        chunk_size: int = 10
-        openai_timeout_seconds: float = 180
+        current_model_name: str = "text-emedding-ada-002"
+        available_models: dict[str, "OpenAIEmbedding.ModelConfig"]
 
     config: ModuleConfigModel
-
-    UI_MODEL_NAMES = ["text-embedding-ada-002"]
-    DEFAULT_MODEL: str = "text-embedding-ada-002"
-    TYPE_MODEL: str = "openai_embedding_model"
+    embedding_models: list
+    current_model_class: ModelConfig
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
-    def _get_query_embedding(self, query, model_name=None):
+    def get_query_embedding(self, query, model_name=None) -> list[float]:
         model = self.get_model(self, requested_model_name=model_name)
         if model is None:
             return None
+
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             openai_api_key=self.secrets["openai_api_key"],
             model=model.MODEL_NAME,
-            request_timeout=self.config.openai_timeout_seconds,
+            request_timeout=self.OPENAI_TIMEOUT_SECONDS,
         )  # type: ignore
+
         query_embedding = embedding_retriever.embed_query(query)
         self._calculate_cost(query, model)
         self.log.print_and_log("Embeddings retrieved")
+
         return query_embedding
 
-    def _get_documents_embedding(self, documents, model_name=None):
+    def get_documents_embedding(self, documents, model_name=None) -> list[list[float]]:
         model = self.get_model(self, requested_model_name=model_name)
+
         if model is None:
             return None
+
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             openai_api_key=self.secrets["openai_api_key"],
             model=model.MODEL_NAME,
-            request_timeout=self.config.openai_timeout_seconds,
+            request_timeout=self.OPENAI_TIMEOUT_SECONDS,
         )  # type: ignore
+
         doc_embeddings = embedding_retriever.embed_documents(documents)
         # self._calculate_cost(query, model)
         self.log.print_and_log("Embeddings retrieved")
+
         return doc_embeddings
 
     def _calculate_cost(self, query, model):
@@ -88,3 +88,6 @@ class OpenAIEmbedding(ModuleBase):
 
         self.total_cost += request_cost
         print(f"Total cost: ${format(self.total_cost, 'f')}")
+
+    def create_settings_ui(self):
+        pass

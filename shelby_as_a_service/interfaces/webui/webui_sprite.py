@@ -35,9 +35,7 @@ class WebUISprite(ModuleBase):
 
     def __init__(self, config_file_dict={}, **kwargs):
         GradioUI.webui_sprite = self
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def _log(self, message):
         self.log.print_and_log_gradio(message)
