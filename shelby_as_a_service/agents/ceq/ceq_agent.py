@@ -1,18 +1,18 @@
 import re
-from typing import Any, Dict, Generator, List, Optional, Tuple, Type
+from typing import Annotated, Any, Dict, Generator, List, Optional, Tuple, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import services.text_processing.text as text
 from agents.retrieval.retrieval_agent import RetrievalAgent
 from app_config.module_base import ModuleBase
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.llm.llm_service import LLMService
 
 
 class CEQAgent(ModuleBase):
     MODULE_NAME: str = "ceq_agent"
-    MODULE_UI_NAME: str = "Context Enhanced Querying"
+    MODULE_UI_NAME: str = "CEQ"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/ceq/ceq_prompt_templates.yaml"
     DATA_DOMAIN_NONE_FOUND_MESSAGE: str = (
         "Query not related to any supported data domains (aka topics). Supported data domains are:"
@@ -21,6 +21,7 @@ class CEQAgent(ModuleBase):
 
     class ModuleConfigModel(BaseModel):
         enabled_data_domains: list[str] = ["all"]
+        context_to_response_ratio: Annotated[float, Field(ge=0, le=1.0)] = 0.5
 
         class Config:
             extra = "ignore"
@@ -38,11 +39,31 @@ class CEQAgent(ModuleBase):
         chat_in,
         llm_provider: Optional[str] = None,
         llm_model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
+        model_token_utilization: Optional[float] = None,
+        context_to_response_ratio: Optional[float] = None,
         stream: Optional[bool] = None,
         sprite_name: Optional[str] = "webui_sprite",
     ):
-        documents = self.retrieval_agent.get_documents(query=chat_in, enabled_data_domains=self.config.enabled_data_domains)
+        available_request_tokens, max_tokens = self.llm_service.get_available_request_tokens(
+            query=chat_in,
+            prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
+            model_token_utilization=model_token_utilization,
+            context_to_response_ratio=context_to_response_ratio
+            if context_to_response_ratio is not None
+            else self.config.context_to_response_ratio,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+        )
+
+        documents = self.retrieval_agent.get_documents(
+            query=chat_in,
+            max_total_tokens=available_request_tokens,
+            enabled_data_domains=self.config.enabled_data_domains,
+        )
+
+        # Context size percentage is the percentage of tokens to use for a given model
+        # Utilization is a balance between context and response length
+        # Max tokens sent to the llm will be CEQ max tokens - retrieved docs max tokens
 
         previous_response: Optional[dict] = None
         final_response: Optional[dict] = None
@@ -143,15 +164,25 @@ class CEQAgent(ModuleBase):
     def create_settings_ui(self):
         components = {}
 
-        components["enabled_data_domains"] = gr.Dropdown(
-            show_label=False,
-            choices=["tatum", "None", "all", "Custom"],
-            value="all",
-            label="Enabled Data Domains",
-            multiselect=True,
-            info="Select which data domains to enable.",
-        )
-        for module_instance in self.list_of_module_instances:
-            with gr.Tab(label=module_instance.MODULE_UI_NAME):
-                module_instance.create_settings_ui()
+        with gr.Tab(label=self.retrieval_agent.MODULE_UI_NAME):
+            components["enabled_data_domains"] = gr.Dropdown(
+                choices=["tatum", "None", "all", "Custom"],
+                value="all",
+                label="Topics to Search",
+                multiselect=True,
+                min_width=0,
+            )
+            components["context_to_response_ratio"] = gr.Slider(
+                value=self.config.context_to_response_ratio,
+                label="Context to Response Ratio",
+                minimum=0.0,
+                maximum=1.0,
+                step=0.05,
+                min_width=0,
+                info="Percent of the model's context size to use for context docs.",
+            )
+            self.retrieval_agent.create_settings_ui()
+        with gr.Tab(label=self.llm_service.MODULE_UI_NAME):
+            self.llm_service.create_settings_ui()
+
         GradioHelper.create_settings_event_listener(self.config, components)

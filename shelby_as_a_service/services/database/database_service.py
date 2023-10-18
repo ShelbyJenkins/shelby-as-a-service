@@ -11,14 +11,14 @@ from services.database.database_pinecone import PineconeDatabase
 
 class DatabaseService(ModuleBase):
     MODULE_NAME: str = "database_service"
-    MODULE_UI_NAME: str = "Database Service"
+    MODULE_UI_NAME: str = "Databases"
     PROVIDERS_TYPE: str = "database_providers"
 
     REQUIRED_MODULES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
-    UI_MODULES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
 
     class ModuleConfigModel(BaseModel):
-        database_provider: str = "local_filestore_database"
+        database_provider: str = "pinecone_database"
+        retrieve_n_docs: int = 6
 
     config: ModuleConfigModel
     database_providers: List[Any]
@@ -32,14 +32,16 @@ class DatabaseService(ModuleBase):
         retrieve_n_docs,
         data_domain_name,
         database_provider=None,
-    ):
+    ) -> list[dict]:
         if database_provider is None:
             database_provider = self.config.database_provider
+
         provider = self.get_requested_module_instance(self.database_providers, database_provider)
+
         if provider:
             return provider.query_index(
                 search_terms=search_terms,
-                retrieve_n_docs=retrieve_n_docs,
+                retrieve_n_docs=self.config.retrieve_n_docs if retrieve_n_docs is None else retrieve_n_docs,
                 data_domain_name=data_domain_name,
             )
         else:
@@ -86,6 +88,10 @@ class DatabaseService(ModuleBase):
                 choices=GradioHelper.get_list_of_module_ui_names(self.database_providers),
                 label="Source Type",
                 container=True,
+                min_width=0,
+            )
+            components["retrieve_n_docs"] = gr.Number(
+                value=self.config.retrieve_n_docs, label="Number of Documents to Retrieve", container=True, min_width=0
             )
             for provider_instance in self.database_providers:
                 provider_instance.create_settings_ui()

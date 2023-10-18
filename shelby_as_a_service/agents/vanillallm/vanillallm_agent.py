@@ -1,8 +1,9 @@
-from typing import Any, Dict, Generator, List, Optional, Type, Union
+from typing import Annotated, Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
+import interfaces.webui.gradio_helpers as GradioHelper
 from app_config.module_base import ModuleBase
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.llm.llm_service import LLMService
 
 
@@ -31,14 +32,33 @@ class VanillaLLM(ModuleBase):
             **kwargs,
         )
 
-    def run_chat(self, chat_in):
-        for response in self.llm_service.create_chat(
+    def run_chat(
+        self,
+        chat_in: str,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None,
+        model_token_utilization: Optional[float] = None,
+        stream: Optional[bool] = None,
+        sprite_name: Optional[str] = "webui_sprite",
+    ):
+        _, max_tokens = self.llm_service.get_available_request_tokens(
             query=chat_in,
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
+            model_token_utilization=model_token_utilization,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+        )
+
+        for response in self.llm_service.create_chat(
+            query=chat_in, prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH, max_tokens=max_tokens
         ):
             yield response["response_content_string"]
 
     def create_settings_ui(self):
+        components = {}
+
         for module_instance in self.list_of_module_instances:
             with gr.Tab(label=module_instance.MODULE_UI_NAME):
                 module_instance.create_settings_ui()
+
+        GradioHelper.create_settings_event_listener(self.config, components)

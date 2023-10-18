@@ -11,16 +11,13 @@ from services.text_processing.parse_retrieval_docs import parse_retrieved_docs
 
 class RetrievalAgent(ModuleBase):
     MODULE_NAME: str = "retrieval_agent"
-    MODULE_UI_NAME: str = "Retrieval Settings"
+    MODULE_UI_NAME: str = "Retrieval"
 
     REQUIRED_MODULES: List[Type] = [EmbeddingService, DatabaseService]
 
     class ModuleConfigModel(BaseModel):
-        database_provider: str = "local_filestore_database"
-        retrieve_n_docs: int = 6
-        doc_max_token_length: int = 1200
-        docs_max_total_tokens: int = 2500
-        docs_max_count: int = 4
+        doc_max_tokens: float = 1400
+        docs_max_count: float = 4
         topic_constraint_enabled: bool = False
         keyword_generator_enabled: bool = False
         doc_relevancy_check_enabled: bool = False
@@ -38,7 +35,9 @@ class RetrievalAgent(ModuleBase):
         self,
         query: str,
         retrieve_n_docs: Optional[int] = None,
-        docs_max_count: Optional[int] = None,
+        doc_max_tokens: Optional[float] = None,
+        max_total_tokens: Optional[float] = None,
+        docs_max_count: Optional[float] = None,
         enabled_data_domains: Optional[list[str]] = None,
         topic_constraint_enabled: Optional[bool] = None,
         keyword_generator_enabled: Optional[bool] = None,
@@ -49,8 +48,8 @@ class RetrievalAgent(ModuleBase):
 
         Args:
             query (str): The query to retrieve documents for.
-            retrieve_n_docs (int, optional): The number of documents to retrieve. Defaults to None.
-            docs_max_count (int, optional): The maximum number of documents to retrieve. Defaults to None.
+            retrieve_n_docs (int, optional): The number of documents to retrieve from the database. Defaults to None.
+            docs_max_count (int, optional): The maximum number of documents to return from the. Defaults to None.
             enabled_data_domains (list[str], optional): The data domains to retrieve documents from. Defaults to None.
             topic_constraint_enabled (bool, optional): Whether to enable topic constraints. Defaults to None.
             keyword_generator_enabled (bool, optional): Whether to enable keyword generation. Defaults to None.
@@ -79,38 +78,90 @@ class RetrievalAgent(ModuleBase):
 
         query_embedding = self.embedding_service.get_query_embedding(query=query)
 
+        docs_max_count = docs_max_count if docs_max_count is not None else self.config.docs_max_count
+        retrieve_n_docs = retrieve_n_docs if retrieve_n_docs is not None else 4
+
+        returned_documents_list: list[Any] = []
+        counter = 0
+        while len(returned_documents_list) < docs_max_count:
+            returned_documents_list = self.retrieve_docs(
+                search_terms=query_embedding,
+                retrieve_n_docs=retrieve_n_docs,
+                enabled_data_domains=enabled_data_domains,
+            )
+
+            returned_documents_list = parse_retrieved_docs(
+                retrieved_documents=returned_documents_list,
+                doc_max_tokens=doc_max_tokens if doc_max_tokens is not None else self.config.doc_max_tokens,
+                max_total_tokens=max_total_tokens if max_total_tokens is not None else 0,
+                docs_max_count=docs_max_count if docs_max_count is not None else self.config.docs_max_count,
+            )
+            if (
+                self.config.doc_relevancy_check_enabled
+                if doc_relevancy_check_enabled is None
+                else doc_relevancy_check_enabled
+            ):
+                # parsed_documents = ActionAgent.doc_relevancy_check(query, parsed_documents)
+                pass
+            if returned_documents_list is None:
+                returned_documents_list = []
+            counter += 1
+            retrieve_n_docs += 1
+
+            if counter > 1:
+                break
+
+        if returned_documents_list is None or len(returned_documents_list) < 1:
+            raise ValueError("No supporting documents found. Currently we don't support queries without supporting context.")
+        return returned_documents_list
+
+    def retrieve_docs(self, search_terms, retrieve_n_docs, enabled_data_domains) -> list[Any]:
         returned_documents_list = []
         for data_domain_name in enabled_data_domains:
             returned_documents = self.database_service.query_index(
-                search_terms=query_embedding,
-                retrieve_n_docs=self.config.retrieve_n_docs if retrieve_n_docs is None else retrieve_n_docs,
+                search_terms=search_terms,
+                retrieve_n_docs=retrieve_n_docs,
                 data_domain_name=data_domain_name,
             )
+
             returned_documents_list.extend(returned_documents)
 
-        parsed_documents = parse_retrieved_docs(
-            retrieved_documents=returned_documents_list,
-            doc_max_token_length=self.config.doc_max_token_length,
-            docs_max_total_tokens=self.config.docs_max_total_tokens,
-            docs_max_count=self.config.docs_max_count if docs_max_count is None else docs_max_count,
-        )
-
-        if self.config.doc_relevancy_check_enabled if doc_relevancy_check_enabled is None else doc_relevancy_check_enabled:
-            # parsed_documents = ActionAgent.doc_relevancy_check(query, parsed_documents)
-            pass
-
-        if parsed_documents is None or len(parsed_documents) < 1:
-            raise ValueError("No supporting documents found. Currently we don't support queries without supporting context.")
-        return parsed_documents
+        return returned_documents_list
 
     def create_settings_ui(self):
         components = {}
 
-        with gr.Column():
-            for module_instance in self.list_of_module_instances:
-                with gr.Tab(label=module_instance.MODULE_UI_NAME):
-                    module_instance.create_settings_ui()
+        with gr.Row():
+            components["topic_constraint_enabled"] = gr.Checkbox(
+                value=self.config.topic_constraint_enabled,
+                label="Topic Constraint",
+            )
+            components["keyword_generator_enabled"] = gr.Checkbox(
+                value=self.config.keyword_generator_enabled,
+                label="Keyword Generator",
+            )
+            components["doc_relevancy_check_enabled"] = gr.Checkbox(
+                value=self.config.doc_relevancy_check_enabled,
+                label="Doc Relevancy Check",
+            )
+        with gr.Row():
+            components["doc_max_tokens"] = gr.Number(
+                value=self.config.doc_max_tokens,
+                label="Maximum Document Length",
+                min_value=1,
+                max_value=10000,
+                step=1,
+                min_width=0,
+            )
+            components["docs_max_count"] = gr.Number(
+                value=self.config.docs_max_count,
+                label="Attempt to retrieve and use this many documents",
+                min_value=1,
+                max_value=100,
+                step=1,
+                min_width=0,
+            )
 
-                    GradioHelper.create_settings_event_listener(self.config, components)
+        GradioHelper.create_settings_event_listener(self.config, components)
 
         return components

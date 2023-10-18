@@ -15,7 +15,9 @@ class ModuleBase(AppBase):
         available_models = None
 
         if model_definitions := getattr(module_instance, "MODEL_DEFINITIONS", None):
-            available_models = ModuleBase.create_model_instances(module_instance, model_definitions, module_config_file_dict, **kwargs)
+            available_models = ModuleBase.create_model_instances(
+                module_instance, model_definitions, module_config_file_dict, **kwargs
+            )
             merged_config["available_models"] = available_models
 
         module_instance.config = module_instance.ModuleConfigModel(**merged_config)
@@ -25,20 +27,26 @@ class ModuleBase(AppBase):
 
         if required_modules := getattr(module_instance, "REQUIRED_MODULES", None):
             for required_module in required_modules:
-                if new_module_instance := ModuleBase.create_module_instance(module_instance, required_module, module_config_file_dict, **kwargs):
+                if new_module_instance := ModuleBase.create_module_instance(
+                    module_instance, required_module, module_config_file_dict, **kwargs
+                ):
                     list_of_module_ui_names.append(new_module_instance.MODULE_UI_NAME)
                     list_of_module_instances.append(new_module_instance)
 
         if extension_modules := getattr(module_instance, "extension_modules", None):
             for extension_module in extension_modules:
-                if new_module_instance := ModuleBase.create_module_instance(module_instance, extension_module, module_config_file_dict, **kwargs):
+                if new_module_instance := ModuleBase.create_module_instance(
+                    module_instance, extension_module, module_config_file_dict, **kwargs
+                ):
                     list_of_module_ui_names.append(new_module_instance.MODULE_UI_NAME)
                     list_of_module_instances.append(new_module_instance)
 
         if ui_views := getattr(module_instance, "UI_VIEWS", None):
             module_instance.ui_view_instances = []
             for view_module in ui_views:
-                if new_module_instance := ModuleBase.create_module_instance(module_instance, view_module, module_config_file_dict, **kwargs):
+                if new_module_instance := ModuleBase.create_module_instance(
+                    module_instance, view_module, module_config_file_dict, **kwargs
+                ):
                     module_instance.ui_view_instances.append(new_module_instance)
 
         if providers_type := getattr(module_instance, "PROVIDERS_TYPE", None):
@@ -87,7 +95,7 @@ class ModuleBase(AppBase):
     @staticmethod
     def get_requested_module_instance(available_module_instances, requested_module):
         for module_instance in available_module_instances:
-            if module_instance.MODULE_NAME == requested_module:
+            if module_instance.MODULE_NAME == requested_module or module_instance.MODULE_UI_NAME == requested_module:
                 return module_instance
 
         return None

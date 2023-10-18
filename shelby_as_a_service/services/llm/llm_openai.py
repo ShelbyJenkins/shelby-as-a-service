@@ -22,6 +22,8 @@ class OpenAILLM(ModuleBase):
         MODEL_NAME: str
         TOKENS_MAX: int
         COST_PER_K: float
+        TOKENS_PER_MESSAGE: int
+        TOKENS_PER_NAME: int
         frequency_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
         max_tokens: Annotated[int, Field(ge=0, le=16384)] = 4096
         presence_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
@@ -30,10 +32,34 @@ class OpenAILLM(ModuleBase):
         top_p: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
 
     MODEL_DEFINITIONS: dict[str, Any] = {
-        "gpt-4": {"MODEL_NAME": "gpt-4", "TOKENS_MAX": 8192, "COST_PER_K": 0.06},
-        "gpt-4-32k": {"MODEL_NAME": "gpt-4-32k", "TOKENS_MAX": 32768, "COST_PER_K": 0.06},
-        "gpt-3.5-turbo": {"MODEL_NAME": "gpt-3.5-turbo", "TOKENS_MAX": 4096, "COST_PER_K": 0.03},
-        "gpt-3.5-turbo-16k": {"MODEL_NAME": "gpt-3.5-turbo-16k", "TOKENS_MAX": 16384, "COST_PER_K": 0.03},
+        "gpt-4": {
+            "MODEL_NAME": "gpt-4",
+            "TOKENS_MAX": 8192,
+            "COST_PER_K": 0.06,
+            "TOKENS_PER_MESSAGE": 3,
+            "TOKENS_PER_NAME": 1,
+        },
+        "gpt-4-32k": {
+            "MODEL_NAME": "gpt-4-32k",
+            "TOKENS_MAX": 32768,
+            "COST_PER_K": 0.06,
+            "TOKENS_PER_MESSAGE": 3,
+            "TOKENS_PER_NAME": 1,
+        },
+        "gpt-3.5-turbo": {
+            "MODEL_NAME": "gpt-3.5-turbo",
+            "TOKENS_MAX": 4096,
+            "COST_PER_K": 0.03,
+            "TOKENS_PER_MESSAGE": 4,
+            "TOKENS_PER_NAME": -1,
+        },
+        "gpt-3.5-turbo-16k": {
+            "MODEL_NAME": "gpt-3.5-turbo-16k",
+            "TOKENS_MAX": 16384,
+            "COST_PER_K": 0.03,
+            "TOKENS_PER_MESSAGE": 3,
+            "TOKENS_PER_NAME": 1,
+        },
     }
 
     class ModuleConfigModel(BaseModel):
@@ -61,12 +87,13 @@ class OpenAILLM(ModuleBase):
         logit_bias=None,
         stream=None,
     ):
-        prompt, llm_model, total_prompt_tokens = self._prep_chat(
+        prompt, llm_model, total_prompt_tokens = self.prep_chat(
             query=query,
             prompt_template_path=prompt_template_path,
             documents=documents,
             llm_model=llm_model,
         )
+
         if max_tokens is None:
             max_tokens = llm_model.max_tokens
         if max_tokens > llm_model.TOKENS_MAX:
@@ -194,7 +221,7 @@ class OpenAILLM(ModuleBase):
                 }
                 return response
 
-    def _prep_chat(self, query, prompt_template_path=None, documents=None, llm_model=None):
+    def prep_chat(self, query, prompt_template_path=None, documents=None, llm_model=None):
         llm_model = self.get_model(self, requested_model_name=llm_model)
 
         prompt = PromptTemplates.create_openai_prompt(
@@ -203,15 +230,12 @@ class OpenAILLM(ModuleBase):
             documents=documents,
         )
 
-        result = ""
-        for entry in prompt:
-            role = entry.get("role", "")
-            content = entry.get("content", "")
-            result += f"{role}: {content}\n"
-        total_prompt_tokens = TextProcess.tiktoken_len(result, encoding_model=llm_model.MODEL_NAME)
+        total_prompt_tokens = TextProcess.tiktoken_len_of_openai_prompt(prompt, llm_model)
 
         if prompt is None or llm_model is None or total_prompt_tokens is None:
-            raise ValueError(f"Error with input values - prompt: {prompt}, model: {llm_model}, total_prompt_tokens: {total_prompt_tokens}")
+            raise ValueError(
+                f"Error with input values - prompt: {prompt}, model: {llm_model}, total_prompt_tokens: {total_prompt_tokens}"
+            )
         return prompt, llm_model, total_prompt_tokens
 
     def create_settings_ui(self):
@@ -232,52 +256,49 @@ class OpenAILLM(ModuleBase):
                 visibility = False
 
             with gr.Group(label=model_name, open=True, visible=visibility) as model_settings:
-                model_compoments["max_tokens"] = gr.Slider(
-                    minimum=0,
-                    maximum=model.TOKENS_MAX,
-                    value=model.max_tokens,
-                    step=1,
-                    label="Max Tokens",
-                    interactive=True,
-                )
                 model_compoments["stream"] = gr.Checkbox(
                     value=model.stream,
                     label="Stream Response",
                     interactive=True,
                 )
-                with gr.Accordion(label="Advanced Settings", open=False):
-                    model_compoments["frequency_penalty"] = gr.Slider(
-                        minimum=-2.0,
-                        maximum=2.0,
-                        value=model.frequency_penalty,
-                        step=0.05,
-                        label="Frequency Penalty",
-                        interactive=True,
-                    )
-                    model_compoments["presence_penalty"] = gr.Slider(
-                        minimum=-2.0,
-                        maximum=2.0,
-                        value=model.presence_penalty,
-                        step=0.05,
-                        label="Presence Penalty",
-                        interactive=True,
-                    )
-                    model_compoments["temperature"] = gr.Slider(
-                        minimum=0.0,
-                        maximum=2.0,
-                        value=model.temperature,
-                        step=0.05,
-                        label="Temperature",
-                        interactive=True,
-                    )
-                    model_compoments["top_p"] = gr.Slider(
-                        minimum=0.0,
-                        maximum=2.0,
-                        value=model.top_p,
-                        step=0.05,
-                        label="Top P",
-                        interactive=True,
-                    )
+                model_compoments["frequency_penalty"] = gr.Slider(
+                    minimum=-2.0,
+                    maximum=2.0,
+                    value=model.frequency_penalty,
+                    step=0.05,
+                    label="Frequency Penalty",
+                    interactive=True,
+                )
+                model_compoments["presence_penalty"] = gr.Slider(
+                    minimum=-2.0,
+                    maximum=2.0,
+                    value=model.presence_penalty,
+                    step=0.05,
+                    label="Presence Penalty",
+                    interactive=True,
+                )
+                model_compoments["temperature"] = gr.Slider(
+                    minimum=0.0,
+                    maximum=2.0,
+                    value=model.temperature,
+                    step=0.05,
+                    label="Temperature",
+                    interactive=True,
+                )
+                model_compoments["top_p"] = gr.Slider(
+                    minimum=0.0,
+                    maximum=2.0,
+                    value=model.top_p,
+                    step=0.05,
+                    label="Top P",
+                    interactive=True,
+                )
+                model_compoments["max_tokens"] = gr.Number(
+                    value=model.TOKENS_MAX,
+                    label="model.TOKENS_MAX",
+                    interactive=False,
+                    info="Maximum Req+Resp Tokens for Model",
+                )
 
             models_list.append(model_settings)
             GradioHelper.create_settings_event_listener(model, model_compoments)

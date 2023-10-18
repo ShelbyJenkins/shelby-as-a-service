@@ -210,35 +210,29 @@ class PineconeDatabase(ModuleBase):
         with gr.Accordion(label=self.MODULE_UI_NAME, open=True):
             with gr.Column():
                 components["index_env"] = gr.Textbox(
-                    value=self.config.index_env,
-                    label="index_env",
-                    interactive=True,
+                    value=self.config.index_env, label="index_env", interactive=True, min_width=0
                 )
                 components["vectorstore_dimension"] = gr.Number(
-                    value=self.config.vectorstore_dimension,
-                    label="vectorstore_dimension",
-                    interactive=True,
+                    value=self.config.vectorstore_dimension, label="vectorstore_dimension", interactive=True, min_width=0
                 )
                 components["vectorstore_upsert_batch_size"] = gr.Number(
                     value=self.config.vectorstore_upsert_batch_size,
                     label="vectorstore_upsert_batch_size",
                     interactive=True,
+                    min_width=0,
                 )
-                components["vectorstore_metric"] = gr.TextArea(
-                    value=self.config.vectorstore_metric,
-                    label="vectorstore_metric",
-                    interactive=True,
+                components["vectorstore_metric"] = gr.Textbox(
+                    value=self.config.vectorstore_metric, label="vectorstore_metric", interactive=True, min_width=0
                 )
-                components["vectorstore_pod_type"] = gr.TextArea(
-                    value=self.config.vectorstore_pod_type,
-                    label="vectorstore_pod_type",
-                    interactive=True,
+                components["vectorstore_pod_type"] = gr.Textbox(
+                    value=self.config.vectorstore_pod_type, label="vectorstore_pod_type", interactive=True, min_width=0
                 )
                 components["indexed_metadata"] = gr.Dropdown(
                     value=self.config.indexed_metadata[0],
                     choices=self.config.indexed_metadata,
                     label="indexed_metadata",
                     interactive=True,
+                    min_width=0,
                 )
                 GradioHelper.create_settings_event_listener(self.config, components)
 

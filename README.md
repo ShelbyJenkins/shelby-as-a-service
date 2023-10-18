@@ -89,7 +89,7 @@
     <img src="documentation/slack-example.png" alt="Slack Screen Shot" style="width: 40%; display: inline-block;">
 </div>
 
-
+IMPORTANT!!! This documentation is completely out of date as the scope of the project has shifted dramatically. See this comment for more details: https://www.reddit.com/r/ChatGPTCoding/comments/17asjf3/best_way_to_create_a_custom_chatbot_from_personal/k5f5l91/
 
 ### Features
 

@@ -12,7 +12,7 @@ from services.embedding.embedding_openai import OpenAIEmbedding
 
 class EmbeddingService(ModuleBase):
     MODULE_NAME: str = "embedding_service"
-    MODULE_UI_NAME: str = "Embedding Settings"
+    MODULE_UI_NAME: str = "Embeddings"
     PROVIDERS_TYPE: str = "embedding_providers"
     REQUIRED_MODULES: List[Type] = [OpenAIEmbedding]
 
@@ -45,6 +45,7 @@ class EmbeddingService(ModuleBase):
             choices=GradioHelper.get_list_of_module_ui_names(self.embedding_providers),
             label=self.MODULE_UI_NAME,
             container=True,
+            min_width=0,
         )
 
         for provider_instance in self.embedding_providers:

@@ -40,13 +40,13 @@ class LocalFileStoreDatabase(ModuleBase):
 
     def create_settings_ui(self):
         components = {}
-        with gr.Accordion(label=self.MODULE_UI_NAME, open=True):
-            with gr.Column():
-                components["max_response_tokens"] = gr.Number(
-                    value=self.config.max_response_tokens,
-                    label="max_response_tokens",
-                    interactive=True,
-                )
-            GradioHelper.create_settings_event_listener(self.config, components)
+        # with gr.Accordion(label=self.MODULE_UI_NAME, open=True):
+        #     with gr.Column():
+        #         components["max_response_tokens"] = gr.Number(
+        #             value=self.config.max_response_tokens,
+        #             label="max_response_tokens",
+        #             interactive=True,
+        #         )
+        #     GradioHelper.create_settings_event_listener(self.config, components)
 
         return components

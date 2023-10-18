@@ -1,10 +1,10 @@
 import types
-from typing import Any, Dict, Generator, List, Optional, Type, Union
+from typing import Annotated, Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from app_config.module_base import ModuleBase
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.llm.llm_openai import OpenAILLM
 
 
@@ -16,6 +16,7 @@ class LLMService(ModuleBase):
 
     class ModuleConfigModel(BaseModel):
         llm_provider: str = "openai_llm"
+        model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
 
         class Config:
             extra = "ignore"
@@ -37,10 +38,9 @@ class LLMService(ModuleBase):
         max_tokens=None,
         stream=None,
     ):
-        if llm_provider is None:
-            llm_provider = self.config.llm_provider
-
-        provider_instance = self.get_requested_module_instance(self.llm_providers, llm_provider)
+        provider_instance = self.get_requested_module_instance(
+            self.llm_providers, llm_provider if llm_provider is not None else self.config.llm_provider
+        )
         if provider_instance:
             response = {}
             for response in provider_instance.create_chat(
@@ -62,8 +62,52 @@ class LLMService(ModuleBase):
                 "model_name": response["model_name"],
             }
 
+    def get_available_request_tokens(
+        self,
+        query,
+        prompt_template_path,
+        model_token_utilization=None,
+        context_to_response_ratio=0.00,
+        llm_provider=None,
+        llm_model=None,
+    ):
+        provider_instance = self.get_requested_module_instance(
+            self.llm_providers, llm_provider if llm_provider is not None else self.config.llm_provider
+        )
+
+        if provider_instance:
+            _, llm_model, total_prompt_tokens = provider_instance.prep_chat(
+                query=query,
+                prompt_template_path=prompt_template_path,
+                llm_model=llm_model,
+            )
+            available_tokens = llm_model.TOKENS_MAX - 10  # for safety in case of model changes
+            available_tokens = available_tokens * (
+                model_token_utilization if model_token_utilization is not None else self.config.model_token_utilization
+            )
+            if context_to_response_ratio > 0.0:
+                available_request_tokens = available_tokens * context_to_response_ratio
+                available_request_tokens = available_request_tokens - total_prompt_tokens
+            else:
+                available_request_tokens = available_tokens - total_prompt_tokens
+            available_response_tokens = available_tokens - available_request_tokens
+            max_tokens = available_response_tokens + available_request_tokens
+
+            return int(available_request_tokens), int(max_tokens)
+        else:
+            return 0, 0
+
     def create_settings_ui(self):
         components = {}
+
+        components["model_token_utilization"] = gr.Slider(
+            value=self.config.model_token_utilization,
+            label="Percent of Model Context Size to Use",
+            minimum=0.0,
+            maximum=1.0,
+            step=0.05,
+            min_width=0,
+        )
 
         components["llm_provider"] = gr.Dropdown(
             value=GradioHelper.get_module_ui_name_from_str(self.llm_providers, self.config.llm_provider),

@@ -11,9 +11,9 @@ from pydantic import BaseModel
 
 class MainChatView(ModuleBase):
     MODULE_NAME: str = "main_chat_view"
-    MODULE_UI_NAME: str = "Main Chat"
-    SETTINGS_UI_COL = 2
-    PRIMARY_UI_COL = 8
+    MODULE_UI_NAME: str = "Chat"
+    SETTINGS_UI_COL = 2.5
+    PRIMARY_UI_COL = 7.5
     REQUIRED_MODULES: list[Type] = [VanillaLLM, CEQAgent]
 
     class ModuleConfigModel(BaseModel):

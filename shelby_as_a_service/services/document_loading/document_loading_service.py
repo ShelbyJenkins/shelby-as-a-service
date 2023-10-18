@@ -12,12 +12,6 @@ class DocLoadingService(ModuleBase):
     MODULE_NAME: str = "doc_loading_service"
     MODULE_UI_NAME: str = "Document Loading Service"
     REQUIRED_MODULES: List[Type] = [GenericWebScraper]
-    UI_MODULES: List[Type] = [
-        GenericWebScraper,
-        GenericRecursiveWebScraper,
-        # OpenAPILoader,
-        # LoadTextFromFile,
-    ]
 
     class ModuleConfigModel(BaseModel):
         doc_loading_provider: str = "generic_web_scraper"

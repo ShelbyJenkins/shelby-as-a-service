@@ -26,9 +26,7 @@ class ContextIndexView(ModuleBase):
     components: Dict[str, Any]
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
         self.components = {}
 
@@ -88,14 +86,10 @@ class ContextIndexView(ModuleBase):
                         self.components["default_web_data_source_drp"] = gr.Dropdown(
                             visible=True,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0]
-                            .data_domain_sources[0]
-                            .data_source_name,
+                            value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
                             choices=[
                                 cls.data_source_name
-                                for cls in self.the_context_index.index_data_domains[
-                                    0
-                                ].data_domain_sources
+                                for cls in self.the_context_index.index_data_domains[0].data_domain_sources
                             ],
                             show_label=False,
                             interactive=True,
@@ -103,14 +97,10 @@ class ContextIndexView(ModuleBase):
                         self.components["default_local_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0]
-                            .data_domain_sources[0]
-                            .data_source_name,
+                            value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
                             choices=[
                                 cls.data_source_name
-                                for cls in self.the_context_index.index_data_domains[
-                                    0
-                                ].data_domain_sources
+                                for cls in self.the_context_index.index_data_domains[0].data_domain_sources
                             ],
                             show_label=False,
                             interactive=True,
@@ -119,14 +109,10 @@ class ContextIndexView(ModuleBase):
                         self.components["custom_web_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0]
-                            .data_domain_sources[0]
-                            .data_source_name,
+                            value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
                             choices=[
                                 cls.data_source_name
-                                for cls in self.the_context_index.index_data_domains[
-                                    0
-                                ].data_domain_sources
+                                for cls in self.the_context_index.index_data_domains[0].data_domain_sources
                             ],
                             show_label=False,
                             interactive=True,
@@ -134,14 +120,10 @@ class ContextIndexView(ModuleBase):
                         self.components["custom_local_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0]
-                            .data_domain_sources[0]
-                            .data_source_name,
+                            value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
                             choices=[
                                 cls.data_source_name
-                                for cls in self.the_context_index.index_data_domains[
-                                    0
-                                ].data_domain_sources
+                                for cls in self.the_context_index.index_data_domains[0].data_domain_sources
                             ],
                             show_label=False,
                             interactive=True,
@@ -330,20 +312,15 @@ class ContextIndexView(ModuleBase):
                 self.components["data_domain_drp"] = gr.Dropdown(
                     allow_custom_value=True,
                     value=self.the_context_index.index_data_domains[0].data_domain_name,
-                    choices=[
-                        cls.data_domain_name for cls in self.the_context_index.index_data_domains
-                    ],
+                    choices=[cls.data_domain_name for cls in self.the_context_index.index_data_domains],
                     show_label=False,
                     interactive=True,
                 )
                 self.components["data_source_drp"] = gr.Dropdown(
                     allow_custom_value=True,
-                    value=self.the_context_index.index_data_domains[0]
-                    .data_domain_sources[0]
-                    .data_source_name,
+                    value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
                     choices=[
-                        cls.data_source_name
-                        for cls in self.the_context_index.index_data_domains[0].data_domain_sources
+                        cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_domain_sources
                     ],
                     show_label=False,
                     interactive=True,
