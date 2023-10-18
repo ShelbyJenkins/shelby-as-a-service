@@ -23,9 +23,12 @@ class LLMService(ModuleBase):
 
     config: ModuleConfigModel
     llm_providers: List[Any]
+    list_of_module_ui_names: list
+    current_llm_provider: Any
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.current_llm_provider = self.get_requested_module_instance(self.llm_providers, self.config.llm_provider)
 
     def create_chat(
         self,
@@ -70,7 +73,7 @@ class LLMService(ModuleBase):
         context_to_response_ratio=0.00,
         llm_provider=None,
         llm_model=None,
-    ):
+    ) -> tuple[int, int]:
         provider_instance = self.get_requested_module_instance(
             self.llm_providers, llm_provider if llm_provider is not None else self.config.llm_provider
         )
@@ -110,8 +113,8 @@ class LLMService(ModuleBase):
         )
 
         components["llm_provider"] = gr.Dropdown(
-            value=GradioHelper.get_module_ui_name_from_str(self.llm_providers, self.config.llm_provider),
-            choices=GradioHelper.get_list_of_module_ui_names(self.llm_providers),
+            value=self.current_llm_provider.MODULE_UI_NAME,
+            choices=self.list_of_module_ui_names,
             label="LLM Provider",
             container=True,
         )

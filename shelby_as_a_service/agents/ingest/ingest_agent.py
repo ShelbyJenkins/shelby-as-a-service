@@ -10,24 +10,20 @@ from services.document_loading.document_loading_service import DocLoadingService
 class IngestAgent(ModuleBase):
     MODULE_NAME: str = "ingest_agent"
     MODULE_UI_NAME: str = "ingest_agent"
-    # REQUIRED_MODULES: List[Type] = [DocLoadingService]
     REQUIRED_MODULES: List[Type] = [DocLoadingService, DatabaseService]
 
     class ModuleConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Load a URL Data Tab, and we'll access it and use it to generate a response."
-        )
-        llm_provider: str = "openai_llm"
-        llm_model: str = "gpt-4"
         database_provider: str = "local_filestore_database"
         doc_loading_provider: str = "generic_web_scraper"
 
     config: ModuleConfigModel
+    list_of_module_instances: list[Any]
+    list_of_module_ui_names: list[Any]
+    doc_loading_service: DocLoadingService
+    database_service: DatabaseService
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(
-            module_instance=self, config_file_dict=config_file_dict, **kwargs
-        )
+        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def ingest_docs(self):
         # indexes = pinecone.list_indexes()
@@ -66,9 +62,7 @@ class IngestAgent(ModuleBase):
                         filter={"data_source_name": {"$eq": data_source.data_source_name}}
                     )
                     existing_resource_vector_count = (
-                        index_resource_stats.get("namespaces", {})
-                        .get(self.deployment_name, {})
-                        .get("vector_count", 0)
+                        index_resource_stats.get("namespaces", {}).get(self.deployment_name, {}).get("vector_count", 0)
                     )
                     self.log.print_and_log(
                         f"Existing vector count for {data_source.data_source_name}: {existing_resource_vector_count}"
@@ -77,9 +71,7 @@ class IngestAgent(ModuleBase):
                     # Load documents
                     documents = data_source.scraper.load()
                     if not documents:
-                        self.log.print_and_log(
-                            f"Skipping data_source: no data loaded for {data_source.data_source_name}"
-                        )
+                        self.log.print_and_log(f"Skipping data_source: no data loaded for {data_source.data_source_name}")
                         break
                     self.log.print_and_log(f"Total documents loaded for indexing: {len(documents)}")
 
@@ -90,9 +82,7 @@ class IngestAgent(ModuleBase):
                             f"Skipping data_source: no data after preprocessing {data_source.data_source_name}"
                         )
                         break
-                    self.log.print_and_log(
-                        f"Total document chunks after processing: {len(document_chunks)}"
-                    )
+                    self.log.print_and_log(f"Total document chunks after processing: {len(document_chunks)}")
 
                     # Checks against local docs if there are changes or new docs
                     (
@@ -101,20 +91,14 @@ class IngestAgent(ModuleBase):
                     ) = data_source.preprocessor.compare_chunks(data_source, document_chunks)
                     # If there are changes or new docs, delete existing local files and write new files
                     if not has_changes:
-                        self.log.print_and_log(
-                            f"Skipping data_source: no new data found for {data_source.data_source_name}"
-                        )
+                        self.log.print_and_log(f"Skipping data_source: no new data found for {data_source.data_source_name}")
                         break
-                    self.log.print_and_log(
-                        f"Found {len(new_or_changed_chunks)} new or changed documents"
-                    )
+                    self.log.print_and_log(f"Found {len(new_or_changed_chunks)} new or changed documents")
                     (
                         text_chunks,
                         document_chunks,
                     ) = data_source.preprocessor.create_text_chunks(data_source, document_chunks)
-                    self.log.print_and_log(
-                        f"Total document chunks after final check: {len(document_chunks)}"
-                    )
+                    self.log.print_and_log(f"Total document chunks after final check: {len(document_chunks)}")
 
                     # Get dense_embeddings
                     dense_embeddings = data_source.embedding_retriever.embed_documents(text_chunks)
@@ -127,9 +111,7 @@ class IngestAgent(ModuleBase):
                             filter={"data_source_name": {"$eq": data_source.data_source_name}}
                         )
                         cleared_resource_vector_count = (
-                            index_resource_stats.get("namespaces", {})
-                            .get(self.deployment_name, {})
-                            .get("vector_count", 0)
+                            index_resource_stats.get("namespaces", {}).get(self.deployment_name, {}).get("vector_count", 0)
                         )
                         self.log.print_and_log(
                             f"Removing pre-existing vectors. New count: {cleared_resource_vector_count} (should be 0)"
@@ -158,9 +140,7 @@ class IngestAgent(ModuleBase):
                         filter={"data_source_name": {"$eq": data_source.data_source_name}}
                     )
                     new_resource_vector_count = (
-                        index_resource_stats.get("namespaces", {})
-                        .get(self.deployment_name, {})
-                        .get("vector_count", 0)
+                        index_resource_stats.get("namespaces", {}).get(self.deployment_name, {}).get("vector_count", 0)
                     )
                     self.log.print_and_log(
                         f"Indexing complete for: {data_source.data_source_name}\nPrevious vector count: {existing_resource_vector_count}\nNew vector count: {new_resource_vector_count}\n"
@@ -204,7 +184,5 @@ class IngestAgent(ModuleBase):
             else:
                 print("Error: documents_iterator is None")
             if documents_list:
-                self.database_service.write_documents_to_database(
-                    documents_list, data_domain, data_source
-                )
+                self.database_service.write_documents_to_database(documents_list, data_domain, data_source)
                 return documents_list

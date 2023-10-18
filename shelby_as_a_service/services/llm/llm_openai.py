@@ -255,7 +255,7 @@ class OpenAILLM(ModuleBase):
             else:
                 visibility = False
 
-            with gr.Group(label=model_name, open=True, visible=visibility) as model_settings:
+            with gr.Group(visible=visibility) as model_settings:
                 model_compoments["stream"] = gr.Checkbox(
                     value=model.stream,
                     label="Stream Response",
@@ -317,7 +317,7 @@ class OpenAILLM(ModuleBase):
                 self.current_model_class = model
                 self.config.current_model_name = ui_name
                 ModuleBase.update_settings_file = True
-                output.append(gr.Group(label=ui_name, visible=True))
+                output.append(gr.Group(visible=True))
             else:
-                output.append(gr.Group(label=ui_name, visible=False))
+                output.append(gr.Group(visible=False))
         return output

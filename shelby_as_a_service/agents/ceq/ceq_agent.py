@@ -1,5 +1,5 @@
 import re
-from typing import Annotated, Any, Dict, Generator, List, Optional, Tuple, Type
+from typing import Annotated, Any, Generator, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
@@ -11,15 +11,35 @@ from services.llm.llm_service import LLMService
 
 
 class CEQAgent(ModuleBase):
+    """
+    CEQ (Context enhanced querying) is a subset of RAG (Retrieval Augmented Generation).
+    CEQAgent generates responses to user queries using by
+    1) Calculating the amount of tokens available for context documents for a given query and llm model
+    2) Retrieving context documents using the RetrievalAgent
+    3) Appending the documents to a users query (Prompt Stuffing) for additional context
+
+    Methods:
+        run_chat(self, chat_in, llm_provider=None, llm_model=None, model_token_utilization=None,
+                 context_to_response_ratio=None, stream=None, sprite_name="webui_sprite"): Generates a response to user input.
+    """
+
     MODULE_NAME: str = "ceq_agent"
     MODULE_UI_NAME: str = "CEQ"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/ceq/ceq_prompt_templates.yaml"
     DATA_DOMAIN_NONE_FOUND_MESSAGE: str = (
         "Query not related to any supported data domains (aka topics). Supported data domains are:"
     )
-    REQUIRED_MODULES: List[Type] = [RetrievalAgent, LLMService]
+    REQUIRED_MODULES: list[Type] = [RetrievalAgent, LLMService]
 
     class ModuleConfigModel(BaseModel):
+        """
+        The configuration settings for the CEQ agent module.
+
+        Attributes:
+            enabled_data_domains (list[str]): A list of enabled data domains.
+            context_to_response_ratio (float): The ratio of context tokens to response tokens to use for generating the response.
+        """
+
         enabled_data_domains: list[str] = ["all"]
         context_to_response_ratio: Annotated[float, Field(ge=0, le=1.0)] = 0.5
 
@@ -43,7 +63,23 @@ class CEQAgent(ModuleBase):
         context_to_response_ratio: Optional[float] = None,
         stream: Optional[bool] = None,
         sprite_name: Optional[str] = "webui_sprite",
-    ):
+    ) -> Union[Generator[str, None, None], dict[str, str]]:
+        """
+        Generates a response to user input.
+        The default values are for the webui, but can be overridden for other interfaces.
+
+        Args:
+            chat_in (str): The user input to generate a response for.
+            llm_provider (Optional[str]): The LLM provider to use for generating the response.
+            llm_model (Optional[str]): The LLM model to use for generating the response.
+            model_token_utilization (Optional[float]): The percentage of available tokens to use for generating the response.
+            context_to_response_ratio (Optional[float]): The ratio of context tokens to response tokens to use for generating the response.
+            stream (Optional[bool]): Whether to stream the response or not.
+            sprite_name (Optional[str]): The name of the sprite to use for displaying the response.
+
+        Yields:
+            str: The generated response to the user input.
+        """
         available_request_tokens, max_tokens = self.llm_service.get_available_request_tokens(
             query=chat_in,
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
@@ -60,10 +96,6 @@ class CEQAgent(ModuleBase):
             max_total_tokens=available_request_tokens,
             enabled_data_domains=self.config.enabled_data_domains,
         )
-
-        # Context size percentage is the percentage of tokens to use for a given model
-        # Utilization is a balance between context and response length
-        # Max tokens sent to the llm will be CEQ max tokens - retrieved docs max tokens
 
         previous_response: Optional[dict] = None
         final_response: Optional[dict] = None
@@ -86,14 +118,14 @@ class CEQAgent(ModuleBase):
         llm_model_name = final_response.get("model_name", None) or "unknown llm model"  # type: ignore
         response_content_string = final_response.get("response_content_string", None)  # type: ignore
 
-        full_response = self.ceq_append_meta(response_content_string, documents, llm_model_name)
+        full_response = self._ceq_append_meta(response_content_string, documents, llm_model_name)
 
         if sprite_name == "webui_sprite":
-            yield self.parse_local_markdown(full_response)
+            yield self._parse_local_markdown(full_response)
         else:
             return full_response
 
-    def ceq_append_meta(self, response_content_string: str, documents: list[dict], llm_model_name) -> dict[str, str]:
+    def _ceq_append_meta(self, response_content_string: str, documents: list[dict], llm_model_name) -> dict[str, str]:
         # Covering LLM doc notations cases
         # The modified pattern now includes optional opening parentheses or brackets before "Document"
         # and optional closing parentheses or brackets after the number
@@ -144,7 +176,7 @@ class CEQAgent(ModuleBase):
 
         return answer_obj
 
-    def parse_local_markdown(self, full_response) -> str:
+    def _parse_local_markdown(self, full_response) -> str:
         # Should move this to text processing module
         markdown_string = ""
         # Start with the answer text

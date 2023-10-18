@@ -3,7 +3,6 @@ from typing import Any, Iterator, List, Type
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from app_config.module_base import ModuleBase
-from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel, Field
 from services.document_loading.document_loading_providers import GenericRecursiveWebScraper, GenericWebScraper
 

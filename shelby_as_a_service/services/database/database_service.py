@@ -22,6 +22,7 @@ class DatabaseService(ModuleBase):
 
     config: ModuleConfigModel
     database_providers: List[Any]
+    list_of_module_ui_names: list
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)

@@ -4,17 +4,18 @@ import gradio as gr
 from app_config.module_base import ModuleBase
 
 
+def update_config_classes(config_model, components, *values):
+    ui_state = {k: v for k, v in zip(components.keys(), values)}
+    current_values = config_model.model_dump()
+    current_values.update(ui_state)
+    for key, value in current_values.items():
+        if hasattr(config_model, key):
+            setattr(config_model, key, value)
+
+    ModuleBase.update_settings_file = True
+
+
 def create_settings_event_listener(config_model, components):
-    def update_config_classes(*values):
-        ui_state = {k: v for k, v in zip(components.keys(), values)}
-        current_values = config_model.model_dump()
-        current_values.update(ui_state)
-        for key, value in current_values.items():
-            if hasattr(config_model, key):
-                setattr(config_model, key, value)
-
-        ModuleBase.update_settings_file = True
-
     components_to_monitor = []
     for _, component in components.items():
         if isinstance(component, gr.State) or isinstance(component, gr.Button):
@@ -24,7 +25,7 @@ def create_settings_event_listener(config_model, components):
 
     for component in components_to_monitor:
         component.change(
-            fn=update_config_classes,
+            fn=lambda *x: update_config_classes(config_model, components, *x),
             inputs=components_to_monitor,
         )
 

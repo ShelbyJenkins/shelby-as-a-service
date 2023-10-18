@@ -23,10 +23,10 @@ class RetrievalAgent(ModuleBase):
         doc_relevancy_check_enabled: bool = False
 
     config: ModuleConfigModel
-    embedding_service: EmbeddingService
-    database_service: DatabaseService
     list_of_module_instances: list[Any]
     list_of_module_ui_names: list[Any]
+    embedding_service: EmbeddingService
+    database_service: DatabaseService
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
@@ -84,7 +84,7 @@ class RetrievalAgent(ModuleBase):
         returned_documents_list: list[Any] = []
         counter = 0
         while len(returned_documents_list) < docs_max_count:
-            returned_documents_list = self.retrieve_docs(
+            returned_documents_list = self._retrieve_docs(
                 search_terms=query_embedding,
                 retrieve_n_docs=retrieve_n_docs,
                 enabled_data_domains=enabled_data_domains,
@@ -115,7 +115,7 @@ class RetrievalAgent(ModuleBase):
             raise ValueError("No supporting documents found. Currently we don't support queries without supporting context.")
         return returned_documents_list
 
-    def retrieve_docs(self, search_terms, retrieve_n_docs, enabled_data_domains) -> list[Any]:
+    def _retrieve_docs(self, search_terms, retrieve_n_docs, enabled_data_domains) -> list[Any]:
         returned_documents_list = []
         for data_domain_name in enabled_data_domains:
             returned_documents = self.database_service.query_index(
@@ -125,7 +125,6 @@ class RetrievalAgent(ModuleBase):
             )
 
             returned_documents_list.extend(returned_documents)
-
         return returned_documents_list
 
     def create_settings_ui(self):
@@ -135,29 +134,32 @@ class RetrievalAgent(ModuleBase):
             components["topic_constraint_enabled"] = gr.Checkbox(
                 value=self.config.topic_constraint_enabled,
                 label="Topic Constraint",
+                interactive=False,
             )
             components["keyword_generator_enabled"] = gr.Checkbox(
                 value=self.config.keyword_generator_enabled,
                 label="Keyword Generator",
+                interactive=False,
             )
             components["doc_relevancy_check_enabled"] = gr.Checkbox(
                 value=self.config.doc_relevancy_check_enabled,
                 label="Doc Relevancy Check",
+                interactive=False,
             )
         with gr.Row():
             components["doc_max_tokens"] = gr.Number(
                 value=self.config.doc_max_tokens,
                 label="Maximum Document Length",
-                min_value=1,
-                max_value=10000,
+                minimum=1,
+                maximum=10000,
                 step=1,
                 min_width=0,
             )
             components["docs_max_count"] = gr.Number(
                 value=self.config.docs_max_count,
                 label="Attempt to retrieve and use this many documents",
-                min_value=1,
-                max_value=100,
+                minimum=1,
+                maximum=100,
                 step=1,
                 min_width=0,
             )

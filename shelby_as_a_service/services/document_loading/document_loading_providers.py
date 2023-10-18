@@ -7,7 +7,6 @@ import gradio as gr
 import services.text_processing.text as TextProcess
 from app_config.module_base import ModuleBase
 from bs4 import BeautifulSoup
-from interfaces.webui.gradio_ui import GradioUI
 from langchain.document_loaders import GitbookLoader, RecursiveUrlLoader, SitemapLoader, WebBaseLoader
 from langchain.schema import Document
 from pydantic import BaseModel

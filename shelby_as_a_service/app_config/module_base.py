@@ -52,8 +52,8 @@ class ModuleBase(AppBase):
         if providers_type := getattr(module_instance, "PROVIDERS_TYPE", None):
             setattr(module_instance, providers_type, list_of_module_instances)
         else:
-            module_instance.list_of_module_ui_names = list_of_module_ui_names
             module_instance.list_of_module_instances = list_of_module_instances
+        module_instance.list_of_module_ui_names = list_of_module_ui_names
 
         if required_secrets := getattr(module_instance, "REQUIRED_SECRETS", None):
             for required_secret in required_secrets:

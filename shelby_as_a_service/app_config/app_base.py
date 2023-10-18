@@ -11,6 +11,16 @@ from pydantic import BaseModel
 
 
 class AppBase:
+    """
+    The base of the Shelby as a Service application.
+    Responsible for loading the app and it's required services from a config file.
+
+    Methods:
+    - setup_app(cls, app_name): Sets up the application with the given app_name.
+    - get_logger(cls, logger_name: Optional[str] = None) -> Logger: Returns a logger instance.
+    - run_sprites(cls): Runs the enabled sprites.
+    """
+
     AVAILABLE_SPRITES: List[str] = ["webui_sprite"]
     # AVAILABLE_SPRITES: List[str] = ["webui_sprite", "discord_sprite", "slack_sprite"]
     webui_sprite: Type
@@ -22,6 +32,16 @@ class AppBase:
     the_context_index: ContextIndexService.TheContextIndex
 
     class AppConfigModel(BaseModel):
+        """
+        A class representing the application configuration model.
+
+        Attributes:
+        - app_name: A string representing the application name.
+        - enabled_sprites: A list of enabled sprites.
+        - enabled_extensions: A list of enabled extensions.
+        - disabled_extensions: A list of disabled extensions.
+        """
+
         app_name: str = "base"
         enabled_sprites: List[str] = ["webui_sprite"]
         enabled_extensions: List[str] = []
@@ -35,10 +55,17 @@ class AppBase:
 
     @classmethod
     def setup_app(cls, app_name):
+        """
+        Sets up the application with the given app_name.
+
+        Args:
+        - app_name: A string representing the application name.
+
+        Returns:
+        - cls: The AppBase class.
+        """
         if app_name is None:
-            raise ValueError(
-                "App must be initialized with an app_name before it can be used without it."
-            )
+            raise ValueError("App must be initialized with an app_name before it can be used without it.")
         if app_name == "base":
             ConfigManager.check_and_create_base()
             app_name = ConfigManager.load_webui_sprite_default_config()
@@ -53,18 +80,25 @@ class AppBase:
         AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
 
         AppBase.local_index_dir = f"app_config/your_apps/{app_name}/index"
-        AppBase.the_context_index = ContextIndexService.TheContextIndex(
-            **app_config_file_dict.get("index", {})
-        )
+        AppBase.the_context_index = ContextIndexService.TheContextIndex(**app_config_file_dict.get("index", {}))
 
-        AppBase.load_sprite_instances(app_config_file_dict)
+        AppBase._load_sprite_instances(app_config_file_dict)
 
         ConfigManager.update_config_file_from_loaded_models()
 
         return cls
 
     @staticmethod
-    def load_sprite_instances(app_config_file_dict: Dict[str, Any]):
+    def _load_sprite_instances(app_config_file_dict: Dict[str, Any]):
+        """
+        Loads the sprite instances.
+
+        Args:
+        - app_config_file_dict: A dictionary representing the application configuration file.
+
+        Returns:
+        - None
+        """
         for sprite_name in AppBase.AVAILABLE_SPRITES:
             match sprite_name:
                 case "webui_sprite":
@@ -98,16 +132,32 @@ class AppBase:
 
     @classmethod
     def get_logger(cls, logger_name: Optional[str] = None) -> Logger:
+        """
+        Returns a logger instance.
+
+        Args:
+        - logger_name: A string representing the logger name.
+
+        Returns:
+        - Logger: A logger instance.
+        """
         if getattr(cls, "log", None) is None:
             if logger_name is None:
-                raise ValueError(
-                    "Logger must be initialized with an logger_name before it can be used without it."
-                )
+                raise ValueError("Logger must be initialized with an logger_name before it can be used without it.")
             cls.log = Logger(logger_name=logger_name)
         return cls.log
 
     @classmethod
     def run_sprites(cls):
+        """
+        Runs the sprites.
+
+        Args:
+        - None
+
+        Returns:
+        - None
+        """
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for sprite_name in AppBase.app_config.enabled_sprites:
                 sprite = getattr(cls, sprite_name)

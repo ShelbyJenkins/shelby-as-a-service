@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 class PineconeDatabase(ModuleBase):
     MODULE_NAME: str = "pinecone_database"
-    MODULE_UI_NAME: str = "pinecone_database"
+    MODULE_UI_NAME: str = "Pinecone Database"
     REQUIRED_SECRETS: List[str] = ["pinecone_api_key"]
 
     class ModuleConfigModel(BaseModel):
