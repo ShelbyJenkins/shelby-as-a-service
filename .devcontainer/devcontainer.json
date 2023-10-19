@@ -2,7 +2,7 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/universal
 {
 	"remoteUser": "root",
-	"image": "docker.io/library/python:3.10.11-slim-buster",
+	"image": "docker.io/library/python:3.12.0-slim-bookworm",
 	// "forwardPorts": [8000],
 	"postCreateCommand": "apt-get update && apt-get install -y git && pip install -r requirements.txt",
     "customizations": {
