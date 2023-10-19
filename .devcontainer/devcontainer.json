@@ -4,18 +4,25 @@
 	"remoteUser": "root",
 	"image": "docker.io/library/python:3.12.0-slim-bookworm",
 	// "forwardPorts": [8000],
-	"postCreateCommand": "apt-get update && apt-get install -y git && pip install -r requirements.txt",
-    "customizations": {
-		"vscode": {
-			"extensions": [
-				"ms-python.black-formatter",
-				"gitHub.codespaces",
-				"ms-python.mypy-type-checker",
-				"ms-python.python",
-				"ms-python.isort"
-			]
-		}
-	} 
+		"postCreateCommand": ["pip install -r /workspace/shelby_as_a_service/requirements.txt"],
+		"customizations": {
+			"vscode": {
+				"extensions": [
+					"ms-python.python",
+					"ms-python.black-formatter",
+					"ms-python.isort",
+					"ms-python.mypy-type-checker",
+					"github.vscode-pull-request-github",
+					"github.vscode-github-actions",
+					"github.copilot",
+					"github.copilot-chat",
+					"d-koppenhagen.file-tree-to-text-generator"
+				]
+			}
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {}
+	}
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
