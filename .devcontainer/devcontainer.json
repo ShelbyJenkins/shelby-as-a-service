@@ -2,9 +2,9 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/universal
 {
 	"remoteUser": "root",
-	"image": "docker.io/library/python:3.12.0-slim-bookworm",
+	"image": "docker.io/library/python:3.11-slim-bookworm",
 	// "forwardPorts": [8000],
-		"postCreateCommand": ["pip install -r /workspace/shelby_as_a_service/requirements.txt"],
+		"postCreateCommand": "pip install -r /workspaces/shelby_as_a_service/requirements.txt",
 		"customizations": {
 			"vscode": {
 				"extensions": [
@@ -23,15 +23,4 @@
 	"features": {
 		"ghcr.io/devcontainers/features/git:1": {}
 	}
-
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
-
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-
-	// Configure tool-specific properties.
-	// "customizations": {}, 
-
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 }
