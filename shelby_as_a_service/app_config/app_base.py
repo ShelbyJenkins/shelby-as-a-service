@@ -23,13 +23,7 @@ class AppBase:
 
     AVAILABLE_SPRITES: List[str] = ["webui_sprite"]
     # AVAILABLE_SPRITES: List[str] = ["webui_sprite", "discord_sprite", "slack_sprite"]
-    webui_sprite: Type
-    discord_sprite: Type
-    slack_sprite: Type
-    available_sprite_instances: List[Any] = []
-    log: Logger
-    context_index_service = ContextIndexService
-    the_context_index: ContextIndexService.TheContextIndex
+    APP_DIR_PATH: str = "app_config/your_apps"
 
     class AppConfigModel(BaseModel):
         """
@@ -48,6 +42,14 @@ class AppBase:
         disabled_extensions: List[str] = []
 
     app_config: AppConfigModel
+
+    webui_sprite: Type
+    discord_sprite: Type
+    slack_sprite: Type
+    context_index_service = ContextIndexService
+    the_context_index: ContextIndexService.TheContextIndex
+    log: Logger
+    available_sprite_instances: List[Any] = []
     list_of_extension_configs: List[Any]
     secrets: Dict[str, str] = {}
     total_cost: Decimal = Decimal("0")
@@ -73,14 +75,15 @@ class AppBase:
         app_config_file_dict = ConfigManager.load_app_config(app_name)
         AppBase.app_config = AppBase.AppConfigModel(**app_config_file_dict.get("app", {}))
 
-        load_dotenv(os.path.join(f"app_config/your_apps/{app_name}", ".env"))
+        load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
         AppBase.log = AppBase.get_logger(logger_name=app_name)
 
         AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
 
-        AppBase.local_index_dir = f"app_config/your_apps/{app_name}/index"
-        AppBase.the_context_index = ContextIndexService.TheContextIndex(**app_config_file_dict.get("index", {}))
+        AppBase.the_context_index = AppBase.context_index_service.setup_context_index(
+            app_base=AppBase, config_file_dict=app_config_file_dict
+        )
 
         AppBase._load_sprite_instances(app_config_file_dict)
 

@@ -174,7 +174,7 @@ class IngestAgent(ModuleBase):
         # get source preset
 
         documents_list = []
-        for data_source in data_domain.data_domain_sources:
+        for data_source in data_domain.data_sources:
             documents_iterator = self.doc_loading_service.load(data_source)
             if documents_iterator is not None:
                 try:

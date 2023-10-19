@@ -31,12 +31,27 @@ class ContextIndexView(ModuleBase):
 
     context_index_service: ContextIndexService
     the_context_index: ContextIndexService.TheContextIndex
-    current_data_domain_instance: Any = None
+    current_data_domain_instance: DataDomain
+    current_data_source_instance: DataSource
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
-
         self.components = {}
+
+        for data_domain in self.the_context_index.data_domains:
+            if self.config.current_data_domain_name == data_domain.NAME:
+                self.current_data_domain_instance = data_domain
+                break
+            if getattr(self, "current_data_domain_instance", None) is None:
+                self.current_data_domain_instance = data_domain
+                self.config.current_data_domain_name = data_domain.NAME
+        for data_source in self.current_data_domain_instance.data_sources:
+            if self.config.current_data_source_name == data_source.NAME:
+                self.current_data_source_instance = data_source
+                break
+            if getattr(self, "current_data_source_instance", None) is None:
+                self.current_data_source_instance = data_source
+                self.config.current_data_source_name = data_source.NAME
 
     def create_primary_ui(self):
         with gr.Column(elem_classes="primary_ui_col"):
@@ -54,7 +69,7 @@ class ContextIndexView(ModuleBase):
     def create_settings_ui(self):
         with gr.Column():
             # self.quick_add()
-            # self.add_source()
+            self.add_source()
             self.add_data_domain()
             with gr.Tab(label="Index Management"):
                 pass
@@ -93,10 +108,9 @@ class ContextIndexView(ModuleBase):
                         self.components["default_web_data_source_drp"] = gr.Dropdown(
                             visible=True,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
+                            value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
                             choices=[
-                                cls.data_source_name
-                                for cls in self.the_context_index.index_data_domains[0].data_domain_sources
+                                cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources
                             ],
                             show_label=False,
                             interactive=True,
@@ -104,10 +118,9 @@ class ContextIndexView(ModuleBase):
                         self.components["default_local_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
+                            value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
                             choices=[
-                                cls.data_source_name
-                                for cls in self.the_context_index.index_data_domains[0].data_domain_sources
+                                cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources
                             ],
                             show_label=False,
                             interactive=True,
@@ -116,10 +129,9 @@ class ContextIndexView(ModuleBase):
                         self.components["custom_web_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
+                            value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
                             choices=[
-                                cls.data_source_name
-                                for cls in self.the_context_index.index_data_domains[0].data_domain_sources
+                                cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources
                             ],
                             show_label=False,
                             interactive=True,
@@ -127,10 +139,9 @@ class ContextIndexView(ModuleBase):
                         self.components["custom_local_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
+                            value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
                             choices=[
-                                cls.data_source_name
-                                for cls in self.the_context_index.index_data_domains[0].data_domain_sources
+                                cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources
                             ],
                             show_label=False,
                             interactive=True,
@@ -312,42 +323,27 @@ class ContextIndexView(ModuleBase):
                         min_width=0,
                     )
 
-                # Settings go here
-                gr.Checkbox(label="test")
+                # # Settings go here
+                # gr.Checkbox(label="test")
 
-            with gr.Tab(open=False, label="Save files and configs"):
-                self.components["data_domain_drp"] = gr.Dropdown(
-                    allow_custom_value=True,
-                    value=self.the_context_index.index_data_domains[0].data_domain_name,
-                    choices=[cls.data_domain_name for cls in self.the_context_index.index_data_domains],
-                    show_label=False,
-                    interactive=True,
-                )
-                self.components["data_source_drp"] = gr.Dropdown(
-                    allow_custom_value=True,
-                    value=self.the_context_index.index_data_domains[0].data_domain_sources[0].data_source_name,
-                    choices=[
-                        cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_domain_sources
-                    ],
-                    show_label=False,
-                    interactive=True,
-                )
+                # # with gr.Tab(open=False, label="Save files and configs"):
+                # self.components["data_domain_drp"] = gr.Dropdown(
+                #     allow_custom_value=True,
+                #     value=self.the_context_index.index_data_domains[0].data_domain_name,
+                #     choices=[cls.data_domain_name for cls in self.the_context_index.index_data_domains],
+                #     show_label=False,
+                #     interactive=True,
+                # )
+                # self.components["data_source_drp"] = gr.Dropdown(
+                #     allow_custom_value=True,
+                #     value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
+                #     choices=[cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources],
+                #     show_label=False,
+                #     interactive=True,
+                # )
             # self.url_or_files_radio_toggle()
 
     def add_data_domain(self):
-        if data_domains := getattr(self.the_context_index, "data_domains", None):
-            for data_domain in data_domains:
-                if self.config.current_data_domain_name == data_domain.NAME:
-                    self.current_data_domain_instance = data_domain
-                    break
-        if self.current_data_domain_instance is None:
-            if data_domains is None:
-                self.the_context_index.data_domains = []
-            new_domain = DataDomain()
-            self.the_context_index.data_domains.append(new_domain)  # type: ignore
-            self.current_data_domain_instance = new_domain
-            self.config.current_data_domain_name = new_domain.NAME
-
         with gr.Tab(label="Add Topic"):
             data_domain_components = {}
 
