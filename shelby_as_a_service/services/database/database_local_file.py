@@ -4,21 +4,21 @@ from typing import Any, Dict, List, Type, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import services.text_processing.text as TextProcess
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel
 
 
 class LocalFileStoreDatabase(ModuleBase):
-    MODULE_NAME: str = "local_filestore_database"
-    MODULE_UI_NAME: str = "Local Files as a Database"
+    CLASS_NAME: str = "local_filestore_database"
+    CLASS_UI_NAME: str = "Local Files as a Database"
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         max_response_tokens: int = 1
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def write_documents_to_database(self, documents, data_domain, data_source):
         data_domain_name_file_path = os.path.join(
@@ -40,7 +40,7 @@ class LocalFileStoreDatabase(ModuleBase):
 
     def create_settings_ui(self):
         components = {}
-        # with gr.Accordion(label=self.MODULE_UI_NAME, open=True):
+        # with gr.Accordion(label=self.CLASS_UI_NAME, open=True):
         #     with gr.Column():
         #         components["max_response_tokens"] = gr.Number(
         #             value=self.config.max_response_tokens,

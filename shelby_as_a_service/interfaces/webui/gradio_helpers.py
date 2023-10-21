@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 import gradio as gr
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 
 
 def update_config_classes(config_model, components, *values):
@@ -31,12 +31,12 @@ def create_settings_event_listener(config_model, components):
 
 
 def list_available(class_model) -> Optional[List[Any]]:
-    if available_providers := getattr(class_model, "REQUIRED_MODULES", None):
-        return [provider.MODULE_NAME for provider in available_providers]
+    if available_providers := getattr(class_model, "REQUIRED_CLASSES", None):
+        return [provider.CLASS_NAME for provider in available_providers]
     if available_models := getattr(class_model, "AVAILABLE_MODELS", None):
         return [modes.MODEL_NAME for modes in available_models]
-    if available_agents := getattr(class_model, "REQUIRED_MODULES", None):
-        return [agent.MODULE_UI_NAME for agent in available_agents]
+    if available_agents := getattr(class_model, "REQUIRED_CLASSES", None):
+        return [agent.CLASS_UI_NAME for agent in available_agents]
     return None
 
 
@@ -47,17 +47,17 @@ def dropdown_choices(class_model):
     return None
 
 
-def get_list_of_module_ui_names(available_modules):
-    list_of_module_ui_name = []
-    for module in available_modules:
-        list_of_module_ui_name.append(module.MODULE_UI_NAME)
-    return list_of_module_ui_name
+def get_list_of_class_ui_names(available_classes):
+    list_of_CLASS_UI_NAME = []
+    for module in available_classes:
+        list_of_CLASS_UI_NAME.append(module.CLASS_UI_NAME)
+    return list_of_CLASS_UI_NAME
 
 
-def get_module_ui_name_from_str(available_modules, requested_module):
-    for module in available_modules:
-        if module.MODULE_NAME == requested_module:
-            return module.MODULE_UI_NAME
+def get_class_ui_name_from_str(available_classes, requested_module):
+    for module in available_classes:
+        if module.CLASS_NAME == requested_module:
+            return module.CLASS_UI_NAME
 
 
 # # Interface functions

@@ -1,11 +1,11 @@
 import concurrent.futures
+import logging
 import os
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
-from app_config.config_manager import ConfigManager
+from app.config_manager import ConfigManager
 from app_config.context_index.index_base import ContextIndexService
-from app_config.log_service import Logger
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ class AppBase:
 
     Methods:
     - setup_app(cls, app_name): Sets up the application with the given app_name.
-    - get_logger(cls, logger_name: Optional[str] = None) -> Logger: Returns a logger instance.
+    - _get_logger(cls, logger_name: Optional[str] = None) -> Logger: Returns a logger instance.
     - run_sprites(cls): Runs the enabled sprites.
     """
 
@@ -48,7 +48,7 @@ class AppBase:
     slack_sprite: Type
     context_index_service = ContextIndexService
     the_context_index: ContextIndexService.TheContextIndex
-    log: Logger
+    log: logging.Logger
     available_sprite_instances: List[Any] = []
     list_of_extension_configs: List[Any]
     secrets: Dict[str, str] = {}
@@ -71,13 +71,13 @@ class AppBase:
         if app_name == "base":
             ConfigManager.check_and_create_base()
             app_name = ConfigManager.load_webui_sprite_default_config()
+        AppBase._get_logger(logger_name=app_name)
+        AppBase.log.info(f"Setting up app instance: {app_name}...")
 
         app_config_file_dict = ConfigManager.load_app_config(app_name)
         AppBase.app_config = AppBase.AppConfigModel(**app_config_file_dict.get("app", {}))
 
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
-
-        AppBase.log = AppBase.get_logger(logger_name=app_name)
 
         AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
 
@@ -134,7 +134,7 @@ class AppBase:
                     print("oops")
 
     @classmethod
-    def get_logger(cls, logger_name: Optional[str] = None) -> Logger:
+    def _get_logger(cls, logger_name: Optional[str] = None):
         """
         Returns a logger instance.
 
@@ -144,11 +144,23 @@ class AppBase:
         Returns:
         - Logger: A logger instance.
         """
-        if getattr(cls, "log", None) is None:
+        if getattr(cls, "logger", None) is None:
             if logger_name is None:
                 raise ValueError("Logger must be initialized with an logger_name before it can be used without it.")
-            cls.log = Logger(logger_name=logger_name)
-        return cls.log
+
+            logs_dir = os.path.join(AppBase.APP_DIR_PATH, "logs")
+            os.makedirs(logs_dir, exist_ok=True)
+            log_file_path = os.path.join(logs_dir, f"{logger_name}.log")
+
+            logging.basicConfig(
+                filename=log_file_path,
+                filemode="a",
+                encoding="utf-8",
+                level=logging.DEBUG,
+                format="%(levelname)s: %(asctime)s %(message)s",
+                datefmt="%Y/%m/%d %I:%M:%S %p",
+            )
+            AppBase.log = logging.getLogger(__name__)
 
     @classmethod
     def run_sprites(cls):
@@ -161,7 +173,15 @@ class AppBase:
         Returns:
         - None
         """
+
+        def run_sprite_with_restart(sprite):
+            while True:
+                try:
+                    sprite.run_sprite()
+                except Exception as e:
+                    AppBase.log.error(f"Sprite crashed with error: {e}. Restarting...")
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for sprite_name in AppBase.app_config.enabled_sprites:
                 sprite = getattr(cls, sprite_name)
-                executor.submit(sprite.run_sprite())
+                executor.submit(run_sprite_with_restart, sprite)

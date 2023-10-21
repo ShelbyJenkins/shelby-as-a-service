@@ -4,16 +4,16 @@ from typing import Any, Dict, List, Type, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import pinecone
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel
 
 
 class PineconeDatabase(ModuleBase):
-    MODULE_NAME: str = "pinecone_database"
-    MODULE_UI_NAME: str = "Pinecone Database"
+    CLASS_NAME: str = "pinecone_database"
+    CLASS_UI_NAME: str = "Pinecone Database"
     REQUIRED_SECRETS: List[str] = ["pinecone_api_key"]
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         index_env: str = "us-central1-gcp"
         index_name: str = "shelby-as-a-service"
         vectorstore_dimension: int = 1536
@@ -34,17 +34,19 @@ class PineconeDatabase(ModuleBase):
             "date_indexed",
         ]
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
-
-        pinecone.init(
-            api_key=self.secrets["pinecone_api_key"],
-            environment=self.config.index_env,
-        )
-        self.pinecone = pinecone
-        self.pinecone_index = pinecone.Index(self.config.index_name)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+        if api_key := self.secrets.get("pinecone_api_key", None) is None:
+            print("Pinecone API Key not found.")
+        if api_key:
+            pinecone.init(
+                api_key=api_key,
+                environment=self.config.index_env,
+            )
+            self.pinecone = pinecone
+            self.pinecone_index = pinecone.Index(self.config.index_name)
 
     def query_index(
         self,
@@ -207,7 +209,7 @@ class PineconeDatabase(ModuleBase):
 
     def create_settings_ui(self):
         components = {}
-        with gr.Accordion(label=self.MODULE_UI_NAME, open=True):
+        with gr.Accordion(label=self.CLASS_UI_NAME, open=True):
             with gr.Column():
                 components["index_env"] = gr.Textbox(
                     value=self.config.index_env, label="index_env", interactive=True, min_width=0

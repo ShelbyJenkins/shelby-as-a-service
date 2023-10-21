@@ -3,32 +3,32 @@ from typing import Annotated, Any, Dict, Generator, List, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.llm.llm_openai import OpenAILLM
 
 
 class LLMService(ModuleBase):
-    MODULE_NAME: str = "llm_service"
-    MODULE_UI_NAME: str = "LLM Settings"
+    CLASS_NAME: str = "llm_service"
+    CLASS_UI_NAME: str = "LLM Settings"
     PROVIDERS_TYPE: str = "llm_providers"
-    REQUIRED_MODULES: List[Type] = [OpenAILLM]
+    REQUIRED_CLASSES: List[Type] = [OpenAILLM]
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         llm_provider: str = "openai_llm"
         model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
 
         class Config:
             extra = "ignore"
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
     llm_providers: List[Any]
-    list_of_module_ui_names: list
+    list_of_class_ui_names: list
     current_llm_provider: Any
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
-        self.current_llm_provider = self.get_requested_module_instance(self.llm_providers, self.config.llm_provider)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.current_llm_provider = self.get_requested_class_instance(self.llm_providers, self.config.llm_provider)
 
     def create_chat(
         self,
@@ -41,7 +41,7 @@ class LLMService(ModuleBase):
         max_tokens=None,
         stream=None,
     ):
-        provider_instance = self.get_requested_module_instance(
+        provider_instance = self.get_requested_class_instance(
             self.llm_providers, llm_provider if llm_provider is not None else self.config.llm_provider
         )
         if provider_instance:
@@ -74,7 +74,7 @@ class LLMService(ModuleBase):
         llm_provider=None,
         llm_model=None,
     ) -> tuple[int, int]:
-        provider_instance = self.get_requested_module_instance(
+        provider_instance = self.get_requested_class_instance(
             self.llm_providers, llm_provider if llm_provider is not None else self.config.llm_provider
         )
 
@@ -113,8 +113,8 @@ class LLMService(ModuleBase):
         )
 
         components["llm_provider"] = gr.Dropdown(
-            value=self.current_llm_provider.MODULE_UI_NAME,
-            choices=self.list_of_module_ui_names,
+            value=self.current_llm_provider.CLASS_UI_NAME,
+            choices=self.list_of_class_ui_names,
             label="LLM Provider",
             container=True,
         )

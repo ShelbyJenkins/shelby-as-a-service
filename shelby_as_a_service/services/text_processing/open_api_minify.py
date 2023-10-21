@@ -1,7 +1,11 @@
-import os, shutil
-import json, yaml
-import string, re
+import json
+import os
+import re
+import shutil
+import string
 from urllib.parse import urlparse
+
+import yaml
 from services.data_processing.data_processing_service import TextProcessing
 
 
@@ -63,20 +67,18 @@ class OpenAPIMinifierService:
         minified_endpoints = self.minify(full_open_api_specs)
 
         # Sort alphabetically by tag and then operation_id
-        minified_endpoints = sorted(
-            minified_endpoints, key=lambda x: (x["tag"], x["operation_id"])
-        )
+        minified_endpoints = sorted(minified_endpoints, key=lambda x: (x["tag"], x["operation_id"]))
 
-        minified_endpoints = self.create_endpoint_documents(
-            minified_endpoints, full_open_api_specs
-        )
+        minified_endpoints = self.create_endpoint_documents(minified_endpoints, full_open_api_specs)
 
         self.create_key_point_guide(minified_endpoints)
 
         return minified_endpoints
 
     def create_full_spec(self, open_api_specs):
-        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/full_spec"
+        folder_path = (
+            f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/full_spec"
+        )
         # Ensure output directory exists
         os.makedirs(folder_path, exist_ok=True)
         shutil.rmtree(folder_path)
@@ -100,18 +102,12 @@ class OpenAPIMinifierService:
                 if "components" in open_api_spec:
                     if "components" not in merged_open_api_spec:
                         merged_open_api_spec["components"] = {}
-                    for component_type, components in open_api_spec[
-                        "components"
-                    ].items():
+                    for component_type, components in open_api_spec["components"].items():
                         if component_type not in merged_open_api_spec["components"]:
                             merged_open_api_spec["components"][component_type] = {}
-                        merged_open_api_spec["components"][component_type].update(
-                            components
-                        )
+                        merged_open_api_spec["components"][component_type].update(components)
 
-        merged_open_api_spec["paths"] = dict(
-            sorted(merged_open_api_spec["paths"].items())
-        )
+        merged_open_api_spec["paths"] = dict(sorted(merged_open_api_spec["paths"].items()))
         if "components" in merged_open_api_spec:
             for component_type in merged_open_api_spec["components"]:
                 merged_open_api_spec["components"][component_type] = dict(
@@ -124,9 +120,7 @@ class OpenAPIMinifierService:
         return merged_open_api_spec
 
     def minify(self, open_api_spec):
-        server_url = open_api_spec["servers"][0][
-            "url"
-        ]  # Fetch the server URL from the open_api_spec specification
+        server_url = open_api_spec["servers"][0]["url"]  # Fetch the server URL from the open_api_spec specification
         # server_url = urlparse(server_url)
 
         minified_endpoints = []
@@ -146,10 +140,7 @@ class OpenAPIMinifierService:
             for method, endpoint in methods.items():
                 if method not in self.methods_to_handle:
                     continue
-                if (
-                    endpoint.get("deprecated", False)
-                    and not self.keys_to_keep["deprecated"]
-                ):
+                if endpoint.get("deprecated", False) and not self.keys_to_keep["deprecated"]:
                     continue
 
                 # Adds schema to each endpoint
@@ -159,28 +150,20 @@ class OpenAPIMinifierService:
                     extracted_endpoint_data = endpoint
 
                 # Populate output list with desired keys
-                extracted_endpoint_data = self.populate_keys(
-                    extracted_endpoint_data, path
-                )
+                extracted_endpoint_data = self.populate_keys(extracted_endpoint_data, path)
 
                 # If key == None or key == ''
-                extracted_endpoint_data = self.remove_empty_keys(
-                    extracted_endpoint_data
-                )
+                extracted_endpoint_data = self.remove_empty_keys(extracted_endpoint_data)
 
                 # Remove unwanted keys
-                extracted_endpoint_data = self.remove_unnecessary_keys(
-                    extracted_endpoint_data
-                )
+                extracted_endpoint_data = self.remove_unnecessary_keys(extracted_endpoint_data)
 
                 # Flattens to remove nested objects where the dict has only one key
                 extracted_endpoint_data = self.flatten_endpoint(extracted_endpoint_data)
 
                 if self.key_abbreviations_enabled:
                     # Replace common keys with abbreviations and sets all text to lower case
-                    extracted_endpoint_data = self.abbreviate(
-                        extracted_endpoint_data, self.key_abbreviations
-                    )
+                    extracted_endpoint_data = self.abbreviate(extracted_endpoint_data, self.key_abbreviations)
 
                 # Get the tag of the current endpoint
                 tags = endpoint.get("tags", [])
@@ -188,7 +171,9 @@ class OpenAPIMinifierService:
 
                 operation_id = endpoint.get("operationId", "")
                 processed_endpoint = self.write_dict_to_text(extracted_endpoint_data)
-                content_string = f"{prompt_template} operationId: {operation_id} path: {server_url}{path} content: {processed_endpoint}"
+                content_string = (
+                    f"{prompt_template} operationId: {operation_id} path: {server_url}{path} content: {processed_endpoint}"
+                )
 
                 api_url = self.api_url_format.format(tag=tag, operationId=operation_id)
 
@@ -257,26 +242,18 @@ class OpenAPIMinifierService:
 
         if self.keys_to_keep["good_responses"]:
             if "responses" in endpoint and "200" in endpoint["responses"]:
-                extracted_endpoint_data["responses"]["200"] = endpoint["responses"].get(
-                    "200"
-                )
+                extracted_endpoint_data["responses"]["200"] = endpoint["responses"].get("200")
 
         if self.keys_to_keep["bad_responses"]:
             if "responses" in endpoint:
                 # Loop through all the responses
                 for status_code, response in endpoint["responses"].items():
                     # Check if status_code starts with '4' or '5' (4xx or 5xx)
-                    if (
-                        status_code.startswith("4")
-                        or status_code.startswith("5")
-                        or "default" in status_code
-                    ):
+                    if status_code.startswith("4") or status_code.startswith("5") or "default" in status_code:
                         # Extract the schema or other relevant information from the response
                         bad_response_content = response
                         if bad_response_content is not None:
-                            extracted_endpoint_data["responses"][
-                                f"{status_code}"
-                            ] = bad_response_content
+                            extracted_endpoint_data["responses"][f"{status_code}"] = bad_response_content
 
         return extracted_endpoint_data
 
@@ -314,11 +291,7 @@ class OpenAPIMinifierService:
                         del current_data[k]
                     if k == "enum" and not self.keys_to_keep["enums"]:
                         del current_data[k]
-                    elif (
-                        k == "description"
-                        and len(parent_keys) > 0
-                        and not self.keys_to_keep["nested_descriptions"]
-                    ):
+                    elif k == "description" and len(parent_keys) > 0 and not self.keys_to_keep["nested_descriptions"]:
                         del current_data[k]
                     # Otherwise, if the value is a dictionary or a list, add it to the stack for further processing
                     # Check if the key still exists before accessing it
@@ -346,10 +319,7 @@ class OpenAPIMinifierService:
         for key, value in endpoint.items():
             if isinstance(value, dict):
                 # Check if the dictionary has any of the keys that need to be kept
-                if key in keep_keys or (
-                    isinstance(key, str)
-                    and (key.startswith("5") or key.startswith("4"))
-                ):
+                if key in keep_keys or (isinstance(key, str) and (key.startswith("5") or key.startswith("4"))):
                     # Keep the inner dictionaries but under the current key
                     flattened_endpoint[key] = self.flatten_endpoint(value)
                 else:
@@ -390,9 +360,7 @@ class OpenAPIMinifierService:
             tag = endpoint.get("tag") or "default"
 
             # Get the corresponding tag summary and number
-            tag_summary_list = [
-                summary for summary in tag_summaries if summary["name"] == tag
-            ]
+            tag_summary_list = [summary for summary in tag_summaries if summary["name"] == tag]
             tag_summary = tag_summary_list[0]["summary"] if tag_summary_list else ""
             tag_number = tag_summary_list[0]["tag_number"] if tag_summary_list else 0
 
@@ -409,9 +377,7 @@ class OpenAPIMinifierService:
             parsed = urlparse(endpoint["server_url"])
             if parsed.scheme and parsed.netloc:
                 # Strip away the https:// and main TLD portion
-                endpoint["title"] = re.sub(
-                    r"https?://[^/]+/", "", endpoint["server_url"]
-                )
+                endpoint["title"] = re.sub(r"https?://[^/]+/", "", endpoint["server_url"])
 
             else:
                 endpoint["title"] = {endpoint["server_url"]}
@@ -434,9 +400,7 @@ class OpenAPIMinifierService:
                     name = tag.get("name")
                     summary = tag.get("description")
                     if name and summary:
-                        tag_summaries.append(
-                            {"name": name, "summary": self.write_dict_to_text(summary)}
-                        )
+                        tag_summaries.append({"name": name, "summary": self.write_dict_to_text(summary)})
                     else:
                         tag_summaries.append({"name": name, "summary": ""})
 
@@ -460,11 +424,7 @@ class OpenAPIMinifierService:
             # Define the characters that should be considered as punctuation
             modified_punctuation = set(string.punctuation) - {"/", "#"}
             # Remove punctuation characters
-            return (
-                "".join(ch for ch in no_html_str if ch not in modified_punctuation)
-                .lower()
-                .strip()
-            )
+            return "".join(ch for ch in no_html_str if ch not in modified_punctuation).lower().strip()
 
         # List to accumulate the formatted text parts
         formatted_text_parts = []
@@ -513,7 +473,9 @@ class OpenAPIMinifierService:
             # Load the YAML data and print the result
             yaml_content = yaml.safe_load(yaml_file)
         prompt_template = yaml_content.get("prompt_template")
-        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/keypoint"
+        folder_path = (
+            f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/keypoint"
+        )
         # Ensure output directory exists
         os.makedirs(folder_path, exist_ok=True)
         # Define output file path
@@ -532,11 +494,7 @@ class OpenAPIMinifierService:
                 current_tag_number = endpoint.get("tag_number")
                 # If we're adding tag descriptions and they exist they're added here.
                 tag_summary = endpoint.get("tag_summary")
-                if (
-                    self.keys_to_keep["tag_summaries"]
-                    and tag_summary is not None
-                    and tag_summary != ""
-                ):
+                if self.keys_to_keep["tag_summaries"] and tag_summary is not None and tag_summary != "":
                     tag_string = f"{endpoint.get('tag')}-{tag_summary}\n"
                 else:
                     tag_string = f"{endpoint.get('tag')}-\n"
@@ -548,13 +506,15 @@ class OpenAPIMinifierService:
 
         output_string += f"{tag_string}\n"
 
-        # self.log_agent.print_and_log(f'keypoint file token count: {self.tiktoken_len(output_string)}')
+        # self.log_agent.info(f'keypoint file token count: {self.tiktoken_len(output_string)}')
         # Write sorted info_strings to the output file
         with open(output_file_path, "w") as output_file:
             output_file.write(output_string)
 
     def compare_chunks(self, data_source, document_chunks):
-        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
+        folder_path = (
+            f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
+        )
         # Create the directory if it does not exist
         os.makedirs(folder_path, exist_ok=True)
         existing_files = os.listdir(folder_path)
@@ -564,10 +524,7 @@ class OpenAPIMinifierService:
         for document_chunk in document_chunks:
             text_chunk = f"{document_chunk['content']} title: {document_chunk['title']}"
             # Skip overly long chunks
-            if (
-                self.tiktoken_len(text_chunk)
-                > self.config.index_text_splitter_max_length
-            ):
+            if self.tiktoken_len(text_chunk) > self.config.index_text_splitter_max_length:
                 continue
             file_name = f"{document_chunk['title']}.txt"
             if file_name not in existing_files:
@@ -589,10 +546,7 @@ class OpenAPIMinifierService:
         for document_chunk in document_chunks:
             text_chunk = f"{document_chunk['content']} title: {document_chunk['title']}"
             # If chunk too big
-            if (
-                self.tiktoken_len(text_chunk)
-                > self.config.index_text_splitter_max_length
-            ):
+            if self.tiktoken_len(text_chunk) > self.config.index_text_splitter_max_length:
                 continue
             checked_document_chunks.append(document_chunk)
             checked_text_chunks.append(text_chunk.lower())
@@ -600,17 +554,16 @@ class OpenAPIMinifierService:
         return checked_text_chunks, checked_document_chunks
 
     def write_chunks(self, data_source, document_chunks):
-        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
+        folder_path = (
+            f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
+        )
         # Clear the folder first
         shutil.rmtree(folder_path)
         os.makedirs(folder_path, exist_ok=True)
         for document_chunk in document_chunks:
             text_chunk = f"{document_chunk['content']} title: {document_chunk['title']}"
             # Skip overly long chunks
-            if (
-                self.tiktoken_len(text_chunk)
-                > self.config.index_text_splitter_max_length
-            ):
+            if self.tiktoken_len(text_chunk) > self.config.index_text_splitter_max_length:
                 continue
             if "filename" in document_chunk:
                 # Do something if 'filename' exists in the dictionary

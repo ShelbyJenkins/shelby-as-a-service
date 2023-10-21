@@ -100,10 +100,7 @@ class ActionAgent(ModuleBase):
 
         # Create a list of formatted strings, each with the format "index. key: value"
         if isinstance(self.data_domains, dict):
-            content_strs = [
-                f"{index + 1}. {key}: {value}"
-                for index, (key, value) in enumerate(self.data_domains.items())
-            ]
+            content_strs = [f"{index + 1}. {key}: {value}" for index, (key, value) in enumerate(self.data_domains.items())]
 
         # Join the strings together with spaces between them
         topics_str = " ".join(content_strs)
@@ -136,11 +133,9 @@ class ActionAgent(ModuleBase):
         if domain_key == 0:
             return 0
         # Otherwise return string with the namespace of the domain in the vectorstore
-        data_domain_name = list(self.data_domains.keys())[
-            domain_key - 1
-        ]  # We subtract 1 because list indices start at 0
+        data_domain_name = list(self.data_domains.keys())[domain_key - 1]  # We subtract 1 because list indices start at 0
 
-        self.ceq_agent.log.print_and_log(
+        self.ceq_agent.log.info(
             f"{self.config.ceq_data_domain_constraints_llm_model} chose to fetch context docs from {data_domain_name} data domain."
         )
 
@@ -150,9 +145,7 @@ class ActionAgent(ModuleBase):
         response = None
 
         if len(self.data_domains) == 0:
-            self.log.print_and_log(
-                f"Error: no enabled data domains for moniker: {self.moniker_name}"
-            )
+            self.log.info(f"Error: no enabled data domains for moniker: {self.moniker_name}")
             return
         elif len(self.data_domains) == 1:
             # If only one topic, then we skip the ActionAgent topic decision.
@@ -167,7 +160,7 @@ class ActionAgent(ModuleBase):
             response += "\n"
             for key, value in self.data_domains.items():
                 response += f"{key}: {value}\n"
-            self.log.print_and_log(response)
+            self.log.info(response)
 
         return data_domain_name, response
 
@@ -205,9 +198,7 @@ class ActionAgent(ModuleBase):
         returned_documents_list = []
         for returned_doc in documents:
             returned_documents_list.append(returned_doc["url"])
-        self.log.print_and_log(
-            f"{len(documents)} documents returned from vectorstore: {returned_documents_list}"
-        )
+        self.log.info(f"{len(documents)} documents returned from vectorstore: {returned_documents_list}")
         with open(
             os.path.join("shelby_as_service/prompt_templates/", "ceq_doc_check.yaml"),
             "r",
@@ -253,7 +244,7 @@ class ActionAgent(ModuleBase):
         matches = re.findall(pattern_num, doc_check)
 
         if (len(matches) == 1 and matches[0] == "0") or len(matches) == 0:
-            self.log.print_and_log(f"Error in doc_check: {response}")
+            self.log.info(f"Error in doc_check: {response}")
             return None
 
         relevant_documents = []
@@ -267,11 +258,9 @@ class ActionAgent(ModuleBase):
 
         for returned_doc in relevant_documents:
             returned_documents_list.append(returned_doc["url"])
-        self.log.print_and_log(
-            f"{len(relevant_documents)} documents returned from doc_check: {returned_documents_list}"
-        )
+        self.log.info(f"{len(relevant_documents)} documents returned from doc_check: {returned_documents_list}")
         if not relevant_documents:
-            self.log.print_and_log("No supporting documents after doc_relevancy_check!")
+            self.log.info("No supporting documents after doc_relevancy_check!")
             return None
 
         return relevant_documents

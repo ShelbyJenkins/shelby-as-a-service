@@ -1,7 +1,6 @@
 import argparse
 
-from app_config.app_base import AppBase
-from extensions.content_aggregator.aggregator_agent import AggregatorAgent
+from app.app_base import AppBase
 
 
 def main():
@@ -22,7 +21,6 @@ def main():
     else:
         app_name = "base"
 
-    print(f"app.py is being run as: {app_name}")
     AppBase.setup_app(app_name)
     AppBase.run_sprites()
 

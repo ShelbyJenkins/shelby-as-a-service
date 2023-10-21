@@ -17,8 +17,11 @@ class ConfigManager:
     @staticmethod
     def check_for_existing_apps():
         existing_app_names = []
-        for app in os.listdir("app_config/your_apps"):
-            app_path = os.path.join("app_config/your_apps", app)
+        dir_path = "app_config/your_apps"
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        for app in os.listdir(dir_path):
+            app_path = os.path.join(dir_path, app)
             if os.path.isdir(app_path):
                 if "app_config.json" in os.listdir(app_path):
                     existing_app_names.append(app)
@@ -174,7 +177,7 @@ class ConfigManager:
 
     @staticmethod
     def add_extensions_to_sprite(list_of_extension_configs, sprite_class):
-        sprite_class_name = sprite_class.MODULE_NAME
+        sprite_class_name = sprite_class.CLASS_NAME
         for extension_config in list_of_extension_configs:
             target_sprites = extension_config.get("TARGET_SPRITES", [])
             if target_sprites is None:
@@ -185,8 +188,8 @@ class ConfigManager:
             folder_name = extension_config.get("FOLDER_NAME")
             module_filename = extension_config.get("MODULE_FILENAME")
             class_name = extension_config.get("CLASS_NAME")
-            module_name = extension_config.get("MODULE_NAME")
-            if not (folder_name and module_filename and class_name and module_name):
+            CLASS_NAME = extension_config.get("CLASS_NAME")
+            if not (folder_name and module_filename and class_name and CLASS_NAME):
                 print(f"Missing configuration: {folder_name}, {module_filename}, {class_name}")
                 continue
 
@@ -211,8 +214,8 @@ class ConfigManager:
             folder_name = extension_config.get("FOLDER_NAME")
             view_filename = extension_config.get("VIEW_FILENAME")
             view_class_name = extension_config.get("VIEW_CLASS_NAME")
-            module_name = extension_config.get("MODULE_NAME")
-            if not (folder_name and view_filename and view_class_name and module_name):
+            CLASS_NAME = extension_config.get("CLASS_NAME")
+            if not (folder_name and view_filename and view_class_name and CLASS_NAME):
                 print(f"Missing configuration: {folder_name}, {view_filename}, {view_class_name}")
                 continue
 
@@ -229,31 +232,31 @@ class ConfigManager:
 
     @staticmethod
     def update_config_file_from_loaded_models():
-        from app_config.app_base import AppBase
+        from app.app_base import AppBase
 
-        def recurse(module_instance, config_dict):
-            config_dict[module_instance.MODULE_NAME] = module_instance.config.model_dump()
-            module_config_dict = config_dict[module_instance.MODULE_NAME]
+        def recurse(class_instance, config_dict):
+            config_dict[class_instance.CLASS_NAME] = class_instance.config.model_dump()
+            module_config_dict = config_dict[class_instance.CLASS_NAME]
 
-            if required_modules := getattr(module_instance, "REQUIRED_MODULES", None):
-                for child_module in required_modules:
-                    child_module_instance = getattr(module_instance, child_module.MODULE_NAME)
-                    recurse(child_module_instance, module_config_dict)
+            if REQUIRED_CLASSES := getattr(class_instance, "REQUIRED_CLASSES", None):
+                for child_module in REQUIRED_CLASSES:
+                    child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
+                    recurse(child_class_instance, module_config_dict)
 
-            if extension_modules := getattr(module_instance, "extension_modules", None):
+            if extension_modules := getattr(class_instance, "extension_modules", None):
                 for child_module in extension_modules:
-                    child_module_instance = getattr(module_instance, child_module.MODULE_NAME)
-                    recurse(child_module_instance, module_config_dict)
+                    child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
+                    recurse(child_class_instance, module_config_dict)
 
-            if ui_views := getattr(module_instance, "UI_VIEWS", None):
+            if ui_views := getattr(class_instance, "UI_VIEWS", None):
                 for child_module in ui_views:
-                    child_module_instance = getattr(module_instance, child_module.MODULE_NAME)
-                    recurse(child_module_instance, module_config_dict)
+                    child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
+                    recurse(child_class_instance, module_config_dict)
 
         app_config_dict = {}
         app_config_dict["app"] = AppBase.app_config.model_dump()
 
-        app_config_dict[AppBase.context_index_service.MODULE_NAME] = AppBase.the_context_index.model_dump()
+        app_config_dict[AppBase.context_index_service.CLASS_NAME] = AppBase.the_context_index.model_dump()
 
         for sprite in AppBase.available_sprite_instances:
             recurse(sprite, app_config_dict)

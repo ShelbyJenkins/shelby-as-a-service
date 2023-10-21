@@ -102,7 +102,7 @@ def parse_retrieved_docs(
 
 #     docs_total_tokens = _docs_tiktoken_len(sorted_documents)
 
-#     # self.log.print_and_log(f"context docs token count: {docs_total_tokens}")
+#     # self.log.info(f"context docs token count: {docs_total_tokens}")
 #     iterations = 0
 #     original_documents_count = len(sorted_documents)
 #     while docs_total_tokens > self.max_total_tokens:
@@ -148,10 +148,10 @@ def parse_retrieved_docs(
 #             sorted_documents.pop(max_token_count_idx)
 
 #         docs_total_tokens = _docs_tiktoken_len(sorted_documents)
-#         # self.log.print_and_log("removed lowest scoring embedding doc .")
-#         # self.log.print_and_log(f"context docs token count: {docs_total_tokens}")
+#         # self.log.info("removed lowest scoring embedding doc .")
+#         # self.log.info(f"context docs token count: {docs_total_tokens}")
 #         iterations += 1
-#     # self.log.print_and_log(f"number of context docs now: {len(sorted_documents)}")
+#     # self.log.info(f"number of context docs now: {len(sorted_documents)}")
 
 #     # Same as above but removes based on total count of docs instead of token count.
 #     while len(sorted_documents) > self.docs_max_used:
@@ -167,7 +167,7 @@ def parse_retrieved_docs(
 #                     sorted_documents.pop(idx)
 #                     hard_count -= 1
 #                     break
-#         # sself.log.print_and_log("removed lowest scoring embedding doc.")
+#         # sself.log.info("removed lowest scoring embedding doc.")
 
 #     for i, document in enumerate(sorted_documents, start=1):
 #         document["doc_num"] = i
@@ -175,10 +175,10 @@ def parse_retrieved_docs(
 #     final_documents_list = []
 #     for parsed_document in sorted_documents:
 #         final_documents_list.append(parsed_document["url"])
-#     # self.log.print_and_log(f"{len(sorted_documents)} documents returned after parsing: {final_documents_list}")
+#     # self.log.info(f"{len(sorted_documents)} documents returned after parsing: {final_documents_list}")
 
 #     if not sorted_documents:
-#         # self.log.print_and_log("No supporting documents after parsing!")
+#         # self.log.info("No supporting documents after parsing!")
 #         return None
 
 #     return sorted_documents

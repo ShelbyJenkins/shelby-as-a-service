@@ -67,11 +67,11 @@ class APIAgent:
                     if filename.endswith(f"-{number}.json"):
                         with open(os.path.join(directory_path, filename), 'r', encoding="utf-8") as f:
                             operationID_file = json.load(f)
-self.log.print_and_log(f"operationID_file found: {os.path.join(directory_path, filename)}.")
+self.log.info(f"operationID_file found: {os.path.join(directory_path, filename)}.")
                         break
                 break
         if operationID_file is None:
-self.log.print_and_log("No matching operationID found.")
+self.log.info("No matching operationID found.")
 
         return operationID_file
 
@@ -101,7 +101,7 @@ self.log.print_and_log("No matching operationID found.")
 
     def run_API_agent(self, query):
 
-self.log.print_and_log(f"new action: {query}")
+self.log.info(f"new action: {query}")
         operationID_file = self.select_API_operationID(query)
         # Here we need to run a doc_agent query if operationID_file is None
         function = self.create_bodyless_function(query, operationID_file)

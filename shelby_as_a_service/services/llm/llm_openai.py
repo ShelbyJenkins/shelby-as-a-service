@@ -7,14 +7,14 @@ import interfaces.webui.gradio_helpers as GradioHelper
 import openai
 import services.prompt_templates.prompt_templates as PromptTemplates
 import services.text_processing.text as TextProcess
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
 
 class OpenAILLM(ModuleBase):
-    MODULE_NAME: str = "openai_llm"
-    MODULE_UI_NAME: str = "OpenAI LLM"
+    CLASS_NAME: str = "openai_llm"
+    CLASS_UI_NAME: str = "OpenAI LLM"
     REQUIRED_SECRETS: list[str] = ["openai_api_key"]
     MODELS_TYPE: str = "llm_models"
 
@@ -62,19 +62,19 @@ class OpenAILLM(ModuleBase):
         },
     }
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         current_model_name: str = "gpt-3.5-turbo"
         available_models: dict[str, "OpenAILLM.ModelConfig"]
 
         class Config:
             extra = "ignore"
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
     llm_models: list
     current_model_class: ModelConfig
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
         self.set_current_model(self.config.current_model_name)
 
     def create_chat(

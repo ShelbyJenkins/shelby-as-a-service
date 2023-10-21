@@ -2,17 +2,17 @@ from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel
 
 
 class SettingsView(ModuleBase):
-    MODULE_NAME: str = "settings_view"
-    MODULE_UI_NAME: str = "⚙️"
+    CLASS_NAME: str = "settings_view"
+    CLASS_UI_NAME: str = "⚙️"
     SETTINGS_UI_COL = 4
     PRIMARY_UI_COL = 6
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         default_local_app_enabled: bool = False
         default_local_app_name: Optional[str] = None
         local_message_start: str = "Running request... relax, chill, and vibe a minute."
@@ -22,10 +22,10 @@ class SettingsView(ModuleBase):
         class Config:
             extra = "ignore"
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def create_primary_ui(self):
         components = {}
@@ -34,7 +34,7 @@ class SettingsView(ModuleBase):
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=f"Welcome to {SettingsView.MODULE_UI_NAME}",
+                placeholder=f"Welcome to {SettingsView.CLASS_UI_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,

@@ -4,8 +4,8 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
-from app_config.config_manager import ConfigManager
-from app_config.module_base import ModuleBase
+from app.config_manager import ConfigManager
+from app.module_base import ModuleBase
 from interfaces.webui.gradio_themes import AtYourServiceTheme
 from interfaces.webui.views.context_index_view import ContextIndexView
 from interfaces.webui.views.main_chat_view import MainChatView
@@ -14,14 +14,14 @@ from pydantic import BaseModel
 
 
 class GradioUI(ModuleBase):
-    MODULE_NAME: str = "gradio_ui"
-    MODULE_UI_NAME: str = "gradio_ui"
+    CLASS_NAME: str = "gradio_ui"
+    CLASS_UI_NAME: str = "gradio_ui"
     settings_ui_col_scaling = 2
     primary_ui_col_scaling = 8
 
     UI_VIEWS: List[Type] = [MainChatView, ContextIndexView, SettingsView]
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         default_local_app_enabled: bool = False
         default_local_app_name: Optional[str] = None
         local_message_start: str = "Running request... relax, chill, and vibe a minute."
@@ -36,7 +36,7 @@ class GradioUI(ModuleBase):
 
     def __init__(self, config_file_dict={}, **kwargs):
         ConfigManager.add_extension_views_to_gradio_ui(self, self.list_of_extension_configs)
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def create_gradio_interface(self):
         all_setting_ui_tabs = []
@@ -65,11 +65,15 @@ class GradioUI(ModuleBase):
             threading.Thread(target=asyncio.run, args=(self.check_for_updates(),)).start()
 
             webui_client.queue()
-            webui_client.launch(prevent_thread_lock=True)
+            try:
+                webui_client.launch(prevent_thread_lock=True, show_error=True)
+            except Warning as w:
+                self.log.warning(w)
+                gr.Warning(message=str(w))
 
     @staticmethod
     def primary_ui_creator(view_instance):
-        view_name = view_instance.MODULE_NAME
+        view_name = view_instance.CLASS_NAME
 
         with gr.Row(
             elem_classes="primary_ui_row",
@@ -82,8 +86,8 @@ class GradioUI(ModuleBase):
 
     @staticmethod
     def settings_ui_creator(view_instance):
-        agent_name = view_instance.MODULE_NAME
-        agent_ui_name = view_instance.MODULE_UI_NAME
+        agent_name = view_instance.CLASS_NAME
+        agent_ui_name = view_instance.CLASS_UI_NAME
 
         with gr.Tab(
             label=agent_ui_name,
@@ -116,9 +120,9 @@ class GradioUI(ModuleBase):
         primary_ui_scale = 1
 
         for view_instance in self.ui_view_instances:
-            if requested_view == view_instance.MODULE_UI_NAME:
+            if requested_view == view_instance.CLASS_UI_NAME:
                 output.append(gr.Row(visible=True))
-                self.webui_sprite.config.current_ui_view_name = view_instance.MODULE_UI_NAME
+                self.webui_sprite.config.current_ui_view_name = view_instance.CLASS_UI_NAME
                 settings_ui_scale = view_instance.SETTINGS_UI_COL
                 primary_ui_scale = view_instance.PRIMARY_UI_COL
             else:

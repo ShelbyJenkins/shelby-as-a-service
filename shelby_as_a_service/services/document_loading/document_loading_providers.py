@@ -5,7 +5,7 @@ from typing import Any, Iterator, List, Optional, Type
 
 import gradio as gr
 import services.text_processing.text as TextProcess
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from bs4 import BeautifulSoup
 from langchain.document_loaders import GitbookLoader, RecursiveUrlLoader, SitemapLoader, WebBaseLoader
 from langchain.schema import Document
@@ -13,17 +13,17 @@ from pydantic import BaseModel
 
 
 class GenericWebScraper(ModuleBase):
-    MODULE_NAME: str = "generic_web_scraper"
-    MODULE_UI_NAME: str = "Generic Web Scraper"
+    CLASS_NAME: str = "generic_web_scraper"
+    CLASS_UI_NAME: str = "Generic Web Scraper"
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         agent_select_status_message: str = "Search index to find docs related to request."
         continue_on_failue: bool = True
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def _load(self, url) -> Iterator[Document]:
         documents = WebBaseLoader(web_path=url).load()
@@ -47,22 +47,21 @@ class GenericWebScraper(ModuleBase):
 
 
 class GenericRecursiveWebScraper(ModuleBase):
-    MODULE_NAME: str = "generic_recursive_web_scraper"
-    MODULE_UI_NAME: str = "Generic Resursive Web Scraper"
+    CLASS_NAME: str = "generic_recursive_web_scraper"
+    CLASS_UI_NAME: str = "Generic Resursive Web Scraper"
     REQUIRED_SECRETS: List[str] = []
 
-    class ModuleConfigModel(BaseModel):
-        agent_select_status_message: str = "Search index to find docs related to request."
+    class ClassConfigModel(BaseModel):
         exclude_dirs: Optional[str] = None
         max_depth: Optional[int] = 2
         timeout: Optional[int] = 10
         use_async: bool = False
         prevent_outside: bool = True
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:
@@ -79,7 +78,7 @@ class GenericRecursiveWebScraper(ModuleBase):
 
     def create_settings_ui(self):
         components = {}
-        with gr.Accordion(label=self.MODULE_NAME, open=False):
+        with gr.Accordion(label=self.CLASS_NAME, open=False):
             with gr.Column():
                 components["exclude_dirs"] = gr.Textbox(
                     value=self.config.exclude_dirs,
@@ -137,10 +136,10 @@ class GenericRecursiveWebScraper(ModuleBase):
     #                 elif filename.endswith(".json"):
     #                     file_extension = ".json"
     #                 else:
-    #                     # self.data_source_config.index_agent.log_agent.print_and_log(f"Unsupported file format: {filename}")
+    #                     # self.data_source_config.index_agent.log_agent.info(f"Unsupported file format: {filename}")
     #                     continue
     #             elif not filename.endswith(file_extension):
-    #                 # self.data_source_config.index_agent.log_agent.print_and_log(f"Inconsistent file formats in directory: {filename}")
+    #                 # self.data_source_config.index_agent.log_agent.info(f"Inconsistent file formats in directory: {filename}")
     #                 continue
     #             file_path = os.path.join(self.data_source_config.target_url, filename)
     #             with open(file_path, "r") as file:
@@ -167,7 +166,7 @@ class GenericRecursiveWebScraper(ModuleBase):
     #     for filename in os.listdir(self.data_source_config.target_url):
     #         if not filename.endswith(file_extension):
     #             # Uncomment the line below if you wish to log unsupported file formats
-    #             # self.data_source_config.index_agent.log_agent.print_and_log(f"Unsupported file format: {filename}")
+    #             # self.data_source_config.index_agent.log_agent.info(f"Unsupported file format: {filename}")
     #             continue
 
     #         file_path = os.path.join(self.data_source_config.target_url, filename)
@@ -193,7 +192,7 @@ class GenericRecursiveWebScraper(ModuleBase):
 
             if file_extension not in allowed_extensions:
                 # Uncomment the line below if you wish to log unsupported file formats
-                # self.data_source_config.index_agent.log_agent.print_and_log(f"Unsupported file format: {filename}")
+                # self.data_source_config.index_agent.log_agent.info(f"Unsupported file format: {filename}")
                 continue
 
             file_path = os.path.join(self.data_source_config.target_url, filename)

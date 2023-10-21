@@ -3,29 +3,29 @@ from typing import Any, List, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.database.database_local_file import LocalFileStoreDatabase
 from services.database.database_pinecone import PineconeDatabase
 
 
 class DatabaseService(ModuleBase):
-    MODULE_NAME: str = "database_service"
-    MODULE_UI_NAME: str = "Databases"
+    CLASS_NAME: str = "database_service"
+    CLASS_UI_NAME: str = "Databases"
     PROVIDERS_TYPE: str = "database_providers"
 
-    REQUIRED_MODULES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
+    REQUIRED_CLASSES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         database_provider: str = "pinecone_database"
         retrieve_n_docs: int = 6
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
     database_providers: List[Any]
-    list_of_module_ui_names: list
+    list_of_CLASS_UI_NAMEs: list
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def query_index(
         self,
@@ -37,7 +37,7 @@ class DatabaseService(ModuleBase):
         if database_provider is None:
             database_provider = self.config.database_provider
 
-        provider = self.get_requested_module_instance(self.database_providers, database_provider)
+        provider = self.get_requested_class_instance(self.database_providers, database_provider)
 
         if provider:
             return provider.query_index(
@@ -56,7 +56,7 @@ class DatabaseService(ModuleBase):
         data_domain_name=None,
         database_provider=None,
     ):
-        provider = self.get_requested_module_instance(self.database_providers, database_provider)
+        provider = self.get_requested_class_instance(self.database_providers, database_provider)
         if provider:
             return provider.fetch_by_ids(
                 ids=ids,
@@ -74,7 +74,7 @@ class DatabaseService(ModuleBase):
         data_source=None,
         database_provider=None,
     ):
-        provider = self.get_requested_module_instance(self.database_providers, database_provider)
+        provider = self.get_requested_class_instance(self.database_providers, database_provider)
         if provider:
             return provider.write_documents_to_database(documents, data_domain, data_source)
         else:
@@ -85,8 +85,8 @@ class DatabaseService(ModuleBase):
 
         with gr.Column():
             components["database_provider"] = gr.Dropdown(
-                value=GradioHelper.get_module_ui_name_from_str(self.database_providers, self.config.database_provider),
-                choices=GradioHelper.get_list_of_module_ui_names(self.database_providers),
+                value=GradioHelper.get_CLASS_UI_NAME_from_str(self.database_providers, self.config.database_provider),
+                choices=GradioHelper.get_list_of_CLASS_UI_NAMEs(self.database_providers),
                 label="Source Type",
                 container=True,
                 min_width=0,

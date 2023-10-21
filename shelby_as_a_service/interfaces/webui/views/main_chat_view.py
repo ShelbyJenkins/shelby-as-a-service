@@ -5,39 +5,39 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from agents.ceq.ceq_agent import CEQAgent
 from agents.vanillallm.vanillallm_agent import VanillaLLM
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel
 
 
 class MainChatView(ModuleBase):
-    MODULE_NAME: str = "main_chat_view"
-    MODULE_UI_NAME: str = "Chat"
-    SETTINGS_UI_COL = 2.5
-    PRIMARY_UI_COL = 7.5
-    REQUIRED_MODULES: list[Type] = [VanillaLLM, CEQAgent]
+    CLASS_NAME: str = "main_chat_view"
+    CLASS_UI_NAME: str = "Chat"
+    SETTINGS_UI_COL = 2
+    PRIMARY_UI_COL = 8
+    REQUIRED_CLASSES: list[Type] = [VanillaLLM, CEQAgent]
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         current_agent_name: str = "vanillallm_agent"
         current_agent_ui_name: str = "VanillaLLM Agent"
 
         class Config:
             extra = "ignore"
 
-    config: ModuleConfigModel
-    list_of_module_ui_names: list
-    list_of_module_instances: list
+    config: ClassConfigModel
+    list_of_CLASS_UI_NAMEs: list
+    list_of_class_instances: list
     vanillallm_agent: Any
     current_agent_instance: Any
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
-        self.current_agent_instance = self.get_requested_module_instance(
-            self.list_of_module_instances, self.config.current_agent_name
+        self.current_agent_instance = self.get_requested_class_instance(
+            self.list_of_class_instances, self.config.current_agent_name
         )
 
     def run_chat(self, chat_in):
-        self.log.print_and_log(f"Running query: {chat_in}")
+        self.log.info(f"Running query: {chat_in}")
 
         response = self.current_agent_instance.run_chat(
             chat_in=chat_in,
@@ -51,7 +51,7 @@ class MainChatView(ModuleBase):
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=f"Welcome to {MainChatView.MODULE_UI_NAME}",
+                placeholder=f"Welcome to {MainChatView.CLASS_UI_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
@@ -84,7 +84,7 @@ class MainChatView(ModuleBase):
                                 max_lines=1,
                                 show_label=False,
                                 placeholder="...status",
-                                elem_id=f"{MainChatView.MODULE_NAME}_chat_tab_status_text",
+                                elem_id=f"{MainChatView.CLASS_NAME}_chat_tab_status_text",
                             )
                         with gr.Row():
                             components["chat_tab_stop_button"] = gr.Button(
@@ -161,18 +161,18 @@ class MainChatView(ModuleBase):
         with gr.Column():
             agent_settings_list = []
             self.config.current_agent_ui_name
-            for agent_instance in self.list_of_module_instances:
-                with gr.Tab(label=agent_instance.MODULE_UI_NAME) as agent_settings:
+            for agent_instance in self.list_of_class_instances:
+                with gr.Tab(label=agent_instance.CLASS_UI_NAME) as agent_settings:
                     agent_instance.create_settings_ui()
 
                 agent_settings_list.append(agent_settings)
 
         def create_nav_events(agent_settings_list):
             def set_agent_view(requested_agent: str):
-                for agent in self.list_of_module_instances:
-                    if requested_agent == agent.MODULE_UI_NAME:
-                        self.config.current_agent_name = agent.MODULE_NAME
-                        self.config.current_agent_ui_name = agent.MODULE_UI_NAME
+                for agent in self.list_of_class_instances:
+                    if requested_agent == agent.CLASS_UI_NAME:
+                        self.config.current_agent_name = agent.CLASS_NAME
+                        self.config.current_agent_ui_name = agent.CLASS_UI_NAME
                         self.current_agent_instance = agent
 
                 ModuleBase.update_settings_file = True

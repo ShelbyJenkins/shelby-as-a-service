@@ -2,14 +2,14 @@ from decimal import Decimal
 from typing import Any, List, Type
 
 import services.text_processing.text as text
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
 
 
 class OpenAIEmbedding(ModuleBase):
-    MODULE_NAME: str = "openai_embedding"
-    MODULE_UI_NAME: str = "OpenAI Embedding"
+    CLASS_NAME: str = "openai_embedding"
+    CLASS_UI_NAME: str = "OpenAI Embedding"
     REQUIRED_SECRETS: List[str] = ["openai_api_key"]
     MODELS_TYPE: str = "embedding_models"
     OPENAI_TIMEOUT_SECONDS: float = 180
@@ -23,16 +23,16 @@ class OpenAIEmbedding(ModuleBase):
         "text-embedding-ada-002": {"MODEL_NAME": "text-embedding-ada-002", "TOKENS_MAX": 8192, "COST_PER_K": 0.0001}
     }
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         current_model_name: str = "text-embedding-ada-002"
         available_models: dict[str, "OpenAIEmbedding.ModelConfig"]
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
     embedding_models: list
     current_model_class: ModelConfig
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def get_query_embedding(self, query, model_name=None) -> list[float]:
         model = self.get_model(self, requested_model_name=model_name)
@@ -48,7 +48,7 @@ class OpenAIEmbedding(ModuleBase):
 
         query_embedding = embedding_retriever.embed_query(query)
         self._calculate_cost(query, model)
-        self.log.print_and_log("Embeddings retrieved")
+        self.log.info("Embeddings retrieved")
 
         return query_embedding
 
@@ -67,7 +67,7 @@ class OpenAIEmbedding(ModuleBase):
 
         doc_embeddings = embedding_retriever.embed_documents(documents)
         # self._calculate_cost(query, model)
-        self.log.print_and_log("Embeddings retrieved")
+        self.log.info("Embeddings retrieved")
 
         return doc_embeddings
 

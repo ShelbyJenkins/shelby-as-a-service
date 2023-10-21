@@ -2,34 +2,32 @@ from typing import Any, Dict, List, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel
-from services.database.database_service import DatabaseService
 from services.embedding.embedding_service import EmbeddingService
 from services.text_processing.parse_retrieval_docs import parse_retrieved_docs
 
 
 class RetrievalAgent(ModuleBase):
-    MODULE_NAME: str = "retrieval_agent"
-    MODULE_UI_NAME: str = "Retrieval"
+    CLASS_NAME: str = "retrieval_agent"
+    CLASS_UI_NAME: str = "Retrieval"
 
-    REQUIRED_MODULES: List[Type] = [EmbeddingService, DatabaseService]
+    REQUIRED_CLASSES: List[Type] = [EmbeddingService]
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         doc_max_tokens: float = 1400
         docs_max_count: float = 4
         topic_constraint_enabled: bool = False
         keyword_generator_enabled: bool = False
         doc_relevancy_check_enabled: bool = False
 
-    config: ModuleConfigModel
-    list_of_module_instances: list[Any]
-    list_of_module_ui_names: list[Any]
+    config: ClassConfigModel
+    list_of_class_instances: list[Any]
+    list_of_CLASS_UI_NAMEs: list[Any]
     embedding_service: EmbeddingService
-    database_service: DatabaseService
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def get_documents(
         self,
@@ -71,7 +69,7 @@ class RetrievalAgent(ModuleBase):
 
         if self.config.keyword_generator_enabled if keyword_generator_enabled is None else keyword_generator_enabled:
             #     query_to_embed = self.action_agent.keyword_generator(query)
-            #     self.log.print_and_log(
+            #     self.log.info(
             #         f"ceq_keyword_generator response: {query_to_embed}"
             #     )
             pass

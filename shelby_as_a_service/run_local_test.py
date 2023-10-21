@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from app_config.app_base import AppBase
+from app.app_base import AppBase
 from extensions.content_aggregator.aggregator_agent import AggregatorAgent
 
 

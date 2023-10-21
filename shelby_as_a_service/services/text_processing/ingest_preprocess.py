@@ -3,7 +3,7 @@ class CEQPreprocess:
         self.index_agent = data_source_config.index_agent
         self.config = data_source_config.index_agent.config
         self.data_source_config = data_source_config
-        self.print_and_log = self.index_agent.log.print_and_log
+        self.info = self.index_agent.log.info
         self.tiktoken_encoding_model = self.config.index_tiktoken_encoding_model
 
         self.tiktoken_len = TextProcessing.tiktoken_len
@@ -11,7 +11,7 @@ class CEQPreprocess:
         self.dfs_splitter = DFSTextSplitter(
             goal_length=self.config.index_text_splitter_goal_length,
             overlap_percent=self.config.index_text_splitter_overlap_percent,
-            print_and_log=self.index_agent.log.print_and_log,
+            info=self.index_agent.log.info,
         )
 
     def run(self, documents) -> []:
@@ -25,54 +25,45 @@ class CEQPreprocess:
                 _, tail = os.path.split(parsed_url.path)
                 # Strip anything with "." like ".html"
                 root, _ = os.path.splitext(tail)
-                doc.metadata[
-                    "title"
-                ] = f"{self.data_source_config.data_source_name}: {root}"
+                doc.metadata["title"] = f"{self.data_source_config.data_source_name}: {root}"
 
             # Remove bad chars and extra whitespace chars
             doc.page_content = TextProcessing.strip_excess_whitespace(doc.page_content)
-            doc.metadata["title"] = TextProcessing.strip_excess_whitespace(
-                doc.metadata["title"]
-            )
+            doc.metadata["title"] = TextProcessing.strip_excess_whitespace(doc.metadata["title"])
 
-            self.print_and_log(f"Processing: {doc.metadata['title']}")
+            self.info(f"Processing: {doc.metadata['title']}")
 
-            if (
-                self.tiktoken_len(doc.page_content)
-                < self.data_source_config.config.index_preprocessor_min_length
-            ):
-                self.print_and_log(
+            if self.tiktoken_len(doc.page_content) < self.data_source_config.config.index_preprocessor_min_length:
+                self.info(
                     f"🔴 Skipping doc because content length: {self.tiktoken_len(doc.page_content)} is shorter than minimum: { self.data_source_config.config.index_preprocessor_min_length}"
                 )
                 continue
 
             text_chunks = self.dfs_splitter.split_text(doc.page_content)
             if text_chunks is None:
-                self.print_and_log("🔴 Something went wrong with the text splitter.")
+                self.info("🔴 Something went wrong with the text splitter.")
                 continue
             # If it's not a list, wrap it inside a list
             if not isinstance(text_chunks, list):
                 text_chunks = [text_chunks]
 
             token_counts = [self.tiktoken_len(chunk) for chunk in text_chunks]
-            self.print_and_log(
-                f"🟢 Doc split into {len(text_chunks)} of averge length {int(sum(token_counts) / len(text_chunks))}"
-            )
+            self.info(f"🟢 Doc split into {len(text_chunks)} of averge length {int(sum(token_counts) / len(text_chunks))}")
 
             for text_chunk in text_chunks:
                 document_chunk, text_chunk = self.append_metadata(text_chunk, doc)
                 processed_document_chunks.append(document_chunk)
                 processed_text_chunks.append(text_chunk.lower())
 
-        self.print_and_log(f"Total docs: {len(documents)}")
-        self.print_and_log(f"Total chunks: {len(processed_document_chunks)}")
+        self.info(f"Total docs: {len(documents)}")
+        self.info(f"Total chunks: {len(processed_document_chunks)}")
         if not processed_document_chunks:
             return
         token_counts = [self.tiktoken_len(chunk) for chunk in processed_text_chunks]
-        self.print_and_log(f"Min: {min(token_counts)}")
-        self.print_and_log(f"Avg: {int(sum(token_counts) / len(token_counts))}")
-        self.print_and_log(f"Max: {max(token_counts)}")
-        self.print_and_log(f"Total tokens: {int(sum(token_counts))}")
+        self.info(f"Min: {min(token_counts)}")
+        self.info(f"Avg: {int(sum(token_counts) / len(token_counts))}")
+        self.info(f"Max: {max(token_counts)}")
+        self.info(f"Total tokens: {int(sum(token_counts))}")
 
         return processed_document_chunks
 

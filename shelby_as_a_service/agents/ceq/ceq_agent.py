@@ -5,7 +5,7 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import services.text_processing.text as text
 from agents.retrieval.retrieval_agent import RetrievalAgent
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.llm.llm_service import LLMService
 
@@ -23,15 +23,15 @@ class CEQAgent(ModuleBase):
                  context_to_response_ratio=None, stream=None, sprite_name="webui_sprite"): Generates a response to user input.
     """
 
-    MODULE_NAME: str = "ceq_agent"
-    MODULE_UI_NAME: str = "CEQ"
+    CLASS_NAME: str = "ceq_agent"
+    CLASS_UI_NAME: str = "CEQ"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/ceq/ceq_prompt_templates.yaml"
     DATA_DOMAIN_NONE_FOUND_MESSAGE: str = (
         "Query not related to any supported data domains (aka topics). Supported data domains are:"
     )
-    REQUIRED_MODULES: list[Type] = [RetrievalAgent, LLMService]
+    REQUIRED_CLASSES: list[Type] = [RetrievalAgent, LLMService]
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         """
         The configuration settings for the CEQ agent module.
 
@@ -46,13 +46,13 @@ class CEQAgent(ModuleBase):
         class Config:
             extra = "ignore"
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
     llm_service: LLMService
     retrieval_agent: RetrievalAgent
-    list_of_module_instances: list
+    list_of_class_instances: list
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def run_chat(
         self,
@@ -137,7 +137,7 @@ class CEQAgent(ModuleBase):
         matches = re.findall(pattern_num, formatted_text)
 
         if not matches:
-            # self.log.print_and_log("No supporting docs.")
+            # self.log.info("No supporting docs.")
             answer_obj = {
                 "response_content_string": response_content_string,
                 "llm": llm_model_name,
@@ -170,9 +170,9 @@ class CEQAgent(ModuleBase):
                     answer_obj["documents"].append(document)
                 else:
                     pass
-                    self.log.print_and_log(f"Document{doc_num} not found in the list.")
+                    self.log.warning(f"Document{doc_num} not found in the list.")
 
-        # self.log.print_and_log(f"response with metadata: {answer_obj}")
+        # self.log.info(f"response with metadata: {answer_obj}")
 
         return answer_obj
 
@@ -196,7 +196,7 @@ class CEQAgent(ModuleBase):
     def create_settings_ui(self):
         components = {}
 
-        with gr.Tab(label=self.retrieval_agent.MODULE_UI_NAME):
+        with gr.Tab(label=self.retrieval_agent.CLASS_UI_NAME):
             components["enabled_data_domains"] = gr.Dropdown(
                 choices=["tatum", "None", "all", "Custom"],
                 value="all",
@@ -214,7 +214,7 @@ class CEQAgent(ModuleBase):
                 info="Percent of the model's context size to use for context docs.",
             )
             self.retrieval_agent.create_settings_ui()
-        with gr.Tab(label=self.llm_service.MODULE_UI_NAME):
+        with gr.Tab(label=self.llm_service.CLASS_UI_NAME):
             self.llm_service.create_settings_ui()
 
         GradioHelper.create_settings_event_listener(self.config, components)

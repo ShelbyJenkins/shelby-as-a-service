@@ -2,30 +2,32 @@ from typing import Any, Iterator, List, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from app_config.module_base import ModuleBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.document_loading.document_loading_providers import GenericRecursiveWebScraper, GenericWebScraper
 
 
 class DocLoadingService(ModuleBase):
-    MODULE_NAME: str = "doc_loading_service"
-    MODULE_UI_NAME: str = "Document Loading Service"
-    REQUIRED_MODULES: List[Type] = [GenericWebScraper]
+    CLASS_NAME: str = "doc_loading_service"
+    CLASS_UI_NAME: str = "Document Loading Service"
+    PROVIDERS_TYPE: str = "doc_loading_providers"
+    REQUIRED_CLASSES: List[Type] = [GenericWebScraper]
 
-    class ModuleConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         doc_loading_provider: str = "generic_web_scraper"
 
         class Config:
             extra = "ignore"
 
-    config: ModuleConfigModel
+    config: ClassConfigModel
     doc_loading_providers: List[Any]
+    list_of_CLASS_UI_NAMEs: List[str]
 
     def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_module_instance(module_instance=self, config_file_dict=config_file_dict, **kwargs)
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def load(self, data_source, doc_loading_provider=None):
-        provider = self.get_requested_module_instance(self.doc_loading_providers, doc_loading_provider)
+        provider = self.get_requested_class_instance(self.doc_loading_providers, doc_loading_provider)
         if provider:
             return provider._load(data_source.data_source_url)
         else:
@@ -36,8 +38,8 @@ class DocLoadingService(ModuleBase):
 
         with gr.Column():
             components["doc_loading_provider"] = gr.Dropdown(
-                value=GradioHelper.get_module_ui_name_from_str(self.doc_loading_providers, self.config.doc_loading_provider),
-                choices=GradioHelper.get_list_of_module_ui_names(self.doc_loading_providers),
+                value=GradioHelper.get_CLASS_UI_NAME_from_str(self.doc_loading_providers, self.config.doc_loading_provider),
+                choices=GradioHelper.get_list_of_CLASS_UI_NAMEs(self.doc_loading_providers),
                 label="Source Type",
                 container=True,
             )
