@@ -81,7 +81,7 @@ class AppBase:
         from context_index.index_base import ContextIndexBase
 
         AppBase.context_index = ContextIndexBase
-        AppBase.context_index.setup_context_index(config_file_dict=app_file_dict)
+        AppBase.context_index.setup_context_index(app_file_dict)
 
         AppBase._load_sprite_instances(app_file_dict)
 

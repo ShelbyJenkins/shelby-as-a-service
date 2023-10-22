@@ -27,19 +27,22 @@ class ModuleBase(AppBase):
 
         class_instance.config = class_instance.ClassConfigModel(**merged_config)
 
-        list_of_class_instances = []
+        list_of_class_names = []
         list_of_class_ui_names = []
+        list_of_class_instances = []
 
         if required_classes := getattr(class_instance, "REQUIRED_CLASSES", None):
             for required_module in required_classes:
                 if new_class_instance := ModuleBase.create_class_instance(
                     class_instance, required_module, module_config_file_dict, **kwargs
                 ):
+                    list_of_class_names.append(new_class_instance.CLASS_NAME)
                     list_of_class_ui_names.append(new_class_instance.CLASS_UI_NAME)
                     list_of_class_instances.append(new_class_instance)
 
-        class_instance.list_of_class_instances = list_of_class_instances
+        class_instance.list_of_class_names = list_of_class_names
         class_instance.list_of_class_ui_names = list_of_class_ui_names
+        class_instance.list_of_class_instances = list_of_class_instances
 
         if required_secrets := getattr(class_instance, "REQUIRED_SECRETS", None):
             for required_secret in required_secrets:

@@ -10,7 +10,7 @@ from services.document_loading.document_loading_providers import GenericRecursiv
 class DocLoadingService(ModuleBase):
     CLASS_NAME: str = "doc_loading_service"
     CLASS_UI_NAME: str = "Document Loading Service"
-    REQUIRED_CLASSES: List[Type] = [GenericWebScraper]
+    REQUIRED_CLASSES: List[Type] = [GenericWebScraper, GenericRecursiveWebScraper]
 
     class ClassConfigModel(BaseModel):
         doc_loading_provider: str = "generic_web_scraper"
@@ -19,8 +19,9 @@ class DocLoadingService(ModuleBase):
             extra = "ignore"
 
     config: ClassConfigModel
-    list_of_class_instances: list[Any]
+    list_of_class_names: list
     list_of_class_ui_names: list
+    list_of_class_instances: list[Any]
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)

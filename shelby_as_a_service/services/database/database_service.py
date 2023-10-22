@@ -20,8 +20,9 @@ class DatabaseService(ModuleBase):
         retrieve_n_docs: int = 6
 
     config: ClassConfigModel
-    list_of_class_instances: list[Any]
+    list_of_class_names: list
     list_of_class_ui_names: list
+    list_of_class_instances: list[Any]
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)

@@ -20,8 +20,8 @@ class GradioUI(ModuleBase):
     primary_ui_col_scaling = 8
 
     # REQUIRED_CLASSES: List[Type] = [MainChatView, ContextIndexView, SettingsView]
-    # REQUIRED_CLASSES: List[Type] = [MainChatView, ContextIndexView]
-    REQUIRED_CLASSES: List[Type] = [MainChatView]
+    REQUIRED_CLASSES: List[Type] = [MainChatView, ContextIndexView]
+    # REQUIRED_CLASSES: List[Type] = [MainChatView]
 
     class ClassConfigModel(BaseModel):
         current_ui_view_name: str = "Chat"
@@ -31,8 +31,9 @@ class GradioUI(ModuleBase):
 
     config: ClassConfigModel
     webui_sprite: Any
-    list_of_class_instances: list
+    list_of_class_names: list
     list_of_class_ui_names: list
+    list_of_class_instances: list
 
     def __init__(self, config_file_dict={}, **kwargs):
         ConfigManager.add_extension_views_to_gradio_ui(self, self.list_of_extension_configs)

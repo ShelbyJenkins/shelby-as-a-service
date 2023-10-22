@@ -23,7 +23,7 @@ class ConfigManager:
         for app in os.listdir(dir_path):
             app_path = os.path.join(dir_path, app)
             if os.path.isdir(app_path):
-                if "app.json" in os.listdir(app_path):
+                if "app_config.json" in os.listdir(app_path):
                     existing_app_names.append(app)
 
         return existing_app_names
@@ -41,10 +41,15 @@ class ConfigManager:
         if not os.path.exists(os.path.join(dir_path, "index/inputs")):
             os.makedirs(os.path.join(dir_path, "index/inputs"))
 
-        # Creates blank app.json
-        app_dest_path = os.path.join(dir_path, "app.json")
-        if not os.path.exists(app_dest_path):
-            with open(app_dest_path, "w", encoding="utf-8") as file:
+        # Creates blank app_config.json
+        app_config_path = os.path.join(dir_path, "app_config.json")
+        if not os.path.exists(app_config_path):
+            with open(app_config_path, "w", encoding="utf-8") as file:
+                file.write("{}")
+        # Creates blank context_index.json
+        index_config_path = os.path.join(dir_path, "index", "context_index.json")
+        if not os.path.exists(index_config_path):
+            with open(index_config_path, "w", encoding="utf-8") as file:
                 file.write("{}")
 
         ConfigManager.create_update_env_file(app_name)
@@ -118,13 +123,12 @@ class ConfigManager:
     def load_app(app_name) -> Dict[str, Any]:
         try:
             with open(
-                f"app/your_apps/{app_name}/app.json",
+                f"app/your_apps/{app_name}/app_config.json",
                 "r",
                 encoding="utf-8",
             ) as stream:
                 config_from_file = json.load(stream)
         except json.JSONDecodeError:
-            # If the JSON file is empty or invalid, return an empty dictionary (or handle in a way you see fit)
             config_from_file = {}
 
         return config_from_file
@@ -133,7 +137,7 @@ class ConfigManager:
     def save_app(app_name, updated_app_dict):
         # Save the updated configuration
         with open(
-            f"app/your_apps/{app_name}/app.json",
+            f"app/your_apps/{app_name}/app_config.json",
             "w",
             encoding="utf-8",
         ) as file:

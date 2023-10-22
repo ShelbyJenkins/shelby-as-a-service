@@ -21,8 +21,9 @@ class LLMService(ModuleBase):
             extra = "ignore"
 
     config: ClassConfigModel
-    list_of_class_instances: list[Any]
+    list_of_class_names: list
     list_of_class_ui_names: list
+    list_of_class_instances: list[Any]
     current_llm_provider: Any
 
     def __init__(self, config_file_dict={}, **kwargs):
