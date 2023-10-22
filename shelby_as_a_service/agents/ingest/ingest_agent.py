@@ -17,7 +17,7 @@ class IngestAgent(ModuleBase):
 
     config: ClassConfigModel
     list_of_class_instances: list[Any]
-    list_of_CLASS_UI_NAMEs: list[Any]
+    list_of_class_ui_names: list[Any]
     doc_loading_service: DocLoadingService
 
     def __init__(self, config_file_dict={}, **kwargs):

@@ -24,7 +24,7 @@ class MainChatView(ModuleBase):
             extra = "ignore"
 
     config: ClassConfigModel
-    list_of_CLASS_UI_NAMEs: list
+    list_of_class_ui_names: list
     list_of_class_instances: list
     vanillallm_agent: Any
     current_agent_instance: Any

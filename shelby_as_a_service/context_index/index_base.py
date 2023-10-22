@@ -10,7 +10,7 @@ from services.document_loading.document_loading_service import DocLoadingService
 class ContextIndexBase(ModuleBase):
     CLASS_NAME: str = "context_index"
 
-    class ContextIndexConfig(BaseModel):
+    class ClassConfigModel(BaseModel):
         database_provider: str = "pinecone_database"
         doc_loading_provider: str = "generic_web_scraper"
 
@@ -19,22 +19,18 @@ class ContextIndexBase(ModuleBase):
 
     local_index_dir: str
     database_service: DatabaseService
-    doc_loading_service: DocLoadingService
 
     data_domains: dict[str, Any] = {}
     list_of_data_domain_ui_names: list[str]
 
     @classmethod
     def setup_context_index(cls, config_file_dict: dict[str, Any] = {}):
-        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app_config.app_name, ContextIndexBase.CLASS_NAME)
+        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app.app_name, ContextIndexBase.CLASS_NAME)
 
         index_config_file_dict = config_file_dict.get(cls.CLASS_NAME, {})
-        cls.config = cls.ContextIndexConfig(**config_file_dict)
+        cls.config = cls.ClassConfigModel(**config_file_dict)
         cls.database_service = DatabaseService(
             config_file_dict=index_config_file_dict, database_provider=cls.config.database_provider
-        )
-        cls.doc_loading_service = DocLoadingService(
-            config_file_dict=index_config_file_dict, database_provider=cls.config.doc_loading_provider
         )
 
         if getattr(index_config_file_dict, "data_domains", {}) == {}:
@@ -42,10 +38,8 @@ class ContextIndexBase(ModuleBase):
             cls.data_domains[new_data_domain.config.name] = new_data_domain
         else:
             data_domains_dict = index_config_file_dict["data_domains"]
-            for domain_name, domain_config in data_domains_dict.items():
-                cls.data_domains[domain_name] = DataDomain(config_file_dict=domain_config)
-
-        return cls
+            for domain_name, _ in data_domains_dict.items():
+                cls.data_domains[domain_name] = DataDomain(config_file_dict=data_domains_dict)
 
     @staticmethod
     def list_context_class_names(list_of_instance):
@@ -57,59 +51,55 @@ class ContextIndexBase(ModuleBase):
 
 class DataDomain(ContextIndexBase):
     CLASS_NAME: str = "data_domain"
+    REQUIRED_CLASSES: list[Type] = []
 
-    class DataDomainConfig(BaseModel):
+    class ClassConfigModel(BaseModel):
         name: str = "A default topic"
         description: str = "A default description"
-        database_provider: str = "pinecone_database"
-        doc_loading_provider: str = "generic_web_scraper"
         batch_update_enabled: bool = True
 
         class Config:
             extra = "ignore"
 
-    config: DataDomainConfig
-    data_sources: dict[str, Any] = {}
-    list_of_data_source_ui_names: list[str]
+    config: ClassConfigModel
+    list_of_class_ui_names: list[str]
+    list_of_class_instances: list[Any]
 
-    def __init__(self, config_file_dict={}):
-        self.config = self.DataDomainConfig(**config_file_dict)
+    data_sources: dict[str, Any] = {}
+
+    def __init__(self, config_file_dict={}, **kwargs):
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+
         if getattr(config_file_dict, "data_sources", {}) == {}:
             new_data_source = DataSource()
             self.data_sources[new_data_source.config.name] = new_data_source
         else:
             data_domains_dict = config_file_dict["data_sources"]
-            for source_name, source_config in data_domains_dict.items():
-                self.data_sources[source_name] = DataSource(config_file_dict=source_config)
+            for source_name, _ in data_domains_dict.items():
+                self.data_sources[source_name] = DataSource(config_file_dict=data_domains_dict)
 
 
 class DataSource(ContextIndexBase):
     CLASS_NAME: str = "data_source"
+    REQUIRED_CLASSES: list[Type] = [DocLoadingService]
 
-    class DataSourceConfig(BaseModel):
+    class ClassConfigModel(BaseModel):
         name: str = "A default source"
         description: str = "A default description"
-        data_source_url: Optional[str] = None
-
-        # doc_loading_provider: str = "generic_web_scraper"
-        doc_loading_provider_name: str = "generic_web_scraper"
-        doc_loading_provider_config: dict[str, Any] = {}
+        doc_loading_provider: str = "generic_web_scraper"
         database_provider: str = "Local Files as a Database"
         batch_update_enabled: bool = True
 
         class Config:
             extra = "ignore"
 
-    config: DataSourceConfig
+    config: ClassConfigModel
+    list_of_class_ui_names: list[str]
+    list_of_class_instances: list[Any]
+    doc_loading_service: DocLoadingService
 
-    def __init__(self, config_file_dict={}):
-        self.config = self.DataSourceConfig(**config_file_dict)
-        for doc_loader in self.doc_loading_service.doc_loading_providers:
-            if doc_loader.CLASS_NAME == self.config.doc_loading_provider_name:
-                self.config.doc_loading_provider_config = doc_loader.ClassConfigModel(
-                    **self.config.doc_loading_provider_config
-                ).model_dump()
-                break
+    def __init__(self, config_file_dict={}, **kwargs):
+        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
 
 class ChunkModel(BaseModel):

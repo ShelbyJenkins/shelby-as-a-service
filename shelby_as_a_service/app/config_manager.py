@@ -17,13 +17,13 @@ class ConfigManager:
     @staticmethod
     def check_for_existing_apps():
         existing_app_names = []
-        dir_path = "app_config/your_apps"
+        dir_path = "app/your_apps"
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
         for app in os.listdir(dir_path):
             app_path = os.path.join(dir_path, app)
             if os.path.isdir(app_path):
-                if "app_config.json" in os.listdir(app_path):
+                if "app.json" in os.listdir(app_path):
                     existing_app_names.append(app)
 
         return existing_app_names
@@ -34,26 +34,26 @@ class ConfigManager:
         Does not overwrite existing apps.
         To start fresh delete the app and then use this function.
         """
-        dir_path = f"app_config/your_apps/{app_name}"
+        dir_path = f"app/your_apps/{app_name}"
 
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
         if not os.path.exists(os.path.join(dir_path, "index/inputs")):
             os.makedirs(os.path.join(dir_path, "index/inputs"))
 
-        # Creates blank app_config.json
-        app_config_dest_path = os.path.join(dir_path, "app_config.json")
-        if not os.path.exists(app_config_dest_path):
-            with open(app_config_dest_path, "w", encoding="utf-8") as file:
+        # Creates blank app.json
+        app_dest_path = os.path.join(dir_path, "app.json")
+        if not os.path.exists(app_dest_path):
+            with open(app_dest_path, "w", encoding="utf-8") as file:
                 file.write("{}")
 
         ConfigManager.create_update_env_file(app_name)
 
     @staticmethod
-    def create_update_env_file(app_name, secrets=None):
-        dir_path = f"app_config/your_apps/{app_name}"
+    def create_update_env_file(app_name: str, secrets: Optional[dict[str, Any]] = None):
+        dir_path = f"app/your_apps/{app_name}"
         dot_env_dest_path = os.path.join(dir_path, ".env")
-        dot_env_source_path = "app_config/template/template.env"
+        dot_env_source_path = "app/template/template.env"
 
         # Helper function to read env file into a dictionary
         def read_env_to_dict(filepath):
@@ -102,8 +102,8 @@ class ConfigManager:
     def load_webui_sprite_default_config():
         app_name = "base"
         # In the case of local app we check for a default_local_app
-        app_config = ConfigManager.load_app_config("base")
-        default_settings = app_config.get("sprites", {}).get("webui_sprite", {}).get("optional", {})
+        app = ConfigManager.load_app("base")
+        default_settings = app.get("sprites", {}).get("webui_sprite", {}).get("optional", {})
         if default_settings.get("default_app_enabled") is True:
             existing_app_names = ConfigManager.check_for_existing_apps()
             default_local_app_name = default_settings.get("default_local_app_name", None)
@@ -115,10 +115,10 @@ class ConfigManager:
         return app_name
 
     @staticmethod
-    def load_app_config(app_name) -> Dict[str, Any]:
+    def load_app(app_name) -> Dict[str, Any]:
         try:
             with open(
-                f"app_config/your_apps/{app_name}/app_config.json",
+                f"app/your_apps/{app_name}/app.json",
                 "r",
                 encoding="utf-8",
             ) as stream:
@@ -130,14 +130,14 @@ class ConfigManager:
         return config_from_file
 
     @staticmethod
-    def save_app_config(app_name, updated_app_config_dict):
+    def save_app(app_name, updated_app_dict):
         # Save the updated configuration
         with open(
-            f"app_config/your_apps/{app_name}/app_config.json",
+            f"app/your_apps/{app_name}/app.json",
             "w",
             encoding="utf-8",
         ) as file:
-            json.dump(updated_app_config_dict, file, ensure_ascii=False, indent=4)
+            json.dump(updated_app_dict, file, ensure_ascii=False, indent=4)
 
     @staticmethod
     def get_extension_configs():
@@ -158,7 +158,8 @@ class ConfigManager:
         # Iterate through all items in the directory
         for item_name in os.listdir("extensions"):
             item_path = os.path.join("extensions", item_name)
-
+            if item_name == "template":
+                continue
             # Check if the item is a directory
             if os.path.isdir(item_path):
                 config_path = os.path.join(item_path, "ext_config.yaml")
@@ -253,12 +254,12 @@ class ConfigManager:
                     child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
                     recurse(child_class_instance, module_config_dict)
 
-        app_config_dict = {}
-        app_config_dict["app"] = AppBase.app_config.model_dump()
+        app_dict = {}
+        app_dict["app"] = AppBase.app.model_dump()
 
-        app_config_dict[AppBase.context_index_service.CLASS_NAME] = AppBase.the_context_index.model_dump()
+        app_dict[AppBase.context_index.CLASS_NAME] = AppBase.context_index.config.model_dump()
 
         for sprite in AppBase.available_sprite_instances:
-            recurse(sprite, app_config_dict)
+            recurse(sprite, app_dict)
 
-        ConfigManager.save_app_config(AppBase.app_config.app_name, app_config_dict)
+        ConfigManager.save_app(AppBase.app.app_name, app_dict)

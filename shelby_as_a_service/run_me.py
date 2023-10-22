@@ -12,7 +12,7 @@ def main():
         "app_name",
         type=str,
         nargs="?",
-        help=f"Runs with a configuration from apps/<app_name>/app_config.json.",
+        help=f"Runs with a configuration from apps/<app_name>/app.json.",
     )
     args = parser.parse_args()
 

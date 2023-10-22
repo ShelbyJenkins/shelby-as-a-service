@@ -1,6 +1,6 @@
 CLASS_NAME: "TemplateClass"
 FOLDER_NAME: "template"
-MODULE_FILENAME: "CLASS_NAME"
+MODULE_FILENAME: "MODULE_NAME"
 TARGET_SPRITES: ["webui_sprite"]
 HAS_VIEW: true
 VIEW_FILENAME: "template_view"

@@ -27,6 +27,9 @@ class EmbeddingService(ModuleBase):
 
     def get_query_embedding(self, query) -> list[float]:
         provider = self.get_requested_class_instance(self.embedding_providers, "openai_embedding")
+        # provider = self.get_requested_class_instance(
+        #     self.embedding_providers, embedding_provider if embedding_provider is not None else self.config.embedding_provider
+        # )
         if provider:
             return provider.get_query_embedding(query)
         return None
@@ -42,7 +45,7 @@ class EmbeddingService(ModuleBase):
 
         components["embedding_provider"] = gr.Dropdown(
             value=GradioHelper.get_CLASS_UI_NAME_from_str(self.embedding_providers, self.config.embedding_provider),
-            choices=GradioHelper.get_list_of_CLASS_UI_NAMEs(self.embedding_providers),
+            choices=GradioHelper.get_list_of_class_ui_names(self.embedding_providers),
             label=self.CLASS_UI_NAME,
             container=True,
             min_width=0,

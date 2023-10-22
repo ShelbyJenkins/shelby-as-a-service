@@ -22,7 +22,7 @@ class DatabaseService(ModuleBase):
 
     config: ClassConfigModel
     database_providers: List[Any]
-    list_of_CLASS_UI_NAMEs: list
+    list_of_class_ui_names: list
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
@@ -37,7 +37,9 @@ class DatabaseService(ModuleBase):
         if database_provider is None:
             database_provider = self.config.database_provider
 
-        provider = self.get_requested_class_instance(self.database_providers, database_provider)
+        provider = self.get_requested_class_instance(
+            self.database_providers, database_provider if database_provider is not None else self.config.database_provider
+        )
 
         if provider:
             return provider.query_index(
@@ -86,7 +88,7 @@ class DatabaseService(ModuleBase):
         with gr.Column():
             components["database_provider"] = gr.Dropdown(
                 value=GradioHelper.get_CLASS_UI_NAME_from_str(self.database_providers, self.config.database_provider),
-                choices=GradioHelper.get_list_of_CLASS_UI_NAMEs(self.database_providers),
+                choices=GradioHelper.get_list_of_class_ui_names(self.database_providers),
                 label="Source Type",
                 container=True,
                 min_width=0,

@@ -21,13 +21,17 @@ class DocLoadingService(ModuleBase):
 
     config: ClassConfigModel
     doc_loading_providers: List[Any]
-    list_of_CLASS_UI_NAMEs: List[str]
+    list_of_class_ui_names: List[str]
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def load(self, data_source, doc_loading_provider=None):
-        provider = self.get_requested_class_instance(self.doc_loading_providers, doc_loading_provider)
+        provider = self.get_requested_class_instance(
+            self.doc_loading_providers,
+            doc_loading_provider if doc_loading_provider is not None else self.config.doc_loading_provider,
+        )
+
         if provider:
             return provider._load(data_source.data_source_url)
         else:
@@ -38,8 +42,8 @@ class DocLoadingService(ModuleBase):
 
         with gr.Column():
             components["doc_loading_provider"] = gr.Dropdown(
-                value=GradioHelper.get_CLASS_UI_NAME_from_str(self.doc_loading_providers, self.config.doc_loading_provider),
-                choices=GradioHelper.get_list_of_CLASS_UI_NAMEs(self.doc_loading_providers),
+                value=GradioHelper.get_class_ui_name_from_str(self.doc_loading_providers, self.config.doc_loading_provider),
+                choices=GradioHelper.get_list_of_class_ui_names(self.doc_loading_providers),
                 label="Source Type",
                 container=True,
             )

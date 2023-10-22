@@ -4,7 +4,7 @@
 shelby-as-a-service.code-workspace
 logs/
 mendable/
-shelby_as_a_service/app_config/your_apps/*
+shelby_as_a_service/app/your_apps/*
 shelby_as_a_service/extensions/*
 !shelby_as_a_service/extensions/template
 

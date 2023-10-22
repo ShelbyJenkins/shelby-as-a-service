@@ -5,7 +5,6 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from app.config_manager import ConfigManager
-from app_config.context_index.index_base import ContextIndexService
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
@@ -23,7 +22,7 @@ class AppBase:
 
     AVAILABLE_SPRITES: List[str] = ["webui_sprite"]
     # AVAILABLE_SPRITES: List[str] = ["webui_sprite", "discord_sprite", "slack_sprite"]
-    APP_DIR_PATH: str = "app_config/your_apps"
+    APP_DIR_PATH: str = "app/your_apps"
 
     class AppConfigModel(BaseModel):
         """
@@ -41,13 +40,12 @@ class AppBase:
         enabled_extensions: List[str] = []
         disabled_extensions: List[str] = []
 
-    app_config: AppConfigModel
+    app: AppConfigModel
 
     webui_sprite: Type
     discord_sprite: Type
     slack_sprite: Type
-    context_index_service = ContextIndexService
-    the_context_index: ContextIndexService.TheContextIndex
+    context_index: Type
     log: logging.Logger
     available_sprite_instances: List[Any] = []
     list_of_extension_configs: List[Any]
@@ -74,30 +72,30 @@ class AppBase:
         AppBase._get_logger(logger_name=app_name)
         AppBase.log.info(f"Setting up app instance: {app_name}...")
 
-        app_config_file_dict = ConfigManager.load_app_config(app_name)
-        AppBase.app_config = AppBase.AppConfigModel(**app_config_file_dict.get("app", {}))
+        app_file_dict = ConfigManager.load_app(app_name)
+        AppBase.app = AppBase.AppConfigModel(**app_file_dict.get("app", {}))
 
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
         AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
+        from context_index.index_base import ContextIndexBase
 
-        AppBase.the_context_index = AppBase.context_index_service.setup_context_index(
-            app_base=AppBase, config_file_dict=app_config_file_dict
-        )
+        AppBase.context_index = ContextIndexBase
+        AppBase.context_index.setup_context_index(config_file_dict=app_file_dict)
 
-        AppBase._load_sprite_instances(app_config_file_dict)
+        AppBase._load_sprite_instances(app_file_dict)
 
         ConfigManager.update_config_file_from_loaded_models()
 
         return cls
 
     @staticmethod
-    def _load_sprite_instances(app_config_file_dict: Dict[str, Any]):
+    def _load_sprite_instances(app_file_dict: Dict[str, Any]):
         """
         Loads the sprite instances.
 
         Args:
-        - app_config_file_dict: A dictionary representing the application configuration file.
+        - app_file_dict: A dictionary representing the application configuration file.
 
         Returns:
         - None
@@ -110,7 +108,7 @@ class AppBase:
                     # ConfigManager.add_extensions_to_sprite(
                     #     AppBase.list_of_extension_configs, WebUISprite
                     # )
-                    AppBase.webui_sprite = WebUISprite(app_config_file_dict)
+                    AppBase.webui_sprite = WebUISprite(app_file_dict)
 
                     AppBase.available_sprite_instances.append(AppBase.webui_sprite)
 
@@ -118,7 +116,7 @@ class AppBase:
                 #     from interfaces.bots.discord_sprite import DiscordSprite
 
                 # ConfigManager.add_extensions_to_sprite(AppBase.list_of_extension_configs, DiscordSprite)
-                #     AppBase.discord_sprite = DiscordSprite(app_config_file_dict)
+                #     AppBase.discord_sprite = DiscordSprite(app_file_dict)
 
                 #     AppBase.available_sprite_instances.append(AppBase.discord_sprite)
 
@@ -126,7 +124,7 @@ class AppBase:
                 #     from interfaces.bots.slack_sprite import SlackSprite
 
                 # ConfigManager.add_extensions_to_sprite(AppBase.list_of_extension_configs, SlackSprite)
-                #     AppBase.slack_sprite = SlackSprite(app_config_file_dict)
+                #     AppBase.slack_sprite = SlackSprite(app_file_dict)
 
                 #     AppBase.available_sprite_instances.append(AppBase.slack_sprite)
 
@@ -182,6 +180,6 @@ class AppBase:
                     AppBase.log.error(f"Sprite crashed with error: {e}. Restarting...")
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for sprite_name in AppBase.app_config.enabled_sprites:
+            for sprite_name in AppBase.app.enabled_sprites:
                 sprite = getattr(cls, sprite_name)
                 executor.submit(run_sprite_with_restart, sprite)

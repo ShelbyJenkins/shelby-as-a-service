@@ -28,14 +28,14 @@ class ModuleBase(AppBase):
         class_instance.config = class_instance.ClassConfigModel(**merged_config)
 
         list_of_class_instances = []
-        list_of_CLASS_UI_NAMEs = []
+        list_of_class_ui_names = []
 
         if REQUIRED_CLASSES := getattr(class_instance, "REQUIRED_CLASSES", None):
             for required_module in REQUIRED_CLASSES:
                 if new_class_instance := ModuleBase.create_class_instance(
                     class_instance, required_module, module_config_file_dict, **kwargs
                 ):
-                    list_of_CLASS_UI_NAMEs.append(new_class_instance.CLASS_UI_NAME)
+                    list_of_class_ui_names.append(new_class_instance.CLASS_UI_NAME)
                     list_of_class_instances.append(new_class_instance)
 
         if extension_modules := getattr(class_instance, "extension_modules", None):
@@ -43,7 +43,7 @@ class ModuleBase(AppBase):
                 if new_class_instance := ModuleBase.create_class_instance(
                     class_instance, extension_module, module_config_file_dict, **kwargs
                 ):
-                    list_of_CLASS_UI_NAMEs.append(new_class_instance.CLASS_UI_NAME)
+                    list_of_class_ui_names.append(new_class_instance.CLASS_UI_NAME)
                     list_of_class_instances.append(new_class_instance)
 
         if ui_views := getattr(class_instance, "UI_VIEWS", None):
@@ -58,7 +58,7 @@ class ModuleBase(AppBase):
             setattr(class_instance, providers_type, list_of_class_instances)
         else:
             class_instance.list_of_class_instances = list_of_class_instances
-        class_instance.list_of_CLASS_UI_NAMEs = list_of_CLASS_UI_NAMEs
+        class_instance.list_of_class_ui_names = list_of_class_ui_names
 
         if required_secrets := getattr(class_instance, "REQUIRED_SECRETS", None):
             for required_secret in required_secrets:
@@ -90,7 +90,7 @@ class ModuleBase(AppBase):
     @staticmethod
     def set_secret(required_secret):
         env_secret = None
-        secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
+        secret_str = f"{AppBase.app.app_name}_{required_secret}".upper()
         env_secret = os.environ.get(secret_str, None)
         if env_secret:
             AppBase.secrets[required_secret] = env_secret

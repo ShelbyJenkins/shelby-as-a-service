@@ -4,7 +4,7 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from agents.ingest.ingest_agent import IngestAgent
 from app.module_base import ModuleBase
-from app_config.context_index.index_base import ContextIndexService, DataDomain, DataSource
+from context_index.index_base import ContextIndexBase, DataDomain, DataSource
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 
@@ -24,13 +24,12 @@ class ContextIndexView(ModuleBase):
             extra = "ignore"
 
     config: ClassConfigModel
-    list_of_CLASS_UI_NAMEs: list
+    list_of_class_ui_names: list
     list_of_class_instances: list
     ingest_agent: IngestAgent
     database_service: DatabaseService
 
-    context_index_service: ContextIndexService
-    the_context_index: ContextIndexService.TheContextIndex
+    context_index: ContextIndexBase
     current_data_domain_instance: DataDomain
     current_data_source_instance: DataSource
 
@@ -38,20 +37,20 @@ class ContextIndexView(ModuleBase):
         self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
         self.components = {}
 
-        for data_domain in self.the_context_index.data_domains:
-            if self.config.current_data_domain_name == data_domain.NAME:
+        for data_domain_name, data_domain in self.context_index.data_domains.items():
+            if self.config.current_data_domain_name == data_domain_name:
                 self.current_data_domain_instance = data_domain
                 break
             if getattr(self, "current_data_domain_instance", None) is None:
                 self.current_data_domain_instance = data_domain
-                self.config.current_data_domain_name = data_domain.NAME
-        for data_source in self.current_data_domain_instance.data_sources:
-            if self.config.current_data_source_name == data_source.NAME:
+                self.config.current_data_domain_name = data_domain_name
+        for data_source_name, data_source in self.current_data_domain_instance.data_sources.items():
+            if self.config.current_data_source_name == data_source_name:
                 self.current_data_source_instance = data_source
                 break
             if getattr(self, "current_data_source_instance", None) is None:
                 self.current_data_source_instance = data_source
-                self.config.current_data_source_name = data_source.NAME
+                self.config.current_data_source_name = data_source_name
 
     def create_primary_ui(self):
         with gr.Column(elem_classes="primary_ui_col"):
@@ -108,20 +107,16 @@ class ContextIndexView(ModuleBase):
                         self.components["default_web_data_source_drp"] = gr.Dropdown(
                             visible=True,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
-                            choices=[
-                                cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources
-                            ],
+                            value=self.context_index.index_data_domains[0].data_sources[0].data_source_name,
+                            choices=[cls.data_source_name for cls in self.context_index.index_data_domains[0].data_sources],
                             show_label=False,
                             interactive=True,
                         )
                         self.components["default_local_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
-                            choices=[
-                                cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources
-                            ],
+                            value=self.context_index.index_data_domains[0].data_sources[0].data_source_name,
+                            choices=[cls.data_source_name for cls in self.context_index.index_data_domains[0].data_sources],
                             show_label=False,
                             interactive=True,
                         )
@@ -129,20 +124,16 @@ class ContextIndexView(ModuleBase):
                         self.components["custom_web_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
-                            choices=[
-                                cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources
-                            ],
+                            value=self.context_index.index_data_domains[0].data_sources[0].data_source_name,
+                            choices=[cls.data_source_name for cls in self.context_index.index_data_domains[0].data_sources],
                             show_label=False,
                             interactive=True,
                         )
                         self.components["custom_local_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.the_context_index.index_data_domains[0].data_sources[0].data_source_name,
-                            choices=[
-                                cls.data_source_name for cls in self.the_context_index.index_data_domains[0].data_sources
-                            ],
+                            value=self.context_index.index_data_domains[0].data_sources[0].data_source_name,
+                            choices=[cls.data_source_name for cls in self.context_index.index_data_domains[0].data_sources],
                             show_label=False,
                             interactive=True,
                         )
@@ -340,15 +331,13 @@ class ContextIndexView(ModuleBase):
             output.append(
                 gr.Dropdown(
                     value=self.current_data_domain_instance.NAME,
-                    choices=self.context_index_service.list_context_class_names(self.the_context_index.data_domains),
+                    choices=self.context_index.list_context_class_names(self.context_index.data_domains),
                 )
             )
             output.append(
                 gr.Dropdown(
                     value=self.current_data_source_instance.NAME,
-                    choices=self.context_index_service.list_context_class_names(
-                        self.current_data_domain_instance.data_sources
-                    ),
+                    choices=self.context_index.list_context_class_names(self.current_data_domain_instance.data_sources),
                 )
             )
             output.append(gr.Textbox(value=self.current_data_source_instance.NAME))
@@ -364,7 +353,7 @@ class ContextIndexView(ModuleBase):
 
             data_source_components["data_domains_dropdown"] = gr.Dropdown(
                 value=self.config.current_data_domain_name,
-                choices=self.context_index_service.list_context_class_names(self.the_context_index.data_domains),
+                choices=self.context_index.list_context_class_names(self.context_index.data_domains),
                 label="Currently Selected Topic",
                 allow_custom_value=False,
             )
@@ -377,7 +366,7 @@ class ContextIndexView(ModuleBase):
             )
             data_source_components["data_sources_dropdown"] = gr.Dropdown(
                 value=self.config.current_data_source_name,
-                choices=self.context_index_service.list_context_class_names(self.current_data_domain_instance.data_sources),
+                choices=self.context_index.list_context_class_names(self.current_data_domain_instance.data_sources),
                 label="Available Sources",
                 allow_custom_value=False,
             )
@@ -396,13 +385,13 @@ class ContextIndexView(ModuleBase):
             )
             data_source_components["default_doc_loader"] = gr.Dropdown(
                 value=self.current_data_source_instance.default_doc_loader,
-                choices=self.database_service.list_of_CLASS_UI_NAMEs,
+                choices=self.database_service.list_of_class_ui_names,
                 label="Default Document Loader",
                 info="Sets default that can be overridden by individual documents.",
             )
             data_source_components["default_database_provider"] = gr.Dropdown(
                 value=self.current_data_source_instance.default_database_provider,
-                choices=self.database_service.list_of_CLASS_UI_NAMEs,
+                choices=self.database_service.list_of_class_ui_names,
                 label="Default Database Provider",
                 info="Sets default that can be overridden by individual documents.",
             )
@@ -455,14 +444,14 @@ class ContextIndexView(ModuleBase):
     def create_data_domain_tab(self):
         def new_data_domain():
             new_domain = DataDomain()
-            self.the_context_index.data_domains.append(new_domain)
+            self.context_index.data_domains.append(new_domain)
             return self.set_current_data_domain(new_domain.NAME)
 
         data_domain_components = {}
         with gr.Tab(label="Topics"):
             data_domain_components["data_domains_dropdown"] = gr.Dropdown(
                 value=self.config.current_data_domain_name,
-                choices=self.context_index_service.list_context_class_names(self.the_context_index.data_domains),
+                choices=self.context_index.list_context_class_names(self.context_index.data_domains),
                 label="Available Topics",
                 allow_custom_value=False,
             )
@@ -516,7 +505,7 @@ class ContextIndexView(ModuleBase):
             with gr.Tab(label="Default Databases"):
                 data_domain_components["default_database_provider"] = gr.Dropdown(
                     value=self.current_data_domain_instance.default_database_provider,
-                    choices=self.database_service.list_of_CLASS_UI_NAMEs,
+                    choices=self.database_service.list_of_class_ui_names,
                     label="Default Database Provider",
                     info="Sets default that can be overridden by individual sources.",
                 )
@@ -544,7 +533,7 @@ class ContextIndexView(ModuleBase):
         )
 
     def set_current_data_domain(self, requested_instance_ui_name):
-        for data_domain in self.the_context_index.data_domains:
+        for data_domain in self.context_index.data_domains:
             if requested_instance_ui_name == data_domain.NAME:
                 self.current_data_domain_instance = data_domain
                 break
@@ -552,7 +541,7 @@ class ContextIndexView(ModuleBase):
         output.append(
             gr.Dropdown(
                 value=self.current_data_domain_instance.NAME,
-                choices=self.context_index_service.list_context_class_names(self.the_context_index.data_domains),
+                choices=self.context_index.list_context_class_names(self.context_index.data_domains),
             )
         )
         output.append(gr.Textbox(value=self.current_data_domain_instance.NAME))
