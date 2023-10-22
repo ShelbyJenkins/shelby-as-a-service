@@ -10,7 +10,6 @@ from services.document_loading.document_loading_providers import GenericRecursiv
 class DocLoadingService(ModuleBase):
     CLASS_NAME: str = "doc_loading_service"
     CLASS_UI_NAME: str = "Document Loading Service"
-    PROVIDERS_TYPE: str = "doc_loading_providers"
     REQUIRED_CLASSES: List[Type] = [GenericWebScraper]
 
     class ClassConfigModel(BaseModel):
@@ -20,15 +19,15 @@ class DocLoadingService(ModuleBase):
             extra = "ignore"
 
     config: ClassConfigModel
-    doc_loading_providers: List[Any]
-    list_of_class_ui_names: List[str]
+    list_of_class_instances: list[Any]
+    list_of_class_ui_names: list
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
 
     def load(self, data_source, doc_loading_provider=None):
         provider = self.get_requested_class_instance(
-            self.doc_loading_providers,
+            self.list_of_class_instances,
             doc_loading_provider if doc_loading_provider is not None else self.config.doc_loading_provider,
         )
 
@@ -42,12 +41,14 @@ class DocLoadingService(ModuleBase):
 
         with gr.Column():
             components["doc_loading_provider"] = gr.Dropdown(
-                value=GradioHelper.get_class_ui_name_from_str(self.doc_loading_providers, self.config.doc_loading_provider),
-                choices=GradioHelper.get_list_of_class_ui_names(self.doc_loading_providers),
+                value=GradioHelper.get_class_ui_name_from_str(
+                    self.list_of_class_instances, self.config.doc_loading_provider
+                ),
+                choices=GradioHelper.get_list_of_class_ui_names(self.list_of_class_instances),
                 label="Source Type",
                 container=True,
             )
-            for provider_instance in self.doc_loading_providers:
+            for provider_instance in self.list_of_class_instances:
                 provider_instance.create_settings_ui()
 
             GradioHelper.create_settings_event_listener(self.config, components)

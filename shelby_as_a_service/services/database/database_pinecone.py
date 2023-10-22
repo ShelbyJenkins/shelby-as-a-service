@@ -120,7 +120,7 @@ class PineconeDatabase(ModuleBase):
         # hard_query_response = self.pinecone_index.query(
         #     top_k=retrieve_n_docs,
         #     include_values=False,
-        #     namespace=AppBase.app_name,
+        #     namespace=AppBase.app_config.app_name,
         #     include_metadata=True,
         #     filter=hard_filter,
         #     vector=dense_embedding

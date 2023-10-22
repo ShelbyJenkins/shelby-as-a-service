@@ -30,34 +30,15 @@ class ModuleBase(AppBase):
         list_of_class_instances = []
         list_of_class_ui_names = []
 
-        if REQUIRED_CLASSES := getattr(class_instance, "REQUIRED_CLASSES", None):
-            for required_module in REQUIRED_CLASSES:
+        if required_classes := getattr(class_instance, "REQUIRED_CLASSES", None):
+            for required_module in required_classes:
                 if new_class_instance := ModuleBase.create_class_instance(
                     class_instance, required_module, module_config_file_dict, **kwargs
                 ):
                     list_of_class_ui_names.append(new_class_instance.CLASS_UI_NAME)
                     list_of_class_instances.append(new_class_instance)
 
-        if extension_modules := getattr(class_instance, "extension_modules", None):
-            for extension_module in extension_modules:
-                if new_class_instance := ModuleBase.create_class_instance(
-                    class_instance, extension_module, module_config_file_dict, **kwargs
-                ):
-                    list_of_class_ui_names.append(new_class_instance.CLASS_UI_NAME)
-                    list_of_class_instances.append(new_class_instance)
-
-        if ui_views := getattr(class_instance, "UI_VIEWS", None):
-            class_instance.ui_view_instances = []
-            for view_module in ui_views:
-                if new_class_instance := ModuleBase.create_class_instance(
-                    class_instance, view_module, module_config_file_dict, **kwargs
-                ):
-                    class_instance.ui_view_instances.append(new_class_instance)
-
-        if providers_type := getattr(class_instance, "PROVIDERS_TYPE", None):
-            setattr(class_instance, providers_type, list_of_class_instances)
-        else:
-            class_instance.list_of_class_instances = list_of_class_instances
+        class_instance.list_of_class_instances = list_of_class_instances
         class_instance.list_of_class_ui_names = list_of_class_ui_names
 
         if required_secrets := getattr(class_instance, "REQUIRED_SECRETS", None):
@@ -67,9 +48,9 @@ class ModuleBase(AppBase):
     @staticmethod
     def create_class_instance(parent_class_instance, new_module, module_config_file_dict={}, **kwargs):
         new_class_instance = None
-        if CLASS_NAME := getattr(new_module, "CLASS_NAME", None):
+        if class_name := getattr(new_module, "CLASS_NAME", None):
             new_class_instance = new_module(module_config_file_dict, **kwargs)
-            setattr(parent_class_instance, CLASS_NAME, new_class_instance)
+            setattr(parent_class_instance, class_name, new_class_instance)
 
         return new_class_instance
 
@@ -90,7 +71,7 @@ class ModuleBase(AppBase):
     @staticmethod
     def set_secret(required_secret):
         env_secret = None
-        secret_str = f"{AppBase.app.app_name}_{required_secret}".upper()
+        secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
         env_secret = os.environ.get(secret_str, None)
         if env_secret:
             AppBase.secrets[required_secret] = env_secret

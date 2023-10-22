@@ -37,20 +37,20 @@ class ContextIndexView(ModuleBase):
         self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
         self.components = {}
 
-        for data_domain_name, data_domain in self.context_index.data_domains.items():
-            if self.config.current_data_domain_name == data_domain_name:
-                self.current_data_domain_instance = data_domain
-                break
-            if getattr(self, "current_data_domain_instance", None) is None:
-                self.current_data_domain_instance = data_domain
-                self.config.current_data_domain_name = data_domain_name
-        for data_source_name, data_source in self.current_data_domain_instance.data_sources.items():
-            if self.config.current_data_source_name == data_source_name:
-                self.current_data_source_instance = data_source
-                break
-            if getattr(self, "current_data_source_instance", None) is None:
-                self.current_data_source_instance = data_source
-                self.config.current_data_source_name = data_source_name
+        # for data_domain_name, data_domain in self.context_index.data_domains.items():
+        #     if self.config.current_data_domain_name == data_domain_name:
+        #         self.current_data_domain_instance = data_domain
+        #         break
+        #     if getattr(self, "current_data_domain_instance", None) is None:
+        #         self.current_data_domain_instance = data_domain
+        #         self.config.current_data_domain_name = data_domain_name
+        # for data_source_name, data_source in self.current_data_domain_instance.data_sources.items():
+        #     if self.config.current_data_source_name == data_source_name:
+        #         self.current_data_source_instance = data_source
+        #         break
+        #     if getattr(self, "current_data_source_instance", None) is None:
+        #         self.current_data_source_instance = data_source
+        #         self.config.current_data_source_name = data_source_name
 
     def create_primary_ui(self):
         with gr.Column(elem_classes="primary_ui_col"):

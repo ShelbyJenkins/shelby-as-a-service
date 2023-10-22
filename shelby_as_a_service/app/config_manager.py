@@ -158,8 +158,10 @@ class ConfigManager:
         # Iterate through all items in the directory
         for item_name in os.listdir("extensions"):
             item_path = os.path.join("extensions", item_name)
+
             if item_name == "template":
                 continue
+
             # Check if the item is a directory
             if os.path.isdir(item_path):
                 config_path = os.path.join(item_path, "ext_config.yaml")
@@ -189,8 +191,7 @@ class ConfigManager:
             folder_name = extension_config.get("FOLDER_NAME")
             module_filename = extension_config.get("MODULE_FILENAME")
             class_name = extension_config.get("CLASS_NAME")
-            CLASS_NAME = extension_config.get("CLASS_NAME")
-            if not (folder_name and module_filename and class_name and CLASS_NAME):
+            if not (folder_name and module_filename and class_name):
                 print(f"Missing configuration: {folder_name}, {module_filename}, {class_name}")
                 continue
 
@@ -198,9 +199,9 @@ class ConfigManager:
             try:
                 module = importlib.import_module(import_path)
                 cls = getattr(module, class_name)
-                if getattr(sprite_class, "extension_modules", None) is None:
-                    sprite_class.extension_modules = []
-                sprite_class.extension_modules.append(cls)
+                if getattr(sprite_class, "REQUIRED_CLASSES", None) is None:
+                    sprite_class.REQUIRED_CLASSES = []
+                sprite_class.REQUIRED_CLASSES.append(cls)
             except ImportError as e:
                 print(f"Failed to import module: {import_path}. Error: {str(e)}")
             except AttributeError as e:
@@ -215,8 +216,8 @@ class ConfigManager:
             folder_name = extension_config.get("FOLDER_NAME")
             view_filename = extension_config.get("VIEW_FILENAME")
             view_class_name = extension_config.get("VIEW_CLASS_NAME")
-            CLASS_NAME = extension_config.get("CLASS_NAME")
-            if not (folder_name and view_filename and view_class_name and CLASS_NAME):
+            class_name = extension_config.get("CLASS_NAME")
+            if not (folder_name and view_filename and view_class_name and class_name):
                 print(f"Missing configuration: {folder_name}, {view_filename}, {view_class_name}")
                 continue
 
@@ -224,7 +225,7 @@ class ConfigManager:
             try:
                 module = importlib.import_module(import_path)
                 cls = getattr(module, view_class_name)
-                gradio_instance.UI_VIEWS.append(cls)
+                gradio_instance.REQUIRED_CLASSES.append(cls)
 
             except ImportError as e:
                 print(f"Failed to import module: {import_path}. Error: {str(e)}")
@@ -239,27 +240,17 @@ class ConfigManager:
             config_dict[class_instance.CLASS_NAME] = class_instance.config.model_dump()
             module_config_dict = config_dict[class_instance.CLASS_NAME]
 
-            if REQUIRED_CLASSES := getattr(class_instance, "REQUIRED_CLASSES", None):
-                for child_module in REQUIRED_CLASSES:
-                    child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
-                    recurse(child_class_instance, module_config_dict)
-
-            if extension_modules := getattr(class_instance, "extension_modules", None):
-                for child_module in extension_modules:
-                    child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
-                    recurse(child_class_instance, module_config_dict)
-
-            if ui_views := getattr(class_instance, "UI_VIEWS", None):
-                for child_module in ui_views:
+            if required_classes := getattr(class_instance, "REQUIRED_CLASSES", None):
+                for child_module in required_classes:
                     child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
                     recurse(child_class_instance, module_config_dict)
 
         app_dict = {}
-        app_dict["app"] = AppBase.app.model_dump()
+        app_dict["app"] = AppBase.app_config.model_dump()
 
-        app_dict[AppBase.context_index.CLASS_NAME] = AppBase.context_index.config.model_dump()
+        app_dict[AppBase.context_index.CLASS_NAME] = AppBase.context_index.index_config.model_dump()
 
         for sprite in AppBase.available_sprite_instances:
             recurse(sprite, app_dict)
 
-        ConfigManager.save_app(AppBase.app.app_name, app_dict)
+        ConfigManager.save_app(AppBase.app_config.app_name, app_dict)

@@ -40,7 +40,7 @@ class AppBase:
         enabled_extensions: List[str] = []
         disabled_extensions: List[str] = []
 
-    app: AppConfigModel
+    app_config: AppConfigModel
 
     webui_sprite: Type
     discord_sprite: Type
@@ -69,11 +69,11 @@ class AppBase:
         if app_name == "base":
             ConfigManager.check_and_create_base()
             app_name = ConfigManager.load_webui_sprite_default_config()
-        AppBase._get_logger(logger_name=app_name)
-        AppBase.log.info(f"Setting up app instance: {app_name}...")
 
         app_file_dict = ConfigManager.load_app(app_name)
-        AppBase.app = AppBase.AppConfigModel(**app_file_dict.get("app", {}))
+        AppBase.app_config = AppBase.AppConfigModel(**app_file_dict.get("app", {}))
+        AppBase._get_logger(logger_name=app_name)
+        AppBase.log.info(f"Setting up app instance: {app_name}...")
 
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
@@ -146,7 +146,7 @@ class AppBase:
             if logger_name is None:
                 raise ValueError("Logger must be initialized with an logger_name before it can be used without it.")
 
-            logs_dir = os.path.join(AppBase.APP_DIR_PATH, "logs")
+            logs_dir = os.path.join(AppBase.APP_DIR_PATH, AppBase.app_config.app_name, "logs")
             os.makedirs(logs_dir, exist_ok=True)
             log_file_path = os.path.join(logs_dir, f"{logger_name}.log")
 
@@ -180,6 +180,7 @@ class AppBase:
                     AppBase.log.error(f"Sprite crashed with error: {e}. Restarting...")
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for sprite_name in AppBase.app.enabled_sprites:
+            for sprite_name in AppBase.app_config.enabled_sprites:
                 sprite = getattr(cls, sprite_name)
-                executor.submit(run_sprite_with_restart, sprite)
+                sprite.run_sprite()
+                # executor.submit(run_sprite_with_restart, sprite)

@@ -12,7 +12,6 @@ from services.database.database_pinecone import PineconeDatabase
 class DatabaseService(ModuleBase):
     CLASS_NAME: str = "database_service"
     CLASS_UI_NAME: str = "Databases"
-    PROVIDERS_TYPE: str = "database_providers"
 
     REQUIRED_CLASSES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
 
@@ -21,7 +20,7 @@ class DatabaseService(ModuleBase):
         retrieve_n_docs: int = 6
 
     config: ClassConfigModel
-    database_providers: List[Any]
+    list_of_class_instances: list[Any]
     list_of_class_ui_names: list
 
     def __init__(self, config_file_dict={}, **kwargs):
@@ -38,7 +37,8 @@ class DatabaseService(ModuleBase):
             database_provider = self.config.database_provider
 
         provider = self.get_requested_class_instance(
-            self.database_providers, database_provider if database_provider is not None else self.config.database_provider
+            self.list_of_class_instances,
+            database_provider if database_provider is not None else self.config.database_provider,
         )
 
         if provider:
@@ -58,7 +58,7 @@ class DatabaseService(ModuleBase):
         data_domain_name=None,
         database_provider=None,
     ):
-        provider = self.get_requested_class_instance(self.database_providers, database_provider)
+        provider = self.get_requested_class_instance(self.list_of_class_instances, database_provider)
         if provider:
             return provider.fetch_by_ids(
                 ids=ids,
@@ -76,7 +76,7 @@ class DatabaseService(ModuleBase):
         data_source=None,
         database_provider=None,
     ):
-        provider = self.get_requested_class_instance(self.database_providers, database_provider)
+        provider = self.get_requested_class_instance(self.list_of_class_instances, database_provider)
         if provider:
             return provider.write_documents_to_database(documents, data_domain, data_source)
         else:
@@ -87,8 +87,8 @@ class DatabaseService(ModuleBase):
 
         with gr.Column():
             components["database_provider"] = gr.Dropdown(
-                value=GradioHelper.get_CLASS_UI_NAME_from_str(self.database_providers, self.config.database_provider),
-                choices=GradioHelper.get_list_of_class_ui_names(self.database_providers),
+                value=GradioHelper.get_class_ui_name_from_str(self.list_of_class_instances, self.config.database_provider),
+                choices=GradioHelper.get_list_of_class_ui_names(self.list_of_class_instances),
                 label="Source Type",
                 container=True,
                 min_width=0,
@@ -96,7 +96,7 @@ class DatabaseService(ModuleBase):
             components["retrieve_n_docs"] = gr.Number(
                 value=self.config.retrieve_n_docs, label="Number of Documents to Retrieve", container=True, min_width=0
             )
-            for provider_instance in self.database_providers:
+            for provider_instance in self.list_of_class_instances:
                 provider_instance.create_settings_ui()
 
             GradioHelper.create_settings_event_listener(self.config, components)

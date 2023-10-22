@@ -1,45 +1,73 @@
 import os
 from typing import Any, Optional, Type
 
-from app.module_base import ModuleBase
+from app.app_base import AppBase
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 
 
-class ContextIndexBase(ModuleBase):
+# this should load from a seperate file in the your_apps folder
+class ContextIndexBase(AppBase):
     CLASS_NAME: str = "context_index"
 
     class ClassConfigModel(BaseModel):
         database_provider: str = "pinecone_database"
         doc_loading_provider: str = "generic_web_scraper"
+        data_domains: dict[str, "DataDomain.ClassConfigModel"] = {}
+        current_data_domain_name: str = "default_data_domain"
+        current_data_source_name: str = "default_data_source"
 
         class Config:
             extra = "ignore"
 
+    index_config: ClassConfigModel
     local_index_dir: str
     database_service: DatabaseService
 
-    data_domains: dict[str, Any] = {}
     list_of_data_domain_ui_names: list[str]
+    current_data_domain_instance: "DataDomain"
+    current_data_source_instance: "DataSource"
 
     @classmethod
     def setup_context_index(cls, config_file_dict: dict[str, Any] = {}):
-        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app.app_name, ContextIndexBase.CLASS_NAME)
+        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app_config.app_name, cls.CLASS_NAME)
 
         index_config_file_dict = config_file_dict.get(cls.CLASS_NAME, {})
-        cls.config = cls.ClassConfigModel(**config_file_dict)
+        cls.index_config = ContextIndexBase.ClassConfigModel(**index_config_file_dict)
+
         cls.database_service = DatabaseService(
-            config_file_dict=index_config_file_dict, database_provider=cls.config.database_provider
+            config_file_dict=index_config_file_dict, database_provider=cls.index_config.database_provider
         )
 
-        if getattr(index_config_file_dict, "data_domains", {}) == {}:
-            new_data_domain = DataDomain()
-            cls.data_domains[new_data_domain.config.name] = new_data_domain
-        else:
-            data_domains_dict = index_config_file_dict["data_domains"]
-            for domain_name, _ in data_domains_dict.items():
-                cls.data_domains[domain_name] = DataDomain(config_file_dict=data_domains_dict)
+        cls.list_of_data_domain_ui_names = []
+        if cls.index_config.data_domains.get(cls.index_config.current_data_domain_name, {}) == {}:
+            cls.create_data_domain(new_data_domain_name=cls.index_config.current_data_domain_name)
+        for domain_name, _ in cls.index_config.data_domains.items():
+            cls.list_of_data_domain_ui_names.append(domain_name)
+        cls.current_data_domain_instance = DataDomain(
+            domain_config=cls.index_config.data_domains[cls.index_config.current_data_domain_name]
+        )
+
+    @classmethod
+    def create_data_domain(cls, new_data_domain_name: Optional[str] = None):
+        if new_data_domain_name is None:
+            new_data_domain_name = DataDomain.ClassConfigModel.name
+        if new_data_domain_name in cls.list_of_data_domain_ui_names:
+            raise Exception(f"Data domain name {new_data_domain_name} already exists")
+        cls.index_config.data_domains[new_data_domain_name] = DataDomain.ClassConfigModel()
+        cls.list_of_data_domain_ui_names.append(new_data_domain_name)
+
+    @classmethod
+    def create_data_source(cls, data_domain: "DataDomain", new_data_source_name: Optional[str] = None):
+        if data_domain.domain_config.name not in cls.list_of_data_domain_ui_names:
+            raise Exception(f"Data domain {data_domain.domain_config.name} does not exist")
+        if new_data_source_name is None:
+            new_data_source_name = DataSource.ClassConfigModel.name
+        if new_data_source_name in data_domain.list_of_data_source_ui_names:
+            raise Exception(f"Data domain name {new_data_source_name} already exists")
+        data_domain.domain_config.data_sources[new_data_source_name] = DataSource.ClassConfigModel()
+        data_domain.list_of_data_source_ui_names.append(new_data_source_name)
 
     @staticmethod
     def list_context_class_names(list_of_instance):
@@ -51,40 +79,41 @@ class ContextIndexBase(ModuleBase):
 
 class DataDomain(ContextIndexBase):
     CLASS_NAME: str = "data_domain"
-    REQUIRED_CLASSES: list[Type] = []
 
     class ClassConfigModel(BaseModel):
-        name: str = "A default topic"
+        name: str = "default_data_domain"
         description: str = "A default description"
+        data_sources: dict[str, "DataSource.ClassConfigModel"] = {}
         batch_update_enabled: bool = True
 
         class Config:
             extra = "ignore"
 
-    config: ClassConfigModel
-    list_of_class_ui_names: list[str]
+    domain_config: ClassConfigModel
+    list_of_class_ui_names: list
     list_of_class_instances: list[Any]
 
-    data_sources: dict[str, Any] = {}
+    list_of_data_source_ui_names: list[str]
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
-
-        if getattr(config_file_dict, "data_sources", {}) == {}:
-            new_data_source = DataSource()
-            self.data_sources[new_data_source.config.name] = new_data_source
-        else:
-            data_domains_dict = config_file_dict["data_sources"]
-            for source_name, _ in data_domains_dict.items():
-                self.data_sources[source_name] = DataSource(config_file_dict=data_domains_dict)
+    def __init__(self, domain_config: ClassConfigModel):
+        self.domain_config = domain_config
+        self.list_of_data_source_ui_names = []
+        if self.domain_config.data_sources.get(ContextIndexBase.index_config.current_data_source_name, {}) == {}:
+            self.create_data_source(
+                data_domain=self, new_data_source_name=ContextIndexBase.index_config.current_data_source_name
+            )
+        for source_name, _ in self.domain_config.data_sources.items():
+            self.list_of_data_source_ui_names.append(source_name)
+        ContextIndexBase.current_data_source_instance = DataSource(
+            source_config=self.domain_config.data_sources[ContextIndexBase.index_config.current_data_source_name]
+        )
 
 
 class DataSource(ContextIndexBase):
     CLASS_NAME: str = "data_source"
-    REQUIRED_CLASSES: list[Type] = [DocLoadingService]
 
     class ClassConfigModel(BaseModel):
-        name: str = "A default source"
+        name: str = "default_data_source"
         description: str = "A default description"
         doc_loading_provider: str = "generic_web_scraper"
         database_provider: str = "Local Files as a Database"
@@ -93,13 +122,12 @@ class DataSource(ContextIndexBase):
         class Config:
             extra = "ignore"
 
-    config: ClassConfigModel
-    list_of_class_ui_names: list[str]
+    source_config: ClassConfigModel
+    list_of_class_ui_names: list
     list_of_class_instances: list[Any]
-    doc_loading_service: DocLoadingService
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, source_config):
+        self.source_config = source_config
 
 
 class ChunkModel(BaseModel):
