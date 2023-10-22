@@ -1,20 +1,21 @@
 import os
-from typing import Any, Optional, Type
+from typing import Any, Optional, Type, Union
 
-from app.app_base import AppBase
+from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 
 
-class ContextIndexBase(AppBase):
+class ContextIndexBase(ModuleBase):
     CLASS_NAME: str = "context_index"
+    REQUIRED_CLASSES: list[Type] = [DatabaseService, DocLoadingService]
 
     class ClassConfigModel(BaseModel):
         database_provider: str = "pinecone_database"
-        doc_loading_provider: str = "generic_web_scraper"
-        data_domains: dict[str, "DataDomain.ClassConfigModel"] = {}
         current_domain_name: str = "default_data_domain"
+        data_domains: dict[str, "DataDomain.ClassConfigModel"] = {}
+        doc_loading_provider: str = "generic_web_scraper"
 
         class Config:
             extra = "ignore"
@@ -131,15 +132,28 @@ class ContextIndexBase(AppBase):
         data_domain.list_of_data_source_ui_names.append(source_name)
         data_domain.domain_config.current_source_name = source_name
 
+    @classmethod
+    def create_service_configs(cls, config, service):
+        service_name = service.CLASS_NAME
+        if (service_config := getattr(config, service_name, {})) == {}:
+            service_config = {}
+        for class_instance in service.list_of_class_instances:
+            if service_config.get(class_instance.CLASS_NAME, {}) == {}:
+                service_config[class_instance.CLASS_NAME] = {}
+            service_config[class_instance.CLASS_NAME] = class_instance.config.model_dump()
+        return service_config
+
 
 class DataDomain(ContextIndexBase):
     CLASS_NAME: str = "data_domain"
+    REQUIRED_CLASSES: list[Type] = [DatabaseService, DocLoadingService]
 
     class ClassConfigModel(BaseModel):
         name: Optional[str] = "default_data_domain"
         description: Optional[str] = "A default description"
         database_provider: Optional[str] = None
         doc_loading_provider: Optional[str] = None
+        doc_loading_config: dict = {}
         batch_update_enabled: bool = True
         data_sources: dict[str, "DataSource.ClassConfigModel"] = {}
         current_source_name: str = "default_data_source"
@@ -154,6 +168,7 @@ class DataDomain(ContextIndexBase):
 
     def __init__(self, domain_config: ClassConfigModel):
         self.domain_config = domain_config
+
         self.list_of_data_source_ui_names = []
         if self.domain_config.data_sources.get(self.domain_config.current_source_name, {}) == {}:
             self.create_data_source(data_domain=self, source_name=self.domain_config.current_source_name)
@@ -166,21 +181,31 @@ class DataDomain(ContextIndexBase):
 
 class DataSource(ContextIndexBase):
     CLASS_NAME: str = "data_source"
+    REQUIRED_CLASSES: list[Type] = [DatabaseService, DocLoadingService]
 
     class ClassConfigModel(BaseModel):
         name: Optional[str] = "default_data_source"
         description: Optional[str] = "A default description"
-        doc_loading_provider: Optional[str] = None
-        database_provider: Optional[str] = None
         batch_update_enabled: bool = True
+        database_provider: Optional[str] = None
+
+        doc_loading_provider: Optional[str] = None
+        doc_loading_service: Optional[dict[str, dict]] = {}
 
         class Config:
             extra = "ignore"
 
     source_config: ClassConfigModel
+    database_service: DatabaseService
+    doc_loading_service: DocLoadingService
 
     def __init__(self, source_config):
         self.source_config = source_config
+        self.doc_loading_service = DocLoadingService(
+            config_file_dict=self.source_config.doc_loading_service,
+            doc_loading_provider=self.source_config.doc_loading_provider,
+        )
+        self.source_config.doc_loading_service = self.create_service_configs(self.source_config, self.doc_loading_service)
 
 
 class ChunkModel(BaseModel):

@@ -82,9 +82,9 @@ class ModuleBase(AppBase):
             print(f"Secret: {required_secret} is None!")
 
     @staticmethod
-    def get_requested_class_instance(available_class_instances, requested_module):
+    def get_requested_class_instance(available_class_instances, requested_class):
         for class_instance in available_class_instances:
-            if class_instance.CLASS_NAME == requested_module or class_instance.CLASS_UI_NAME == requested_module:
+            if class_instance.CLASS_NAME == requested_class or class_instance.CLASS_UI_NAME == requested_class:
                 return class_instance
 
     @staticmethod

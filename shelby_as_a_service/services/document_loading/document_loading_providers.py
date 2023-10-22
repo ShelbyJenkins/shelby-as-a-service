@@ -34,14 +34,14 @@ class GenericWebScraper(ModuleBase):
 
     def create_settings_ui(self):
         components = {}
-        with gr.Accordion(label="Generic Web Scraper", open=True):
-            with gr.Column():
-                components["continue_on_failue"] = gr.Checkbox(
-                    value=self.config.continue_on_failue,
-                    label="Continue On Failure",
-                    interactive=True,
-                )
-            # GradioHelper.create_settings_event_listener(self.config, components)
+
+        with gr.Column():
+            components["continue_on_failue"] = gr.Checkbox(
+                value=self.config.continue_on_failue,
+                label="Continue On Failure",
+                interactive=True,
+            )
+        # GradioHelper.create_settings_event_listener(self.config, components)
 
         return components
 
@@ -78,39 +78,39 @@ class GenericRecursiveWebScraper(ModuleBase):
 
     def create_settings_ui(self):
         components = {}
-        with gr.Accordion(label=self.CLASS_NAME, open=False):
-            with gr.Column():
-                components["exclude_dirs"] = gr.Textbox(
-                    value=self.config.exclude_dirs,
-                    label="Exclude dirs.",
-                    info="A list of subdirectories to exclude.",
-                    interactive=True,
-                )
-                components["max_depth"] = gr.Number(
-                    value=self.config.max_depth,
-                    label="Max Depth",
-                    info="The max depth of the recursive loading.",
-                    interactive=True,
-                )
-                components["timeout"] = gr.Number(
-                    value=self.config.timeout,
-                    label="Timeout Time",
-                    info="The timeout for the requests, in the unit of seconds.",
-                    interactive=True,
-                )
-                components["use_async"] = gr.Checkbox(
-                    value=self.config.use_async,
-                    label="Use Async",
-                    info="Whether to use asynchronous loading, if use_async is true, this function will not be lazy, but it will still work in the expected way, just not lazy.",
-                    interactive=True,
-                )
-                components["prevent_outside"] = gr.Checkbox(
-                    value=self.config.prevent_outside,
-                    label="Prevent Outside",
-                    info="IDK",
-                    interactive=True,
-                )
-                # GradioHelper.create_settings_event_listener(self.config, components)
+
+        with gr.Column():
+            components["exclude_dirs"] = gr.Textbox(
+                value=self.config.exclude_dirs,
+                label="Exclude dirs.",
+                info="A list of subdirectories to exclude.",
+                interactive=True,
+            )
+            components["max_depth"] = gr.Number(
+                value=self.config.max_depth,
+                label="Max Depth",
+                info="The max depth of the recursive loading.",
+                interactive=True,
+            )
+            components["timeout"] = gr.Number(
+                value=self.config.timeout,
+                label="Timeout Time",
+                info="The timeout for the requests, in the unit of seconds.",
+                interactive=True,
+            )
+            components["use_async"] = gr.Checkbox(
+                value=self.config.use_async,
+                label="Use Async",
+                info="Whether to use asynchronous loading, if use_async is true, this function will not be lazy, but it will still work in the expected way, just not lazy.",
+                interactive=True,
+            )
+            components["prevent_outside"] = gr.Checkbox(
+                value=self.config.prevent_outside,
+                label="Prevent Outside",
+                info="IDK",
+                interactive=True,
+            )
+            # GradioHelper.create_settings_event_listener(self.config, components)
 
         return components
 
