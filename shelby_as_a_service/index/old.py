@@ -3,13 +3,10 @@ from typing import Any, Optional, Type, Union
 
 from app.module_base import ModuleBase
 from pydantic import BaseModel
-from services.database.database_service import DatabaseService
-from services.document_loading.document_loading_service import DocLoadingService
 
 
 class ContextIndexBase(ModuleBase):
     CLASS_NAME: str = "context_index"
-    REQUIRED_CLASSES: list[Type] = [DatabaseService, DocLoadingService]
 
     class ClassConfigModel(BaseModel):
         database_provider: str = "pinecone_database"
@@ -22,8 +19,6 @@ class ContextIndexBase(ModuleBase):
 
     index_config: ClassConfigModel
     local_index_dir: str
-    database_service: DatabaseService
-    doc_loading_service: DocLoadingService
 
     list_of_data_domain_ui_names: list
     current_domain: "DataDomain"
@@ -34,13 +29,6 @@ class ContextIndexBase(ModuleBase):
 
         index_config_file_dict = config_file_dict.get(cls.CLASS_NAME, {})
         cls.index_config = ContextIndexBase.ClassConfigModel(**index_config_file_dict)
-
-        cls.database_service = DatabaseService(
-            config_file_dict=index_config_file_dict, database_provider=cls.index_config.database_provider
-        )
-        cls.doc_loading_service = DocLoadingService(
-            config_file_dict=index_config_file_dict, doc_loading_provider=cls.index_config.doc_loading_provider
-        )
 
         cls.list_of_data_domain_ui_names = []
         if cls.index_config.data_domains.get(cls.index_config.current_domain_name, {}) == {}:
@@ -70,8 +58,6 @@ class ContextIndexBase(ModuleBase):
         cls,
         domain_name: Optional[str] = None,
         description: Optional[str] = None,
-        database_provider: Optional[str] = None,
-        doc_loading_provider: Optional[str] = None,
         batch_update_enabled: bool = True,
     ):
         if not description:
@@ -102,8 +88,6 @@ class ContextIndexBase(ModuleBase):
         data_domain: "DataDomain",
         source_name: Optional[str] = None,
         description: Optional[str] = None,
-        database_provider: Optional[str] = None,
-        doc_loading_provider: Optional[str] = None,
         batch_update_enabled: bool = True,
     ):
         if data_domain.domain_config.name not in cls.list_of_data_domain_ui_names:
@@ -146,7 +130,6 @@ class ContextIndexBase(ModuleBase):
 
 class DataDomain(ContextIndexBase):
     CLASS_NAME: str = "data_domain"
-    REQUIRED_CLASSES: list[Type] = [DatabaseService, DocLoadingService]
 
     class ClassConfigModel(BaseModel):
         name: Optional[str] = "default_data_domain"
@@ -181,7 +164,6 @@ class DataDomain(ContextIndexBase):
 
 class DataSource(ContextIndexBase):
     CLASS_NAME: str = "data_source"
-    REQUIRED_CLASSES: list[Type] = [DatabaseService, DocLoadingService]
 
     class ClassConfigModel(BaseModel):
         name: Optional[str] = "default_data_source"
@@ -196,16 +178,9 @@ class DataSource(ContextIndexBase):
             extra = "ignore"
 
     source_config: ClassConfigModel
-    database_service: DatabaseService
-    doc_loading_service: DocLoadingService
 
     def __init__(self, source_config):
         self.source_config = source_config
-        self.doc_loading_service = DocLoadingService(
-            config_file_dict=self.source_config.doc_loading_service,
-            doc_loading_provider=self.source_config.doc_loading_provider,
-        )
-        self.source_config.doc_loading_service = self.create_service_configs(self.source_config, self.doc_loading_service)
 
 
 class ChunkModel(BaseModel):

@@ -252,7 +252,7 @@ class ConfigManager:
         app_dict = {}
         app_dict["app"] = AppBase.app_config.model_dump()
 
-        app_dict[AppBase.context_index.CLASS_NAME] = AppBase.context_index.index_config.model_dump()
+        # app_dict[AppBase.context_index.CLASS_NAME] = AppBase.context_index.index_config.model_dump()
 
         for sprite in AppBase.available_sprite_instances:
             recurse(sprite, app_dict)

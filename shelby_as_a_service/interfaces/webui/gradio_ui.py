@@ -34,6 +34,7 @@ class GradioUI(ModuleBase):
     list_of_class_names: list
     list_of_class_ui_names: list
     list_of_class_instances: list
+    list_of_extension_configs: Optional[list] = []
 
     def __init__(self, config_file_dict={}, **kwargs):
         ConfigManager.add_extension_views_to_gradio_ui(self, self.list_of_extension_configs)

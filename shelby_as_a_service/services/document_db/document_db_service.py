@@ -5,13 +5,13 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from app.module_base import ModuleBase
 from pydantic import BaseModel
-from services.database.database_local_file import LocalFileStoreDatabase
-from services.database.database_pinecone import PineconeDatabase
+from services.document_db.document_db_local_file import LocalFileStoreDatabase
+from services.document_db.document_db_pinecone import PineconeDatabase
 
 
-class DatabaseService(ModuleBase):
-    CLASS_NAME: str = "database_service"
-    CLASS_UI_NAME: str = "Databases"
+class DocumentDBService(ModuleBase):
+    CLASS_NAME: str = "document_db_service"
+    CLASS_UI_NAME: str = "Document Databases"
 
     REQUIRED_CLASSES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
 

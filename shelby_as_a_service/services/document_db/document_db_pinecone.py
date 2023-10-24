@@ -38,7 +38,7 @@ class PineconeDatabase(ModuleBase):
 
     def __init__(self, config_file_dict={}, **kwargs):
         self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
-        if api_key := self.secrets.get("pinecone_api_key", None) is None:
+        if (api_key := self.secrets.get("pinecone_api_key")) is None:
             print("Pinecone API Key not found.")
         if api_key:
             pinecone.init(

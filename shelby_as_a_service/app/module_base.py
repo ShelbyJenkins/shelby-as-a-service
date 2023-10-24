@@ -14,7 +14,8 @@ class ModuleBase(AppBase):
         class_name = class_instance.__class__.__name__
         class_instance.log = logging.getLogger(class_name)
 
-        module_config_file_dict = config_file_dict.get(class_instance.CLASS_NAME, {})
+        if (module_config_file_dict := config_file_dict.get(class_instance.CLASS_NAME, {})) == {}:
+            module_config_file_dict = config_file_dict
         merged_config = {**kwargs, **module_config_file_dict}
 
         available_models = None

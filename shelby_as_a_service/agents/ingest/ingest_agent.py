@@ -181,5 +181,5 @@ class IngestAgent(ModuleBase):
             else:
                 print("Error: documents_iterator is None")
             if documents_list:
-                self.database_service.write_documents_to_database(documents_list, data_domain, data_source)
+                self.document_db_service.write_documents_to_database(documents_list, data_domain, data_source)
                 return documents_list
