@@ -78,7 +78,7 @@ class AppBase:
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
         # AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
-        from index.index_base import ContextIndex
+        from index.context_index import ContextIndex
 
         AppBase.context_index = ContextIndex()
         AppBase._load_sprite_instances(app_file_dict)

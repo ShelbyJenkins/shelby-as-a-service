@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Type, Union
+from typing import Any, Dict, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
@@ -11,7 +11,7 @@ from pydantic import BaseModel
 class PineconeDatabase(ModuleBase):
     CLASS_NAME: str = "pinecone_database"
     CLASS_UI_NAME: str = "Pinecone Database"
-    REQUIRED_SECRETS: List[str] = ["pinecone_api_key"]
+    REQUIRED_SECRETS: list[str] = ["pinecone_api_key"]
 
     class ClassConfigModel(BaseModel):
         index_env: str = "us-central1-gcp"
@@ -26,7 +26,7 @@ class PineconeDatabase(ModuleBase):
         text_splitter_goal_length: int = 750
         text_splitter_overlap_percent: int = 15  # In percent
         retrieve_n_docs: int = 5
-        indexed_metadata: List[str] = [
+        indexed_metadata: list = [
             "data_domain_name",
             "data_source_name",
             "doc_type",
@@ -53,7 +53,7 @@ class PineconeDatabase(ModuleBase):
         search_terms,
         retrieve_n_docs=None,
         data_domain_name=None,
-    ) -> List[Any]:
+    ) -> list[Any]:
         if retrieve_n_docs is None:
             top_k = self.config.retrieve_n_docs
         else:
@@ -139,7 +139,7 @@ class PineconeDatabase(ModuleBase):
         #     }
         #     returned_documents.append(response)
 
-    def fetch_by_ids(self, ids, namespace=None) -> List[Any]:
+    def fetch_by_ids(self, ids, namespace=None) -> list[Any]:
         response = self.pinecone_index.fetch(
             namespace=namespace,
             ids=ids,

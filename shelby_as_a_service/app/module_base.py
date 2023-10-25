@@ -87,6 +87,7 @@ class ModuleBase(AppBase):
         for class_instance in available_class_instances:
             if class_instance.CLASS_NAME == requested_class or class_instance.CLASS_UI_NAME == requested_class:
                 return class_instance
+        raise ValueError(f"Requested class {requested_class} not found.")
 
     @staticmethod
     def get_model(provider_instance, requested_model_name=None):

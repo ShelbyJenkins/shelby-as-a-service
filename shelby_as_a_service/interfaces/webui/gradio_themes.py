@@ -100,8 +100,8 @@ class AtYourServiceTheme(Base):
         )
         super().set(
             # sizes
-            layout_gap="0",
-            block_border_width="0px",
+            # layout_gap="1px",
+            block_padding="5px",
             block_border_width_dark="0px",
             block_label_border_width_dark="0px",
             block_title_border_width_dark="0px",
