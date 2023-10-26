@@ -1,6 +1,7 @@
+import logging
 from typing import Any, Optional, Type, Union
 
-from index.context_models import Base, ContextModel, DocDBConfigs, DocLoaderConfigs, DomainModel, SourceModel
+from index.context_models import Base, ContextModel, DocDBConfigs, DomainModel, SourceModel
 from index.index_base import IndexBase
 from services.document_db.document_db_service import DocumentDBService
 from services.document_loading.document_loading_service import DocLoadingService
@@ -9,9 +10,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
+log: logging.Logger = logging.getLogger(__name__)
+
 
 class ContextIndex(IndexBase):
-    model: ContextModel
+    index_model: ContextModel
     session: Session
 
     def __init__(self) -> None:
@@ -20,56 +23,70 @@ class ContextIndex(IndexBase):
         self.setup_context_index()
 
     def setup_context_index(self):
-        if not (context_index := self.session.query(ContextModel).first()):
-            self.session.add(ContextModel())
-            if not (context_index := self.session.query(ContextModel).first()):
-                raise Exception("Context index not found.")
+        # Create a new context index from models
+        if not (index_model := self.session.query(ContextModel).first()):
+            self.index_model = ContextModel()
+            self.session.add(self.index_model)
+            self.session.flush()
+            self.populate_doc_db_configs()
+            enabled_doc_db = self.index_model.enabled_doc_db()
+            self.index_model.enabled_doc_db_id = enabled_doc_db.id
+            self.index_model.enabled_doc_db_name = enabled_doc_db.db_name
 
-        self.populate_doc_db_configs(context_index)
-        self.populate_doc_loader_configs(context_index)
+            default_domain_model = self.create_domain()
+            self.enabled_domain_id = default_domain_model.id
+            self.enabled_domain_name = default_domain_model.name
 
-        if not (domains := context_index.domains):
-            default_domain = DomainModel(
-                enabled_doc_db_name=context_index.enabled_doc_db_name,
-                enabled_doc_loader_name=context_index.enabled_doc_loader_name,
-            )
-            context_index.domains.append(default_domain)
-            self.populate_doc_loader_configs(default_domain)
+            default_source_model = self.domain.create_source()
+            default_domain_model.enabled_source_id = default_source_model.id
+            default_domain_model.enabled_source_name = default_source_model.name
+        # Or update the existing one
+        else:
+            self.index_model = index_model
+            self.populate_doc_db_configs()
 
-        if not domains[0].sources:
-            default_source = SourceModel(
-                enabled_doc_db_name=domains[0].enabled_doc_db_name,
-                enabled_doc_loader_name=domains[0].enabled_doc_loader_name,
-            )
-            domains[0].sources.append(default_source)
-            self.populate_doc_loader_configs(default_source)
-
-        self.model = context_index
         self.commit_session()
-        self.session.add(self.model)
+        self.session.add(self.index_model)
+
+    def create_domain(self) -> "DomainModel":
+        default_domain = DomainModel()
+        self.index_model.domains.append(default_domain)
+        default_domain.enabled_doc_db_id = self.index_model.enabled_doc_db_id
+        default_domain.enabled_doc_db_name = self.index_model.enabled_doc_db_name
+        self.session.flush()
+        return default_domain
 
     @property
     def list_of_domain_names(self) -> list:
-        return [domain.name for domain in self.model.domains]
-
-    def domain(self, domain_name: Optional[str] = None) -> "Domain":
-        if not domain_name:
-            domain_name = self.model.current_domain_name
-        domain_model = next((domain for domain in self.model.domains if domain.name == domain_name), None)
-        if not domain_model:
-            raise Exception(f"Domain {domain_name} not found.")
-        return Domain(domain_model)
+        return [domain.name for domain in self.index_model.domains]
 
     @property
-    def list_of_doc_loading_names(self) -> list:
-        return [doc_db.CLASS_NAME for doc_db in DocLoadingService.REQUIRED_CLASSES]
+    def domain(self) -> "Domain":
+        if hasattr(self, "enabled_domain_relation") and self.index_model.enabled_domain_relation:
+            return Domain(self.index_model.enabled_domain_relation)
+        if enabled_domain_name := getattr(self, "enabled_domain_name", None):
+            if domain_model := next(
+                (domain for domain in self.index_model.domains if domain.name == enabled_domain_name), None
+            ):
+                return Domain(domain_model)
+        # In the case of a first index creation we retrieve the default
+        if domain_model := next(
+            (domain for domain in self.index_model.domains if domain.name == DomainModel.DEFAULT_DOMAIN_NAME), None
+        ):
+            log.warning(f"domain {enabled_domain_name} not found. Using default {DomainModel.DEFAULT_DOMAIN_NAME}.")
+            return Domain(domain_model)
+        raise Exception("domain_model not found in index_model.")
 
-    @property
-    def doc_loading(self) -> DocLoadingService:
-        # doc_loading_name = self.model.current_doc_loading_name or self.model.CURRENT_DOC_LOADING_NAME
-        return DocLoadingService()
+    def populate_doc_db_configs(self):
+        for db_class in DocumentDBService.REQUIRED_CLASSES:
+            db_name = db_class.CLASS_NAME
+            existing_config = next((doc_db for doc_db in self.index_model.doc_dbs if doc_db.db_name == db_name), None)
 
-        # raise Exception(f"Document DB {doc_loading_name} has no ClassConfigModel.")
+            if not existing_config:
+                db_config = db_class.ClassConfigModel().model_dump()
+                new_config = DocDBConfigs(context_id=self.index_model.id, db_name=db_name, db_config=db_config)
+                self.index_model.doc_dbs.append(new_config)
+                self.session.flush()
 
     @property
     def list_of_db_names(self) -> list:
@@ -77,56 +94,55 @@ class ContextIndex(IndexBase):
 
     @property
     def doc_db(self) -> DocumentDBService:
-        db_name = self.model.enabled_doc_db_name or self.model.DEFAULT_DB_NAME
-
-        if doc_db := self.session.query(DocDBConfigs).filter_by(db_name=db_name).first():
-            if db_config := doc_db.db_config:
-                return DocumentDBService(db_config)
-        raise Exception(f"Document DB {db_name} has no ClassConfigModel.")
-
-    @property
-    def doc_db_provider(self) -> DocumentDBService:
-        db_name = self.model.enabled_doc_db_name or self.model.DEFAULT_DB_NAME
-        if not db_name:
-            db_name = self.model.DEFAULT_DB_NAME
-
-        if doc_db := self.session.query(DocDBConfigs).filter_by(db_name=db_name).first():
-            if db_config := doc_db.db_config:
-                doc_db_service = DocumentDBService(db_config)
-                doc_db_provider = doc_db_service.get_requested_class_instance(
-                    doc_db_service.list_of_class_instances, db_name
-                )
-                return doc_db_provider
-        raise Exception(f"Document DB {db_name} has no ClassConfigModel.")
-
-    # def set_doc_db(self, db_name: Optional[str] = None):
-    #         doc_db_class = self.get_doc_db(db_name)
-    #         if hasattr(doc_db_class, "ClassConfigModel"):
-    #             return doc_db_class.ClassConfigModel().model_dump()
-    #         raise Exception(f"Document DB {db_name} has no ClassConfigModel.")
+        if model := getattr(self, "model", None):
+            pass
+        elif index_model := getattr(self, "index_model", None):
+            model = index_model
+        if enabled_doc_db_id := getattr(model, "enabled_doc_db_id", None):
+            if doc_db := self.index_model.enabled_doc_db(enabled_doc_db_id):
+                return DocumentDBService(doc_db.db_config)
+            raise Exception(f"{model} has no doc_db for {enabled_doc_db_id}.")
+        raise Exception(f"{model} has no enabled_doc_db_id.")
 
 
 class Domain(ContextIndex):
-    model: DomainModel
+    domain_model: DomainModel
 
     def __init__(self, domain_model) -> None:
-        self.model = domain_model
+        self.domain_model = domain_model
+
+    def create_source(self) -> "SourceModel":
+        default_source = SourceModel()
+        self.domain_model.sources.append(default_source)
+        default_source.enabled_doc_db_id = self.domain_model.enabled_doc_db_id
+        default_source.enabled_doc_db_name = self.domain_model.enabled_doc_db_name
+        self.session.flush()
+        return default_source
 
     @property
     def list_of_source_names(self) -> list:
-        return [source.name for source in self.model.sources]
+        return [source.name for source in self.domain_model.sources]
 
-    def source(self, source_name: Optional[str] = None) -> "Source":
-        if not source_name:
-            source_name = self.model.current_source_name
-        source_model = next((source for source in self.model.sources if source.name == source_name), None)
-        if not source_model:
-            raise Exception(f"Source {source_name} not found.")
-        return Source(source_model)
+    @property
+    def source(self) -> "Source":
+        if hasattr(self, "enabled_source_relation") and self.domain_model.enabled_source_relation:
+            return Source(self.domain_model.enabled_source_relation)
+        if enabled_source_name := getattr(self, "enabled_source_name", None):
+            if source_model := next(
+                (source for source in self.domain_model.sources if source.name == enabled_source_name), None
+            ):
+                return Source(source_model)
+        # In the case of a first index creation we retrieve the default
+        if source_model := next(
+            (source for source in self.domain_model.sources if source.name == SourceModel.DEFAULT_SOURCE_NAME), None
+        ):
+            log.warning(f"source {enabled_source_name} not found. Using default {SourceModel.DEFAULT_SOURCE_NAME}.")
+            return Source(source_model)
+        raise Exception("source_model not found in domain_model.")
 
 
 class Source(Domain):
     model: SourceModel
 
     def __init__(self, source_model) -> None:
-        self.model = source_model
+        self.source_model = source_model

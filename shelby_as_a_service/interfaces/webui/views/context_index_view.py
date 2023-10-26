@@ -4,7 +4,7 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from agents.ingest.ingest_agent import IngestAgent
 from app.module_base import ModuleBase
-from index.index_base import ContextIndex
+from index.context_index import ContextIndex
 from pydantic import BaseModel
 
 
@@ -74,7 +74,8 @@ class ContextIndexView(ModuleBase):
                 self.create_context_builder_tab()
             # self.create_event_handlers()
             with gr.Tab(label="Management"):
-                self.context_index.doc_db_provider.create_settings_ui()
+                # self.context_index.doc_db_provider.create_settings_ui()
+                pass
 
     def quick_add(self):
         with gr.Tab("Quick Add"):
@@ -110,7 +111,7 @@ class ContextIndexView(ModuleBase):
                         self.components["default_web_data_source_drp"] = gr.Dropdown(
                             visible=True,
                             allow_custom_value=True,
-                            value=self.context_index.domain().model.name,
+                            value=self.context_index.domain.domain_model.name,
                             choices=self.context_index.list_of_doc_db_ui_names,
                             show_label=False,
                             interactive=True,
@@ -118,7 +119,7 @@ class ContextIndexView(ModuleBase):
                         self.components["default_local_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.context_index.domain().model.name,
+                            value=self.context_index.domain.domain_model.name,
                             choices=self.context_index.list_of_doc_db_ui_names,
                             show_label=False,
                             interactive=True,
@@ -127,7 +128,7 @@ class ContextIndexView(ModuleBase):
                         self.components["custom_web_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.context_index.domain().model.name,
+                            value=self.context_index.domain.domain_model.name,
                             choices=self.context_index.list_of_doc_db_ui_names,
                             show_label=False,
                             interactive=True,
@@ -135,7 +136,7 @@ class ContextIndexView(ModuleBase):
                         self.components["custom_local_data_source_drp"] = gr.Dropdown(
                             visible=False,
                             allow_custom_value=True,
-                            value=self.context_index.domain().model.name,
+                            value=self.context_index.domain.domain_model.name,
                             choices=self.context_index.list_of_doc_db_ui_names,
                             show_label=False,
                             interactive=True,
@@ -444,7 +445,7 @@ class ContextIndexView(ModuleBase):
         data_domain_buttons = {}
 
         data_domain_inputs["data_domains_dropdown"] = gr.Dropdown(
-            value=self.context_index.domain().model.name,
+            value=self.context_index.domain.domain_model.name,
             choices=self.context_index.list_of_domain_names,
             label="Available Topics",
             allow_custom_value=False,
@@ -458,18 +459,18 @@ class ContextIndexView(ModuleBase):
                 size="sm",
             )
             data_domain_inputs["batch_update_enabled"] = gr.Checkbox(
-                value=self.context_index.domain().model.batch_update_enabled,
+                value=self.context_index.domain.domain_model.batch_update_enabled,
                 label="Update Topic During Full Index Batch Update",
             )
         with gr.Tab(label="Add New"):
             new_domain_components["new_domain_name"] = gr.Textbox(
-                placeholder=self.context_index.domain().model.name,
+                placeholder=self.context_index.domain.domain_model.name,
                 lines=1,
                 container=True,
                 label="New Topic Name",
             )
             new_domain_components["description"] = gr.Textbox(
-                placeholder=self.context_index.domain().model.description,
+                placeholder=self.context_index.domain.domain_model.description,
                 lines=1,
                 container=True,
                 label="New Topic Description",
@@ -484,27 +485,37 @@ class ContextIndexView(ModuleBase):
                 size="sm",
             )
         with gr.Tab(label="Loader"):
-            data_domain_inputs["doc_loading_provider"] = gr.Dropdown(
-                value=self.context_index.domain().model.current_doc_loading_name,
-                choices=self.context_index.list_of_doc_loading_names,
-                label="Default Doc Loading Provider",
+            # data_domain_inputs["doc_loading_provider"] = gr.Dropdown(
+            #     value=self.context_index.domain.domain_model.current_doc_loading_name,
+            #     choices=self.context_index.list_of_doc_loading_names,
+            #     label="Default Doc Loading Provider",
+            # )
+            # self.context_index.doc_loading.create_settings_ui()
+
+            gr.Textbox(
+                value="Not Implemented",
+                show_label=False,
+                lines=1,
             )
-            self.context_index.doc_loading.create_settings_ui()
-            
         with gr.Tab(label="Processor"):
             gr.Textbox(
                 value="Not Implemented",
                 show_label=False,
                 lines=1,
             )
-        
+
         with gr.Tab(label="Database"):
-            data_domain_inputs["database_provider"] = gr.Dropdown(
-                value=self.context_index.domain().model.current_doc_db_name,
-                choices=self.context_index.list_of_doc_db_names,
-                label="Default Topic Document Database",
-                info="Database settings are managed elsewhere."
+            gr.Textbox(
+                value="Not Implemented",
+                show_label=False,
+                lines=1,
             )
+            # data_domain_inputs["database_provider"] = gr.Dropdown(
+            #     value=self.context_index.domain.domain_model.current_doc_db_name,
+            #     choices=self.context_index.list_of_doc_db_names,
+            #     label="Default Topic Document Database",
+            #     info="Database settings are managed elsewhere.",
+            # )
 
         with gr.Tab(label="Manage"):
             gr.Textbox(
@@ -513,23 +524,23 @@ class ContextIndexView(ModuleBase):
                 lines=1,
             )
             gr.Textbox(
-                value=self.context_index.domain().model.name,
+                value=self.context_index.domain.domain_model.name,
                 label="New Domain Name",
                 lines=1,
             )
             gr.Textbox(
-                value=self.context_index.domain().model.description,
+                value=self.context_index.domain.domain_model.description,
                 label="New Domain Description",
                 lines=1,
             )
             with gr.Row():
                 gr.Textbox(
-                    placeholder=f"Type {self.context_index.domain().model.name} to confirm deletion.",
+                    placeholder=f"Type {self.context_index.domain.domain_model.name} to confirm deletion.",
                     lines=1,
                     show_label=False,
                 )
                 gr.Button(
-                    value=f"Delete {self.context_index.domain().model.name} and all it's sources.",
+                    value=f"Delete {self.context_index.domain.domain_model.name} and all it's sources.",
                     min_width=0,
                     size="sm",
                     variant="stop",
