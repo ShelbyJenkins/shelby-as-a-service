@@ -1,7 +1,8 @@
 import logging
 from typing import Any, Optional, Type, Union
 
-from index.context_models import Base, ContextModel, DocDBConfigs, DomainModel, SourceModel
+from agents.ingest.ingest_templates import IngestTemplates
+from index.context_models import ContextModel, DocDBConfigs, DocIngestTemplateConfigs, DomainModel, SourceModel
 from index.index_base import IndexBase
 from services.document_db.document_db_service import DocumentDBService
 from services.document_loading.document_loading_service import DocLoadingService
@@ -15,6 +16,7 @@ log: logging.Logger = logging.getLogger(__name__)
 
 class ContextIndex(IndexBase):
     index_model: ContextModel
+    model: Union[DomainModel, SourceModel]
     session: Session
 
     def __init__(self) -> None:
@@ -29,13 +31,17 @@ class ContextIndex(IndexBase):
             self.session.add(self.index_model)
             self.session.flush()
             self.populate_doc_db_configs()
-            enabled_doc_db = self.index_model.enabled_doc_db()
+            enabled_doc_db = self.get_doc_db()
             self.index_model.enabled_doc_db_id = enabled_doc_db.id
             self.index_model.enabled_doc_db_name = enabled_doc_db.db_name
+            self.populate_doc_ingest_template_configs(model=self.index_model)
+            enabled_doc_ingest = self.set_doc_ingest_template()
+            self.index_model.enabled_doc_ingest_template_id = enabled_doc_ingest.id
+            self.index_model.enabled_doc_ingest_template_name = enabled_doc_ingest.template_name
 
             default_domain_model = self.create_domain()
-            self.enabled_domain_id = default_domain_model.id
-            self.enabled_domain_name = default_domain_model.name
+            self.index_model.enabled_domain_id = default_domain_model.id
+            self.index_model.enabled_domain_name = default_domain_model.name
 
             default_source_model = self.domain.create_source()
             default_domain_model.enabled_source_id = default_source_model.id
@@ -44,6 +50,7 @@ class ContextIndex(IndexBase):
         else:
             self.index_model = index_model
             self.populate_doc_db_configs()
+            self.populate_doc_ingest_template_configs(model=self.index_model)
 
         self.commit_session()
         self.session.add(self.index_model)
@@ -53,6 +60,11 @@ class ContextIndex(IndexBase):
         self.index_model.domains.append(default_domain)
         default_domain.enabled_doc_db_id = self.index_model.enabled_doc_db_id
         default_domain.enabled_doc_db_name = self.index_model.enabled_doc_db_name
+        self.session.flush()
+        self.populate_doc_ingest_template_configs(model=default_domain)
+        enabled_doc_ingest = self.set_doc_ingest_template()
+        self.index_model.enabled_doc_ingest_template_id = enabled_doc_ingest.id
+        self.index_model.enabled_doc_ingest_template_name = enabled_doc_ingest.template_name
         self.session.flush()
         return default_domain
 
@@ -94,15 +106,88 @@ class ContextIndex(IndexBase):
 
     @property
     def doc_db(self) -> DocumentDBService:
-        if model := getattr(self, "model", None):
-            pass
-        elif index_model := getattr(self, "index_model", None):
-            model = index_model
+        if getattr(self, "model", None):
+            model = self.model
+        else:
+            model = self.index_model
         if enabled_doc_db_id := getattr(model, "enabled_doc_db_id", None):
-            if doc_db := self.index_model.enabled_doc_db(enabled_doc_db_id):
+            if doc_db := self.get_doc_db(enabled_doc_db_id):
                 return DocumentDBService(doc_db.db_config)
             raise Exception(f"{model} has no doc_db for {enabled_doc_db_id}.")
         raise Exception(f"{model} has no enabled_doc_db_id.")
+
+    def get_doc_db(self, enabled_doc_db_id: Optional[int] = None):
+        if doc_db := next((doc_db for doc_db in self.index_model.doc_dbs if doc_db.id == enabled_doc_db_id), None):
+            return doc_db
+        # In the case of the first run
+        if doc_db := next(
+            (doc_db for doc_db in self.index_model.doc_dbs if doc_db.db_name == self.index_model.DEFAULT_DB_NAME), None
+        ):
+            return doc_db
+        raise Exception(f"DocDB {enabled_doc_db_id} not found.")
+
+    def populate_doc_ingest_template_configs(self, model: Union[ContextModel, DomainModel, SourceModel]):
+        for template_class in IngestTemplates.AVAILABLE_TEMPLATES:
+            template_name = template_class.CLASS_NAME
+
+            existing_config = next(
+                (
+                    doc_ingest_template
+                    for doc_ingest_template in model.doc_ingest_templates
+                    if doc_ingest_template.template_name == template_name
+                ),
+                None,
+            )
+            if not existing_config:
+                loader_config = template_class.doc_loader_class.ClassConfigModel().model_dump()
+                loader_name = template_class.doc_loader_class.CLASS_NAME
+                new_config = DocIngestTemplateConfigs(
+                    template_name=template_name, loader_config=loader_config, loader_name=loader_name
+                )
+                model.doc_ingest_templates.append(new_config)
+                self.session.flush()
+
+    @property
+    def list_of_ingest_template_names(self) -> list:
+        return [template_class.CLASS_NAME for template_class in IngestTemplates.AVAILABLE_TEMPLATES]
+
+    @property
+    def doc_ingest(self) -> DocLoadingService:
+        if getattr(self, "model", None):
+            model = self.model
+        else:
+            model = self.index_model
+        ingest_template = model.enabled_doc_ingest_template_relation
+        if ingest_template:
+            return DocLoadingService(ingest_template.loader_config)
+
+        raise Exception(f"{model} has no enabled_doc_ingest_template_relation.")
+
+    def set_doc_ingest_template(self, enabled_doc_ingest_template_id: Optional[int] = None):
+        if getattr(self, "model", None):
+            model = self.model
+        else:
+            model = self.index_model
+        if ingest_template := next(
+            (
+                ingest_template
+                for ingest_template in model.doc_ingest_templates
+                if ingest_template.id == enabled_doc_ingest_template_id
+            ),
+            None,
+        ):
+            return ingest_template
+        # In the case of the first run
+        if ingest_template := next(
+            (
+                ingest_template
+                for ingest_template in model.doc_ingest_templates
+                if ingest_template.template_name == model.DEFAULT_TEMPLATE_NAME
+            ),
+            None,
+        ):
+            return ingest_template
+        raise Exception(f"Doc ingest template {enabled_doc_ingest_template_id} not found.")
 
 
 class Domain(ContextIndex):
@@ -116,6 +201,11 @@ class Domain(ContextIndex):
         self.domain_model.sources.append(default_source)
         default_source.enabled_doc_db_id = self.domain_model.enabled_doc_db_id
         default_source.enabled_doc_db_name = self.domain_model.enabled_doc_db_name
+        self.session.flush()
+        self.populate_doc_ingest_template_configs(model=default_source)
+        enabled_doc_ingest = self.set_doc_ingest_template()
+        self.index_model.enabled_doc_ingest_template_id = enabled_doc_ingest.id
+        self.index_model.enabled_doc_ingest_template_name = enabled_doc_ingest.template_name
         self.session.flush()
         return default_source
 

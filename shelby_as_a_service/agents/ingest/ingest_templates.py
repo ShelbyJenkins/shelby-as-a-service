@@ -9,7 +9,7 @@ from services.document_loading.document_loading_service import DocLoadingService
 
 class IngestTemplates:
     class GenericIngestTemplate:
-        CLASS_NAME: str = "Generic Recursive Web Scraper"
+        CLASS_NAME: str = "generic_recursive_web_scraper"
         doc_loader_class = GenericRecursiveWebScraper
         text_processing_provider = "test"
 
