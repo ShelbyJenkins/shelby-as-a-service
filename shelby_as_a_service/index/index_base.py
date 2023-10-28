@@ -2,7 +2,7 @@ import os
 from typing import Any, Callable, Optional, Type, Union
 
 from app.app_base import AppBase
-from index.context_models import Base, ContextModel, DocDBConfigs, DomainModel, SourceModel
+from index.context_index_model import Base, ContextModel, DocDBConfigs, DomainModel, SourceModel
 from services.document_db.document_db_service import DocumentDBService
 from services.document_loading.document_loading_service import DocLoadingService
 from sqlalchemy import create_engine
@@ -24,18 +24,17 @@ class IndexBase(AppBase):
         cls._session_factory = sessionmaker(bind=engine)
 
     @classmethod
-    def get_session(cls):
+    def get_session(cls) -> Session:
         if cls._session_factory is None:
             raise Exception("Database not set up. Call setup_index_db first.")
-        cls.session = cls._session_factory()
+        return cls._session_factory()
 
-    @classmethod
-    def commit_session(cls):
+    def commit_session(self):
         try:
-            cls.session.commit()
+            self.session.commit()
         except:
-            cls.session.rollback()  # Rollback in case of error
+            self.session.rollback()  # Rollback in case of error
             raise
         finally:
-            cls.session.close()
-            cls.get_session()
+            self.session.close()
+            return self.get_session()

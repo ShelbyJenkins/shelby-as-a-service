@@ -1,8 +1,20 @@
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Union
+
+import gradio as gr
+import interfaces.webui.gradio_helpers as GradioHelper
 
 # from modules.index.data_model import DataModels
 from app.module_base import ModuleBase
+from index.context_index import ContextIndex
+from index.context_index_model import (
+    ContextModel,
+    DocDBConfigs,
+    DocIngestTemplateConfigs,
+    DomainModel,
+    SourceModel,
+)
 from pydantic import BaseModel
+from services.document_db.document_db_service import DocumentDBService
 from services.document_loading.document_loading_service import DocLoadingService
 
 
@@ -18,7 +30,7 @@ class IngestAgent(ModuleBase):
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_class_instances: list[Any]
+    list_of_class_instances: list[Union[DocLoadingService, DocumentDBService]]
     doc_loading_service: DocLoadingService
 
     def __init__(self, config_file_dict={}, **kwargs):
@@ -61,7 +73,9 @@ class IngestAgent(ModuleBase):
                         filter={"data_source_name": {"$eq": data_source.data_source_name}}
                     )
                     existing_resource_vector_count = (
-                        index_resource_stats.get("namespaces", {}).get(self.deployment_name, {}).get("vector_count", 0)
+                        index_resource_stats.get("namespaces", {})
+                        .get(self.deployment_name, {})
+                        .get("vector_count", 0)
                     )
                     self.log.info(
                         f"Existing vector count for {data_source.data_source_name}: {existing_resource_vector_count}"
@@ -70,14 +84,18 @@ class IngestAgent(ModuleBase):
                     # Load documents
                     documents = data_source.scraper.load()
                     if not documents:
-                        self.log.info(f"Skipping data_source: no data loaded for {data_source.data_source_name}")
+                        self.log.info(
+                            f"Skipping data_source: no data loaded for {data_source.data_source_name}"
+                        )
                         break
                     self.log.info(f"Total documents loaded for indexing: {len(documents)}")
 
                     # Removes bad chars, and chunks text
                     document_chunks = data_source.preprocessor.run(documents)
                     if not document_chunks:
-                        self.log.info(f"Skipping data_source: no data after preprocessing {data_source.data_source_name}")
+                        self.log.info(
+                            f"Skipping data_source: no data after preprocessing {data_source.data_source_name}"
+                        )
                         break
                     self.log.info(f"Total document chunks after processing: {len(document_chunks)}")
 
@@ -88,14 +106,18 @@ class IngestAgent(ModuleBase):
                     ) = data_source.preprocessor.compare_chunks(data_source, document_chunks)
                     # If there are changes or new docs, delete existing local files and write new files
                     if not has_changes:
-                        self.log.info(f"Skipping data_source: no new data found for {data_source.data_source_name}")
+                        self.log.info(
+                            f"Skipping data_source: no new data found for {data_source.data_source_name}"
+                        )
                         break
                     self.log.info(f"Found {len(new_or_changed_chunks)} new or changed documents")
                     (
                         text_chunks,
                         document_chunks,
                     ) = data_source.preprocessor.create_text_chunks(data_source, document_chunks)
-                    self.log.info(f"Total document chunks after final check: {len(document_chunks)}")
+                    self.log.info(
+                        f"Total document chunks after final check: {len(document_chunks)}"
+                    )
 
                     # Get dense_embeddings
                     dense_embeddings = data_source.embedding_retriever.embed_documents(text_chunks)
@@ -108,7 +130,9 @@ class IngestAgent(ModuleBase):
                             filter={"data_source_name": {"$eq": data_source.data_source_name}}
                         )
                         cleared_resource_vector_count = (
-                            index_resource_stats.get("namespaces", {}).get(self.deployment_name, {}).get("vector_count", 0)
+                            index_resource_stats.get("namespaces", {})
+                            .get(self.deployment_name, {})
+                            .get("vector_count", 0)
                         )
                         self.log.info(
                             f"Removing pre-existing vectors. New count: {cleared_resource_vector_count} (should be 0)"
@@ -137,7 +161,9 @@ class IngestAgent(ModuleBase):
                         filter={"data_source_name": {"$eq": data_source.data_source_name}}
                     )
                     new_resource_vector_count = (
-                        index_resource_stats.get("namespaces", {}).get(self.deployment_name, {}).get("vector_count", 0)
+                        index_resource_stats.get("namespaces", {})
+                        .get(self.deployment_name, {})
+                        .get("vector_count", 0)
                     )
                     self.log.info(
                         f"Indexing complete for: {data_source.data_source_name}\nPrevious vector count: {existing_resource_vector_count}\nNew vector count: {new_resource_vector_count}\n"
@@ -181,5 +207,10 @@ class IngestAgent(ModuleBase):
             else:
                 print("Error: documents_iterator is None")
             if documents_list:
-                self.document_db_service.write_documents_to_database(documents_list, data_domain, data_source)
+                self.document_db_service.write_documents_to_database(
+                    documents_list, data_domain, data_source
+                )
                 return documents_list
+
+    def create_loader_ui(self, current_class: Union[ContextModel, DomainModel, SourceModel]):
+        self.doc_loading_service.create_settings_ui(current_class=current_class)

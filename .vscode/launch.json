@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/shelby_as_a_service/run_me.py",
             "cwd": "${workspaceFolder}/shelby_as_a_service",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": true
         }
     ]
 }

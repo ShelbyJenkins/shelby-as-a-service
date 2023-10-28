@@ -11,7 +11,7 @@
     "python.linting.enabled": true,
     "black-formatter.args": [
         "--line-length",
-        "125"
+        "100"
     ],
     "terminal.integrated.cwd": "${workspaceFolder}/shelby_as_a_service"
 }

@@ -65,7 +65,9 @@ class AppBase:
         - cls: The AppBase class.
         """
         if app_name is None:
-            raise ValueError("App must be initialized with an app_name before it can be used without it.")
+            raise ValueError(
+                "App must be initialized with an app_name before it can be used without it."
+            )
         if app_name == "base":
             ConfigManager.check_and_create_base()
             app_name = ConfigManager.load_webui_sprite_default_config()
@@ -78,9 +80,7 @@ class AppBase:
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
         # AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
-        from index.context_index import ContextIndex
 
-        AppBase.context_index = ContextIndex()
         AppBase._load_sprite_instances(app_file_dict)
 
         ConfigManager.update_config_file_from_loaded_models()
@@ -142,7 +142,9 @@ class AppBase:
         """
         if getattr(cls, "logger", None) is None:
             if logger_name is None:
-                raise ValueError("Logger must be initialized with an logger_name before it can be used without it.")
+                raise ValueError(
+                    "Logger must be initialized with an logger_name before it can be used without it."
+                )
 
             logs_dir = os.path.join(AppBase.APP_DIR_PATH, AppBase.app_config.app_name, "logs")
             os.makedirs(logs_dir, exist_ok=True)
