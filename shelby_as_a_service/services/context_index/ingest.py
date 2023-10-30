@@ -32,7 +32,7 @@ class DocIngest(ModuleBase):
     list_of_class_names: list
     list_of_class_ui_names: list
     list_of_required_class_instances: list[Union[DocLoadingService, DataBaseService]]
-    doc_loading_service: DocLoadingService
+    doc_loader_service: DocLoadingService
     context_index: ContextIndex
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
@@ -200,7 +200,7 @@ class DocIngest(ModuleBase):
 
         documents_list = []
         for data_source in data_domain.data_sources:
-            documents_iterator = self.doc_loading_service.load(data_source)
+            documents_iterator = self.doc_loader_service.load(data_source)
             if documents_iterator is not None:
                 try:
                     documents_list = list(documents_iterator)
@@ -215,4 +215,4 @@ class DocIngest(ModuleBase):
                 return documents_list
 
     def create_loader_ui(self, current_class: Union[DomainModel, SourceModel]):
-        self.doc_loading_service.create_settings_ui(current_class=current_class)
+        self.doc_loader_service.create_settings_ui(current_class=current_class)

@@ -19,9 +19,9 @@ from services.document_loading.document_loading_providers import (
 
 
 class DocLoadingService(ModuleBase):
-    CLASS_NAME: str = "doc_loading_service"
+    CLASS_NAME: str = "doc_loader_service"
     CLASS_UI_NAME: str = "Document Loading Service"
-    REQUIRED_CLASSES: list[Type] = [GenericWebScraper, GenericRecursiveWebScraper]
+    REQUIRED_CLASSES = [GenericWebScraper, GenericRecursiveWebScraper]
 
     class ClassConfigModel(BaseModel):
         doc_loading_provider: str = "generic_web_scraper"
@@ -51,43 +51,41 @@ class DocLoadingService(ModuleBase):
         else:
             print("rnr")
 
-    def create_settings_ui(self, current_class: Union[DomainModel, SourceModel]):
-        components = {}
-        provider_list = []
+    def create_settings_ui(self, class_instance):
+        provider_components = {}
+        provider_views = []
+
         with gr.Column():
-            components["doc_loading_provider"] = gr.Dropdown(
-                value=current_class.context_config.doc_loading_provider_name,
+            doc_loading_provider = gr.Dropdown(
+                value=class_instance.context_config.doc_loader.doc_loader_provider_name,
                 choices=self.list_of_class_names,
                 label="Doc Loader",
                 container=True,
             )
-            for provider_instance in self.list_of_required_class_instances:
-                if (
-                    current_class.context_config.doc_loading_provider_name
-                    == provider_instance.CLASS_NAME
-                ):
-                    visibility = True
-                else:
-                    visibility = False
-                with gr.Group(visible=visibility) as provider_settings:
-                    provider_instance.create_settings_ui()
+            for provider_class in self.REQUIRED_CLASSES:
+                provider_instance = provider_class()
+                with gr.Group(visible=False) as provider_view:
+                    provider_components[
+                        provider_instance.CLASS_NAME
+                    ] = provider_instance.create_settings_ui()
 
-                provider_list.append(provider_settings)
+                provider_views.append(provider_view)
 
-            components["doc_loading_provider"].change(
-                fn=self.set_current_provider,
-                inputs=components["doc_loading_provider"],
-                outputs=provider_list,
+            doc_loading_provider.change(
+                fn=self.set_current_ui_provider,
+                inputs=doc_loading_provider,
+                outputs=provider_views,
             )
 
-            GradioHelper.create_settings_event_listener(self.config, components)
+        self.set_current_ui_provider(
+            requested_model=class_instance.context_config.doc_loader.doc_loader_provider_name
+        )
+        return provider_components
 
-        return components
-
-    def set_current_provider(self, requested_model):
+    def set_current_ui_provider(self, requested_model: str):
         output = []
-        for provider_instance in self.list_of_required_class_instances:
-            if requested_model == provider_instance.CLASS_NAME:
+        for provider_name in self.list_of_class_names:
+            if requested_model == provider_name:
                 output.append(gr.Group(visible=True))
             else:
                 output.append(gr.Group(visible=False))

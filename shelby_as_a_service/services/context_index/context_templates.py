@@ -15,16 +15,16 @@ from services.document_loading.document_loading_service import DocLoadingService
 class ContextTemplates:
     class DefaultContextTemplate:
         TEMPLATE_NAME: str = "default_template_name"
-        doc_loading_provider_name = GenericRecursiveWebScraper.CLASS_NAME
-        doc_loading_config = GenericRecursiveWebScraper.ClassConfigModel(max_depth=3)
+        doc_loader_provider_name = GenericRecursiveWebScraper.CLASS_NAME
+        doc_loader_config = GenericRecursiveWebScraper.ClassConfigModel(max_depth=3)
         database_provider_name = PineconeDatabase.CLASS_NAME
         text_processing_provider = "test"
         batch_update_enabled = True
 
     class DefaultContextTemplate1:
         TEMPLATE_NAME: str = "default_template_name"
-        doc_loading_provider_name = GenericRecursiveWebScraper.CLASS_NAME
-        doc_loading_config = GenericRecursiveWebScraper.ClassConfigModel(max_depth=3)
+        doc_loader_provider_name = GenericRecursiveWebScraper.CLASS_NAME
+        doc_loader_config = GenericRecursiveWebScraper.ClassConfigModel(max_depth=3)
         database_provider_name = PineconeDatabase.CLASS_NAME
         text_processing_provider = "test"
         batch_update_enabled = True

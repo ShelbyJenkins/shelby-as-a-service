@@ -3,6 +3,10 @@ from typing import Any, Optional, Type, Union
 
 from services.database.database_service import DataBaseService
 from services.database.index_base import IndexBase
+from services.document_loading.document_loading_providers import (
+    GenericRecursiveWebScraper,
+    GenericWebScraper,
+)
 from services.document_loading.document_loading_service import DocLoadingService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -12,6 +16,7 @@ from .context_index_model import (
     ContextIndexModel,
     ContextTemplateModel,
     DocDBModel,
+    DocLoaderModel,
     DomainModel,
     SourceModel,
 )
@@ -47,8 +52,6 @@ class ContextConfig:
             if not existing_config:
                 new_template = ContextTemplateModel(
                     context_template_name=available_template.TEMPLATE_NAME,
-                    doc_loading_provider_name=available_template.doc_loading_provider_name,
-                    doc_loading_config=available_template.doc_loading_config.model_dump(),
                     doc_db_id=DocDB.get_doc_db(
                         requested_database_name=available_template.database_provider_name
                     ).id,
@@ -56,8 +59,12 @@ class ContextConfig:
                 )
 
                 ContextIndex.context_index_model.index_context_templates.append(new_template)
-
                 ContextIndex.session.flush()
+                DocLoading.add_doc_loaders_to_config_or_template(
+                    enabled_doc_loader_name=available_template.doc_loader_provider_name,
+                    enabled_doc_loader_config=available_template.doc_loader_config.model_dump(),
+                    context_config_or_template=new_template,
+                )
 
     def get_template(
         self,
@@ -119,8 +126,6 @@ class ContextConfig:
         # create new context_config from template
         new_context_config = ContextConfigModel(
             context_config_name=new_context_config_name,
-            doc_loading_provider_name=requested_context_template.doc_loading_provider_name,
-            doc_loading_config=requested_context_template.doc_loading_config,
             doc_db_id=requested_context_template.doc_db_id,
             batch_update_enabled=requested_context_template.batch_update_enabled,
         )
@@ -129,6 +134,11 @@ class ContextConfig:
         ContextIndex.session.flush()
         self.instance_model.context_config_id = new_context_config.id
         ContextIndex.session.flush()
+        DocLoading.add_doc_loaders_to_config_or_template(
+            enabled_doc_loader_name=requested_context_template.doc_loader.doc_loader_provider_name,
+            enabled_doc_loader_config=requested_context_template.doc_loader.doc_loader_config,
+            context_config_or_template=new_context_config,
+        )
 
     def get_config(
         self,
@@ -186,8 +196,6 @@ class ContextConfig:
         # create new context_config from template
         new_context_template = ContextTemplateModel(
             context_template_name=new_context_template_name,
-            doc_loading_provider_name=requested_context_config.doc_loading_provider_name,
-            doc_loading_config=requested_context_config.doc_loading_config,
             doc_db_id=requested_context_config.doc_db_id,
             batch_update_enabled=requested_context_config.batch_update_enabled,
         )
@@ -200,16 +208,19 @@ class ContextConfig:
         existing_context_config: ContextConfigModel,
         target_instance_model: Union[DomainModel, SourceModel],
     ):
-        target_instance_model.context_configs.append(
-            ContextConfigModel(
-                context_config_name=existing_context_config.context_config_name,
-                doc_loading_provider_name=existing_context_config.doc_loading_provider_name,
-                doc_loading_config=existing_context_config.doc_loading_config,
-                doc_db_id=existing_context_config.doc_db_id,
-                batch_update_enabled=existing_context_config.batch_update_enabled,
-            )
+        new_context_config = ContextConfigModel(
+            context_config_name=existing_context_config.context_config_name,
+            doc_db_id=existing_context_config.doc_db_id,
+            batch_update_enabled=existing_context_config.batch_update_enabled,
         )
+
+        target_instance_model.context_configs.append(new_context_config)
         ContextIndex.session.flush()
+        DocLoading.add_doc_loaders_to_config_or_template(
+            enabled_doc_loader_name=existing_context_config.doc_loader.doc_loader_provider_name,
+            enabled_doc_loader_config=existing_context_config.doc_loader.doc_loader_config,
+            context_config_or_template=new_context_config,
+        )
 
     def set_config(
         self,
@@ -277,6 +288,82 @@ class DocDB:
                     f"DocDB {requested_database_name} not found in {ContextIndex.context_index_model.doc_dbs}"
                 )
         return doc_db
+
+
+class DocLoading:
+    @staticmethod
+    def add_doc_loaders_to_config_or_template(
+        enabled_doc_loader_name,
+        enabled_doc_loader_config,
+        context_config_or_template: Union[ContextConfigModel, ContextTemplateModel],
+    ):
+        for available_doc_loader in DocLoadingService.REQUIRED_CLASSES:
+            if available_doc_loader.CLASS_NAME == enabled_doc_loader_name:
+                doc_loader_config = enabled_doc_loader_config
+            else:
+                doc_loader_config = available_doc_loader.ClassConfigModel().model_dump()
+
+            context_config_or_template.doc_loaders.append(
+                DocLoaderModel(
+                    doc_loader_provider_name=available_doc_loader.CLASS_NAME,
+                    doc_loader_config=doc_loader_config,
+                )
+            )
+            ContextIndex.session.flush()
+
+        DocLoading.set_doc_loader(
+            context_config_or_template=context_config_or_template,
+            requested_doc_loader_name=enabled_doc_loader_name,
+        )
+
+    @staticmethod
+    def set_doc_loader(
+        context_config_or_template: Union[ContextConfigModel, ContextTemplateModel],
+        requested_doc_loader_id: Optional[int] = None,
+        requested_doc_loader_name: Optional[str] = None,
+    ):
+        doc_loader = DocLoading.get_doc_loader(
+            list_of_doc_loaders=context_config_or_template.doc_loaders,
+            requested_doc_loader_id=requested_doc_loader_id,
+            requested_doc_loader_name=requested_doc_loader_name,
+        )
+
+        context_config_or_template.doc_loader_id = doc_loader.id
+        ContextIndex.session.flush()
+
+    @staticmethod
+    def get_doc_loader(
+        list_of_doc_loaders: list[DocLoaderModel],
+        requested_doc_loader_id: Optional[int] = None,
+        requested_doc_loader_name: Optional[str] = None,
+    ) -> DocLoaderModel:
+        if requested_doc_loader_id:
+            doc_loader = next(
+                (
+                    doc_loader
+                    for doc_loader in list_of_doc_loaders
+                    if doc_loader.id == requested_doc_loader_id
+                ),
+                None,
+            )
+            if doc_loader is None:
+                raise Exception(
+                    f"DocDB {requested_doc_loader_id} not found in {list_of_doc_loaders}"
+                )
+        else:
+            doc_loader = next(
+                (
+                    doc_loader
+                    for doc_loader in list_of_doc_loaders
+                    if doc_loader.doc_loader_provider_name == requested_doc_loader_name
+                ),
+                None,
+            )
+            if doc_loader is None:
+                raise Exception(
+                    f"DocDB {requested_doc_loader_name} not found in {list_of_doc_loaders}"
+                )
+        return doc_loader
 
 
 class ContextIndex(IndexBase, ContextConfig, DocDB):
@@ -379,6 +466,13 @@ class ContextIndex(IndexBase, ContextConfig, DocDB):
     def list_of_database_provider_names(self) -> list:
         return [
             doc_db.database_provider_name for doc_db in ContextIndex.context_index_model.doc_dbs
+        ]
+
+    @property
+    def list_of_doc_loader_provider_names(self) -> list:
+        return [
+            doc_loader.doc_loader_provider_name
+            for doc_loader in self.instance_model.context_config.doc_loaders
         ]
 
     @property

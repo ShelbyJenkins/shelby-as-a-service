@@ -4,6 +4,23 @@ from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
+class DocLoaderModel(Base):
+    __tablename__ = "doc_loaders"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    context_config_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("context_configs.id"), nullable=True
+    )
+    context_config_model = relationship("ContextConfigModel", foreign_keys=[context_config_id])
+    context_template_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("index_context_templates.id"), nullable=True
+    )
+    context_template_model = relationship(
+        "ContextTemplateModel", foreign_keys=[context_template_id]
+    )
+    doc_loader_provider_name: Mapped[str] = mapped_column(String)
+    doc_loader_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
+
+
 class DocDBModel(Base):
     __tablename__ = "doc_dbs"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -26,12 +43,18 @@ class ContextTemplateModel(Base):
     )
     context_index_model = relationship("ContextIndexModel", foreign_keys=[context_id])
 
-    context_template_name: Mapped[str] = mapped_column(String)
-    doc_loading_provider_name: Mapped[str] = mapped_column(String)
-    doc_loading_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
+    doc_loader_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_loaders.id"), nullable=True)
+    doc_loader = relationship("DocLoaderModel", foreign_keys=[doc_loader_id])
+    doc_loaders: Mapped[list[DocLoaderModel]] = relationship(
+        "DocLoaderModel",
+        back_populates="context_template_model",
+        cascade="all, delete-orphan",
+        foreign_keys=[DocLoaderModel.context_template_id],
+    )
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
     doc_db = relationship("DocDBModel")
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    context_template_name: Mapped[str] = mapped_column(String)
 
 
 class ContextConfigModel(Base):
@@ -49,12 +72,18 @@ class ContextConfigModel(Base):
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
     source_model = relationship("SourceModel", foreign_keys=[source_id])
 
-    context_config_name: Mapped[str] = mapped_column(String)
-    doc_loading_provider_name: Mapped[str] = mapped_column(String)
-    doc_loading_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
+    doc_loader_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_loaders.id"), nullable=True)
+    doc_loader = relationship("DocLoaderModel", foreign_keys=[doc_loader_id])
+    doc_loaders: Mapped[list[DocLoaderModel]] = relationship(
+        "DocLoaderModel",
+        back_populates="context_config_model",
+        cascade="all, delete-orphan",
+        foreign_keys=[DocLoaderModel.context_config_id],
+    )
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
     doc_db = relationship("DocDBModel")
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    context_config_name: Mapped[str] = mapped_column(String)
 
 
 # class ChunkModel(Base):

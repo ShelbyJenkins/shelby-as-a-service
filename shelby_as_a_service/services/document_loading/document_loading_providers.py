@@ -23,7 +23,6 @@ class GenericWebScraper(ModuleBase):
     CLASS_UI_NAME: str = "Generic Web Scraper"
 
     class ClassConfigModel(BaseModel):
-        agent_select_status_message: str = "Search index to find docs related to request."
         continue_on_failue: bool = True
 
     config: ClassConfigModel

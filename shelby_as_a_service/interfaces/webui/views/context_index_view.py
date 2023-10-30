@@ -15,6 +15,7 @@ from services.context_index.context_index_model import (
 )
 from services.context_index.ingest import DocIngest
 from services.database.database_service import DataBaseService
+from services.document_loading.document_loading_service import DocLoadingService
 
 
 class ContextIndexView(ModuleBase):
@@ -36,7 +37,7 @@ class ContextIndexView(ModuleBase):
     list_of_required_class_instances: list
     doc_ingest: DocIngest
     database_service: DataBaseService
-
+    doc_loader_service: DocLoadingService
     context_index: ContextIndex
     # current_domain: DataDomain
     # current_source: DataSource
@@ -45,6 +46,7 @@ class ContextIndexView(ModuleBase):
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
+        self.doc_loader_service = DocLoadingService()
         self.doc_ingest = DocIngest()
         self.database_service = DataBaseService()
 
@@ -133,7 +135,7 @@ class ContextIndexView(ModuleBase):
 
     def create_builder_sources_tab(self):
         inputs = {}
-        context_template = {}
+        context_config = {}
         buttons = {}
 
         with gr.Row():
@@ -239,14 +241,15 @@ class ContextIndexView(ModuleBase):
                     variant="stop",
                 )
         with gr.Tab(label="Loader"):
-            context_template["url_textbox"] = gr.Textbox(
+            context_config["url_textbox"] = gr.Textbox(
                 placeholder="Web URL or Local Filepath",
                 lines=1,
                 show_label=False,
             )
-            self.doc_ingest.create_loader_ui(
-                current_class=self.context_index.domain.source.instance_model
+            doc_loader_components = self.doc_loader_service.create_settings_ui(
+                class_instance=self.context_index.domain.source.instance_model
             )
+
         with gr.Tab(label="Processor"):
             gr.Textbox(
                 value="Not Implemented",
@@ -256,15 +259,15 @@ class ContextIndexView(ModuleBase):
             # self.doc_ingest.create_processor_ui()
 
         with gr.Tab(label="Database"):
-            context_template["database_dropdown"] = gr.Dropdown(
+            context_config["database_dropdown"] = gr.Dropdown(
                 value=self.context_index.domain.source.instance_model.context_config.doc_db.database_provider_name,
                 choices=self.context_index.list_of_database_provider_names,
                 show_label=False,
-                info="Default document database for the Souce. Database context_template are managed elsewhere.",
+                info="Default document database for the Source. Database context_config are managed elsewhere.",
             )
 
         with gr.Tab(label="Ingest Source"):
-            context_template["batch_update_enabled"] = gr.Checkbox(
+            context_config["batch_update_enabled"] = gr.Checkbox(
                 value=self.context_index.domain.source.instance_model.context_config.batch_update_enabled,
                 label="Update Source During Topic Batch Update",
             )
@@ -279,14 +282,14 @@ class ContextIndexView(ModuleBase):
 
         sources = {}
         sources["inputs"] = inputs
-        sources["context_template"] = context_template
+        sources["context_config"] = context_config
         sources["buttons"] = buttons
 
         return sources
 
     def create_builder_topics_tab(self):
         inputs = {}
-        context_template = {}
+        context_config = {}
         buttons = {}
 
         with gr.Row():
@@ -386,7 +389,8 @@ class ContextIndexView(ModuleBase):
                     variant="stop",
                 )
         with gr.Tab(label="Loader"):
-            self.doc_ingest.create_loader_ui(current_class=self.context_index.domain.instance_model)
+            pass
+            # self.doc_ingest.create_loader_ui(current_class=self.context_index.domain.instance_model)
         with gr.Tab(label="Processor"):
             gr.Textbox(
                 value="Not Implemented",
@@ -400,7 +404,7 @@ class ContextIndexView(ModuleBase):
                 value=self.context_index.domain.instance_model.context_config.doc_db.database_provider_name,
                 choices=self.context_index.list_of_database_provider_names,
                 show_label=False,
-                info="Default document database for the topic. Database context_template are managed elsewhere.",
+                info="Default document database for the topic. Database context_config are managed elsewhere.",
             )
         with gr.Tab(label="Ingest Topic"):
             inputs["batch_update_enabled"] = gr.Checkbox(
@@ -417,7 +421,7 @@ class ContextIndexView(ModuleBase):
             )
         topics = {}
         topics["inputs"] = inputs
-        topics["context_template"] = context_template
+        topics["context_config"] = context_config
         topics["buttons"] = buttons
 
     def create_event_handlers(self):
@@ -431,11 +435,11 @@ class ContextIndexView(ModuleBase):
                 doc_loading_provider=doc_loading,
             ),
             inputs=[
-                self.uic["context_template"]["new_source_name"],
-                self.uic["context_template"]["new_source_description"],
-                self.uic["context_template"]["new_source_database_provider"],
-                self.uic["context_template"]["new_source_batch_update_enabled"],
-                self.uic["context_template"]["new_source_doc_loading_provider"],
+                self.uic["context_config"]["new_source_name"],
+                self.uic["context_config"]["new_source_description"],
+                self.uic["context_config"]["new_source_database_provider"],
+                self.uic["context_config"]["new_source_batch_update_enabled"],
+                self.uic["context_config"]["new_source_doc_loading_provider"],
             ],
         ).then(
             fn=self.set_current_data_source,
@@ -443,8 +447,8 @@ class ContextIndexView(ModuleBase):
         ).then(
             fn=lambda: ("", ""),
             outputs=[
-                self.uic["context_template"]["new_source_name"],
-                self.uic["context_template"]["new_source_description"],
+                self.uic["context_config"]["new_source_name"],
+                self.uic["context_config"]["new_source_description"],
             ],
         ).then(
             fn=lambda *x: GradioHelper.update_config_classes(
