@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional
+import typing
+from typing import Any, Dict, Optional
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper

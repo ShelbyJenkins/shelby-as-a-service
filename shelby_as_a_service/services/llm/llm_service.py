@@ -1,5 +1,6 @@
 import types
-from typing import Annotated, Any, Dict, Generator, List, Optional, Type, Union
+import typing
+from typing import Annotated, Any, Dict, Generator, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
@@ -11,7 +12,7 @@ from services.llm.llm_openai import OpenAILLM
 class LLMService(ModuleBase):
     CLASS_NAME: str = "llm_service"
     CLASS_UI_NAME: str = "LLM Settings"
-    REQUIRED_CLASSES: List[Type] = [OpenAILLM]
+    REQUIRED_CLASSES: list[Type] = [OpenAILLM]
 
     class ClassConfigModel(BaseModel):
         llm_provider: str = "openai_llm"
@@ -23,12 +24,12 @@ class LLMService(ModuleBase):
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_class_instances: list[Any]
+    list_of_required_class_instances: list[Any]
     current_llm_provider: Any
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
-        self.current_llm_provider = self.get_requested_class_instance(self.list_of_class_instances, self.config.llm_provider)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.current_llm_provider = self.get_requested_class_instance(self.config.llm_provider)
 
     def create_chat(
         self,
@@ -42,7 +43,8 @@ class LLMService(ModuleBase):
         stream=None,
     ):
         provider_instance = self.get_requested_class_instance(
-            self.list_of_class_instances, llm_provider if llm_provider is not None else self.config.llm_provider
+            self.list_of_required_class_instances,
+            llm_provider if llm_provider is not None else self.config.llm_provider,
         )
         if provider_instance:
             response = {}
@@ -75,7 +77,8 @@ class LLMService(ModuleBase):
         llm_model=None,
     ) -> tuple[int, int]:
         provider_instance = self.get_requested_class_instance(
-            self.list_of_class_instances, llm_provider if llm_provider is not None else self.config.llm_provider
+            self.list_of_required_class_instances,
+            llm_provider if llm_provider is not None else self.config.llm_provider,
         )
 
         if provider_instance:
@@ -86,7 +89,9 @@ class LLMService(ModuleBase):
             )
             available_tokens = llm_model.TOKENS_MAX - 10  # for safety in case of model changes
             available_tokens = available_tokens * (
-                model_token_utilization if model_token_utilization is not None else self.config.model_token_utilization
+                model_token_utilization
+                if model_token_utilization is not None
+                else self.config.model_token_utilization
             )
             if context_to_response_ratio > 0.0:
                 available_request_tokens = available_tokens * context_to_response_ratio
@@ -119,7 +124,7 @@ class LLMService(ModuleBase):
             container=True,
         )
 
-        for provider_instance in self.list_of_class_instances:
+        for provider_instance in self.list_of_required_class_instances:
             provider_instance.create_settings_ui()
 
         GradioHelper.create_settings_event_listener(self.config, components)

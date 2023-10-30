@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional
+import typing
+from typing import Any, Dict, Optional
 
 import gradio as gr
 from app.module_base import ModuleBase
@@ -30,7 +31,7 @@ def create_settings_event_listener(config_model, components):
         )
 
 
-def list_available(class_model) -> Optional[List[Any]]:
+def list_available(class_model) -> Optional[list[Any]]:
     if available_providers := getattr(class_model, "REQUIRED_CLASSES", None):
         return [provider.CLASS_NAME for provider in available_providers]
     if available_models := getattr(class_model, "AVAILABLE_MODELS", None):

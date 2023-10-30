@@ -45,13 +45,21 @@ class DFSTextSplitter:
 
         self.max_length = int(self.goal_length * 1.25)
 
-        self.goal_length_max_threshold = self.goal_length + int(self.threshold_modifier * self.goal_length)
-        self.goal_length_min_threshold = self.goal_length - int(self.threshold_modifier * self.goal_length)
+        self.goal_length_max_threshold = self.goal_length + int(
+            self.threshold_modifier * self.goal_length
+        )
+        self.goal_length_min_threshold = self.goal_length - int(
+            self.threshold_modifier * self.goal_length
+        )
 
         self.chunk_overlap = int(self.goal_length * (self.overlap_percent / 100))
 
-        self.chunk_overlap_max_threshold = self.chunk_overlap + int(self.threshold_modifier * self.chunk_overlap)
-        self.chunk_overlap_min_threshold = self.chunk_overlap - int(self.threshold_modifier * self.chunk_overlap)
+        self.chunk_overlap_max_threshold = self.chunk_overlap + int(
+            self.threshold_modifier * self.chunk_overlap
+        )
+        self.chunk_overlap_min_threshold = self.chunk_overlap - int(
+            self.threshold_modifier * self.chunk_overlap
+        )
         # self.info(f"New goal_length: {self.goal_length}")
 
     def _set_heuristics(self, text, splits):
@@ -74,7 +82,7 @@ class DFSTextSplitter:
         self.average_range_min = int((estimated_splits_per_chunk / 2))
         return True
 
-    def _split_text(self, text, separator) -> List[List[str]]:
+    def _split_text(self, text, separator) -> list[list[str]]:
         """Splits text by various methods."""
 
         match separator:
@@ -152,7 +160,9 @@ class DFSTextSplitter:
 
         valid_ends = []
 
-        current_length = self.tiktoken_len("".join(splits[start : start + 1 + self.average_range_min]))
+        current_length = self.tiktoken_len(
+            "".join(splits[start : start + 1 + self.average_range_min])
+        )
         for j in range(start + 1 + self.average_range_min, len(splits)):
             # Final tokenization will be of combined chunks - not individual chars!
             current_length = self.tiktoken_len("".join(splits[start:j]))
@@ -255,7 +265,9 @@ class DFSTextSplitter:
                     return overlap
         return None
 
-    def _create_backwards_overlap(self, start_split, previous_end, overlap_min, overlap_max, splits):
+    def _create_backwards_overlap(
+        self, start_split, previous_end, overlap_min, overlap_max, splits
+    ):
         """Creates backwards chunks."""
         overlap_text = "".join(splits[previous_end:start_split])
         for separator in self._separators:
@@ -275,12 +287,14 @@ class DFSTextSplitter:
                     return overlap
         return None
 
-    def split_text(self, text) -> List[str]:
+    def split_text(self, text) -> list[str]:
         """Interface for class."""
         self._set_thresholds(self.original_goal_length)
         # Skip if too small
         if self.tiktoken_len(text) < self.max_length:
-            self.info(f"Doc length: {self.tiktoken_len(text)} already within max_length: {self.max_length}")
+            self.info(
+                f"Doc length: {self.tiktoken_len(text)} already within max_length: {self.max_length}"
+            )
             return text
         for separator in self._separators:
             self.info(f"Trying separator: {repr(separator)}")
@@ -333,7 +347,7 @@ class BalancedRecursiveCharacterTextSplitter:
         else:
             self._chunk_overlap = self._chunk_overlap
 
-    def _split_text(self, text: str, separators: List[str], goal_length=None) -> List[List[str]]:
+    def _split_text(self, text: str, separators: list[str], goal_length=None) -> list[list[str]]:
         """Split incoming text and return chunks."""
 
         # Have to define here initially so it can be redefined for each recursion
@@ -373,7 +387,9 @@ class BalancedRecursiveCharacterTextSplitter:
                 # we adjust the goal_length and retry separator
                 combo_token_count = self.tiktoken_len("".join(combo))
                 if combo_token_count < self.goal_length * 0.75 and len(final_combos) > 1:
-                    new_goal_length = int(goal_length + (combo_token_count / (len(final_combos) - 1)))
+                    new_goal_length = int(
+                        goal_length + (combo_token_count / (len(final_combos) - 1))
+                    )
                     final_combos = self._split_text(text, separators, new_goal_length)
                 # If a combo of splits is too large, we retry with new separator
                 elif combo_token_count > self.max_length and new_separators:
@@ -385,9 +401,9 @@ class BalancedRecursiveCharacterTextSplitter:
         # All combos satisfy requirements
         return final_combos
 
-    def distribute_splits(self, splits: list, goal_length: int) -> List[List[str]]:
+    def distribute_splits(self, splits: list, goal_length: int) -> list[list[str]]:
         # Build initial combos
-        combos: List[List[str]] = []
+        combos: list[list[str]] = []
         current_combo = []
         combo_token_count = 0
         for split in splits:
@@ -418,6 +434,6 @@ class BalancedRecursiveCharacterTextSplitter:
             combos.append(current_combo)
         return combos
 
-    def split_text(self, text: str) -> List[str]:
+    def split_text(self, text: str) -> list[str]:
         final_combos = self._split_text(text, self._separators, self.goal_length)
         return ["".join(combo) for combo in final_combos]

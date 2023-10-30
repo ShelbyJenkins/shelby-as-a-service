@@ -1,18 +1,16 @@
 import json
+import tempfile
+from collections import Counter
+from pathlib import Path
+from typing import Dict, Optional, Tuple, Union
+
 import mmh3
 import numpy as np
-import tempfile
-from pathlib import Path
-from tqdm.auto import tqdm
 import wget
-from typing import List, Optional, Dict, Union, Tuple
-from collections import Counter
-
 from services.pinecone_io_pinecone_text.sparse import SparseVector
-from services.pinecone_io_pinecone_text.sparse.base_sparse_encoder import (
-    BaseSparseEncoder,
-)
+from services.pinecone_io_pinecone_text.sparse.base_sparse_encoder import BaseSparseEncoder
 from services.pinecone_io_pinecone_text.sparse.bm25_tokenizer import BM25Tokenizer
+from tqdm.auto import tqdm
 
 
 class BM25Encoder(BaseSparseEncoder):
@@ -71,7 +69,7 @@ class BM25Encoder(BaseSparseEncoder):
         self.n_docs: Optional[int] = None
         self.avgdl: Optional[float] = None
 
-    def fit(self, corpus: List[str]) -> "BM25Encoder":
+    def fit(self, corpus: list[str]) -> "BM25Encoder":
         """
         Fit BM25 by calculating document frequency over the corpus
 
@@ -101,8 +99,8 @@ class BM25Encoder(BaseSparseEncoder):
         return self
 
     def encode_documents(
-        self, texts: Union[str, List[str]]
-    ) -> Union[SparseVector, List[SparseVector]]:
+        self, texts: Union[str, list[str]]
+    ) -> Union[SparseVector, list[SparseVector]]:
         """
         encode documents to a sparse vector (for upsert to pinecone)
 
@@ -124,17 +122,15 @@ class BM25Encoder(BaseSparseEncoder):
         tf = np.array(doc_tf)
         tf_sum = sum(tf)
 
-        tf_normed = tf / (
-            self.k1 * (1.0 - self.b + self.b * (tf_sum / self.avgdl)) + tf
-        )
+        tf_normed = tf / (self.k1 * (1.0 - self.b + self.b * (tf_sum / self.avgdl)) + tf)
         return {
             "indices": indices,
             "values": tf_normed.tolist(),
         }
 
     def encode_queries(
-        self, texts: Union[str, List[str]]
-    ) -> Union[SparseVector, List[SparseVector]]:
+        self, texts: Union[str, list[str]]
+    ) -> Union[SparseVector, list[SparseVector]]:
         """
         encode query to a sparse vector
 
@@ -185,7 +181,7 @@ class BM25Encoder(BaseSparseEncoder):
 
     def get_params(
         self,
-    ) -> Dict[str, Union[int, float, str, Dict[str, List[Union[int, float]]]]]:
+    ) -> Dict[str, Union[int, float, str, Dict[str, list[Union[int, float]]]]]:
         """Returns the BM25 params"""
 
         if self.doc_freq is None or self.n_docs is None or self.avgdl is None:
@@ -212,7 +208,7 @@ class BM25Encoder(BaseSparseEncoder):
         self,
         avgdl: float,
         n_docs: int,
-        doc_freq: Dict[str, List[int]],
+        doc_freq: Dict[str, list[int]],
         b: float,
         k1: float,
         lower_case: bool,
@@ -239,8 +235,7 @@ class BM25Encoder(BaseSparseEncoder):
         self.avgdl = avgdl  # type: ignore
         self.n_docs = n_docs  # type: ignore
         self.doc_freq = {
-            idx: val
-            for idx, val in zip(doc_freq["indices"], doc_freq["values"])  # type: ignore
+            idx: val for idx, val in zip(doc_freq["indices"], doc_freq["values"])  # type: ignore
         }
         self.b = b  # type: ignore
         self.k1 = k1  # type: ignore
@@ -269,7 +264,7 @@ class BM25Encoder(BaseSparseEncoder):
         """Use mmh3 to hash text to 32-bit unsigned integer"""
         return mmh3.hash(token, signed=False)
 
-    def _tf(self, text: str) -> Tuple[List[int], List[int]]:
+    def _tf(self, text: str) -> Tuple[list[int], list[int]]:
         """
         Calculate term frequency for a given text
 

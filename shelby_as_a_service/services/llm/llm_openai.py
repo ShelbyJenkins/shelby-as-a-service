@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+import typing
 from decimal import Decimal
-from typing import Any, Generator, Optional, Union
+from typing import Any, Optional, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
@@ -63,7 +63,7 @@ class OpenAILLM(ModuleBase):
     }
 
     class ClassConfigModel(BaseModel):
-        current_model_name: str = "gpt-3.5-turbo"
+        enabled_model_name: str = "gpt-3.5-turbo"
         available_models: dict[str, "OpenAILLM.ModelConfig"]
 
         class Config:
@@ -73,16 +73,16 @@ class OpenAILLM(ModuleBase):
     llm_models: list
     current_model_class: ModelConfig
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
-        self.set_current_model(self.config.current_model_name)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.set_current_model(self.config.enabled_model_name)
 
     def create_chat(
         self,
         query=None,
         prompt_template_path=None,
         documents=None,
-        llm_model=None,
+        llm_model_name: Optional[str] = None,
         max_tokens=None,
         logit_bias=None,
         stream=None,
@@ -91,7 +91,7 @@ class OpenAILLM(ModuleBase):
             query=query,
             prompt_template_path=prompt_template_path,
             documents=documents,
-            llm_model=llm_model,
+            llm_model_name=llm_model_name,
         )
 
         if max_tokens is None:
@@ -102,7 +102,9 @@ class OpenAILLM(ModuleBase):
             max_tokens = max_tokens - total_prompt_tokens
 
         if (llm_model.stream and stream is None) or (stream is True):
-            yield from self._create_streaming_chat(prompt, max_tokens, total_prompt_tokens, llm_model)
+            yield from self._create_streaming_chat(
+                prompt, max_tokens, total_prompt_tokens, llm_model
+            )
         else:
             if logit_bias is None:
                 logit_bias = {}
@@ -190,6 +192,10 @@ class OpenAILLM(ModuleBase):
         total_completion_tokens = 0
         total_token_count = total_prompt_tokens
         for chunk in stream:
+            if isinstance(chunk, list):
+                raise ValueError(
+                    f"Chunk: {chunk} Error in response: chunk should not be a list here."
+                )
             delta_content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
             if len(delta_content) != 0:
                 chunk_token_count = TextProcess.tiktoken_len(delta_content, llm_model.MODEL_NAME)
@@ -221,8 +227,10 @@ class OpenAILLM(ModuleBase):
                 }
                 return response
 
-    def prep_chat(self, query, prompt_template_path=None, documents=None, llm_model=None):
-        llm_model = self.get_model(self, requested_model_name=llm_model)
+    def prep_chat(
+        self, query, prompt_template_path=None, documents=None, llm_model_name: Optional[str] = None
+    ) -> typing.Tuple[list[dict[str, str]], "ModelConfig", int]:
+        llm_model = self.get_model(requested_model_name=llm_model_name)
 
         prompt = PromptTemplates.create_openai_prompt(
             query=query,
@@ -240,7 +248,7 @@ class OpenAILLM(ModuleBase):
 
     def create_settings_ui(self):
         model_dropdown = gr.Dropdown(
-            value=self.config.current_model_name,
+            value=self.config.enabled_model_name,
             choices=self.llm_models,
             label="OpenAI LLM Model",
             interactive=True,
@@ -250,7 +258,7 @@ class OpenAILLM(ModuleBase):
         for model_name, model in self.config.available_models.items():
             model_compoments = {}
 
-            if self.config.current_model_name == model_name:
+            if self.config.enabled_model_name == model_name:
                 visibility = True
             else:
                 visibility = False
@@ -315,7 +323,7 @@ class OpenAILLM(ModuleBase):
             ui_name = model_name
             if ui_name == requested_model:
                 self.current_model_class = model
-                self.config.current_model_name = ui_name
+                self.config.enabled_model_name = ui_name
                 ModuleBase.update_settings_file = True
                 output.append(gr.Group(visible=True))
             else:

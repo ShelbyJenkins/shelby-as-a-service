@@ -1,7 +1,7 @@
 import importlib
 import json
 import os
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 import yaml
 
@@ -64,7 +64,11 @@ class ConfigManager:
         def read_env_to_dict(filepath):
             with open(filepath, "r", encoding="utf-8") as file:
                 lines = file.readlines()
-            return {line.split("=")[0].strip(): line.split("=")[1].strip() for line in lines if "=" in line}
+            return {
+                line.split("=")[0].strip(): line.split("=")[1].strip()
+                for line in lines
+                if "=" in line
+            }
 
         # If .env file doesn't exist, create it from template
         if not os.path.exists(dot_env_dest_path):
@@ -209,7 +213,9 @@ class ConfigManager:
             except ImportError as e:
                 print(f"Failed to import module: {import_path}. Error: {str(e)}")
             except AttributeError as e:
-                print(f"Failed to find class: {class_name} in module: {import_path}. Error: {str(e)}")
+                print(
+                    f"Failed to find class: {class_name} in module: {import_path}. Error: {str(e)}"
+                )
 
     @staticmethod
     def add_extension_views_to_gradio_ui(gradio_instance, list_of_extension_configs):
@@ -234,7 +240,9 @@ class ConfigManager:
             except ImportError as e:
                 print(f"Failed to import module: {import_path}. Error: {str(e)}")
             except AttributeError as e:
-                print(f"Failed to find class: {view_class_name} in module: {import_path}. Error: {str(e)}")
+                print(
+                    f"Failed to find class: {view_class_name} in module: {import_path}. Error: {str(e)}"
+                )
 
     @staticmethod
     def update_config_file_from_loaded_models():

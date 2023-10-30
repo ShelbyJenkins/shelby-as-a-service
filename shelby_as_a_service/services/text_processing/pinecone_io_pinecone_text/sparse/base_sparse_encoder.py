@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union, List
+from typing import Union
 
 from services.pinecone_io_pinecone_text.sparse import SparseVector
 
@@ -7,8 +7,8 @@ from services.pinecone_io_pinecone_text.sparse import SparseVector
 class BaseSparseEncoder(ABC):
     @abstractmethod
     def encode_documents(
-        self, texts: Union[str, List[str]]
-    ) -> Union[SparseVector, List[SparseVector]]:
+        self, texts: Union[str, list[str]]
+    ) -> Union[SparseVector, list[SparseVector]]:
         """
         encode documents to a sparse vector (for upsert to pinecone)
 
@@ -19,8 +19,8 @@ class BaseSparseEncoder(ABC):
 
     @abstractmethod
     def encode_queries(
-        self, texts: Union[str, List[str]]
-    ) -> Union[SparseVector, List[SparseVector]]:
+        self, texts: Union[str, list[str]]
+    ) -> Union[SparseVector, list[SparseVector]]:
         """
         encode queries to a sparse vector
 

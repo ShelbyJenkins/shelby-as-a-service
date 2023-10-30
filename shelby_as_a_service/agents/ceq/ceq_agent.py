@@ -1,12 +1,13 @@
 import re
+import typing
 from typing import Annotated, Any, Generator, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 import services.text_processing.text as text
-from agents.retrieval.retrieval_agent import RetrievalAgent
 from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
+from services.context_index.retrieval import DocRetrieval
 from services.llm.llm_service import LLMService
 
 
@@ -15,7 +16,7 @@ class CEQAgent(ModuleBase):
     CEQ (Context enhanced querying) is a subset of RAG (Retrieval Augmented Generation).
     CEQAgent generates responses to user queries using by
     1) Calculating the amount of tokens available for context documents for a given query and llm model
-    2) Retrieving context documents using the RetrievalAgent
+    2) Retrieving context documents using the DocRetrieval
     3) Appending the documents to a users query (Prompt Stuffing) for additional context
 
     Methods:
@@ -29,7 +30,7 @@ class CEQAgent(ModuleBase):
     DATA_DOMAIN_NONE_FOUND_MESSAGE: str = (
         "Query not related to any supported data domains (aka topics). Supported data domains are:"
     )
-    REQUIRED_CLASSES: list[Type] = [RetrievalAgent, LLMService]
+    REQUIRED_CLASSES: list[Type] = [DocRetrieval, LLMService]
 
     class ClassConfigModel(BaseModel):
         """
@@ -48,11 +49,11 @@ class CEQAgent(ModuleBase):
 
     config: ClassConfigModel
     llm_service: LLMService
-    retrieval_agent: RetrievalAgent
-    list_of_class_instances: list
+    doc_retrieval: DocRetrieval
+    list_of_required_class_instances: list
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def run_chat(
         self,
@@ -91,7 +92,7 @@ class CEQAgent(ModuleBase):
             llm_model=llm_model,
         )
 
-        documents = self.retrieval_agent.get_documents(
+        documents = self.doc_retrieval.get_documents(
             query=chat_in,
             max_total_tokens=available_request_tokens,
             enabled_data_domains=self.config.enabled_data_domains,
@@ -125,7 +126,9 @@ class CEQAgent(ModuleBase):
         else:
             return full_response
 
-    def _ceq_append_meta(self, response_content_string: str, documents: list[dict], llm_model_name) -> dict[str, str]:
+    def _ceq_append_meta(
+        self, response_content_string: str, documents: list[dict], llm_model_name
+    ) -> dict[str, str]:
         # Covering LLM doc notations cases
         # The modified pattern now includes optional opening parentheses or brackets before "Document"
         # and optional closing parentheses or brackets after the number
@@ -196,7 +199,7 @@ class CEQAgent(ModuleBase):
     def create_settings_ui(self):
         components = {}
 
-        with gr.Tab(label=self.retrieval_agent.CLASS_UI_NAME):
+        with gr.Tab(label=self.doc_retrieval.CLASS_UI_NAME):
             components["enabled_data_domains"] = gr.Dropdown(
                 choices=["tatum", "None", "all", "Custom"],
                 value="all",
@@ -213,7 +216,7 @@ class CEQAgent(ModuleBase):
                 min_width=0,
                 info="Percent of the model's context size to use for context docs.",
             )
-            self.retrieval_agent.create_settings_ui()
+            self.doc_retrieval.create_settings_ui()
         with gr.Tab(label=self.llm_service.CLASS_UI_NAME):
             self.llm_service.create_settings_ui()
 

@@ -22,9 +22,9 @@ This allows a semantic search to be performed on the sparse vectors. The SPLADE 
 For more information, see the [SPLADE paper](https://arxiv.org/abs/2109.10086). The SPLADE encoder is currently only available for inference only.
 """
 
-from typing import Union, Dict, List
+from typing import Dict, Union, list
 
-SparseVector = Dict[str, Union[List[int], List[float]]]
+SparseVector = Dict[str, Union[list[int], list[float]]]
 
 from .bm25_encoder import BM25Encoder
 

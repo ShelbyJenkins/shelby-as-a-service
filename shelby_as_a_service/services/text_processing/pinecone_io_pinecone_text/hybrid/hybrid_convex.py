@@ -1,10 +1,11 @@
-from typing import List, Tuple
+from typing import Tuple
+
 from pinecone_text.sparse import SparseVector
 
 
 def hybrid_convex_scale(
-    query_dense: List[float], query_sparse: SparseVector, alpha: float
-) -> Tuple[List[float], SparseVector]:
+    query_dense: list[float], query_sparse: SparseVector, alpha: float
+) -> Tuple[list[float], SparseVector]:
     """Hybrid vector scaling using a convex combination
     Args:
         query_dense: a query dense vector represented as a list of floats

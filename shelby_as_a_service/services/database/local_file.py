@@ -1,5 +1,6 @@
 import os
-from typing import Any, Dict, List, Type, Union
+import typing
+from typing import Any, Dict, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
@@ -8,8 +9,8 @@ from app.module_base import ModuleBase
 from pydantic import BaseModel
 
 
-class LocalFileStoreDatabase(ModuleBase):
-    CLASS_NAME: str = "local_filestore_database"
+class LocalFileDatabase(ModuleBase):
+    CLASS_NAME: str = "local_file_database"
     CLASS_UI_NAME: str = "Local Files as a Database"
 
     class ClassConfigModel(BaseModel):
@@ -17,8 +18,8 @@ class LocalFileStoreDatabase(ModuleBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def write_documents_to_database(self, documents, data_domain, data_source):
         data_domain_name_file_path = os.path.join(

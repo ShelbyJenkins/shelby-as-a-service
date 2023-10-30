@@ -1,3 +1,4 @@
+import typing
 from decimal import Decimal
 from typing import Any, Dict, Optional, Type
 
@@ -26,15 +27,15 @@ class MainChatView(ModuleBase):
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_class_instances: list
+    list_of_required_class_instances: list
     vanillallm_agent: Any
     current_agent_instance: Any
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
         self.current_agent_instance = self.get_requested_class_instance(
-            self.list_of_class_instances, self.config.current_agent_name
+            self.config.current_agent_name
         )
 
     def run_chat(self, chat_in):
@@ -162,7 +163,7 @@ class MainChatView(ModuleBase):
         with gr.Column():
             agent_settings_list = []
             self.config.current_agent_ui_name
-            for agent_instance in self.list_of_class_instances:
+            for agent_instance in self.list_of_required_class_instances:
                 with gr.Tab(label=agent_instance.CLASS_UI_NAME) as agent_settings:
                     agent_instance.create_settings_ui()
 
@@ -170,7 +171,7 @@ class MainChatView(ModuleBase):
 
         def create_nav_events(agent_settings_list):
             def set_agent_view(requested_agent: str):
-                for agent in self.list_of_class_instances:
+                for agent in self.list_of_required_class_instances:
                     if requested_agent == agent.CLASS_UI_NAME:
                         self.config.current_agent_name = agent.CLASS_NAME
                         self.config.current_agent_ui_name = agent.CLASS_UI_NAME

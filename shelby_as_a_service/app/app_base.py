@@ -1,12 +1,15 @@
 import concurrent.futures
 import logging
 import os
+import typing
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union
 
 from app.config_manager import ConfigManager
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 
 class AppBase:
@@ -20,8 +23,8 @@ class AppBase:
     - run_sprites(cls): Runs the enabled sprites.
     """
 
-    AVAILABLE_SPRITES: List[str] = ["webui_sprite"]
-    # AVAILABLE_SPRITES: List[str] = ["webui_sprite", "discord_sprite", "slack_sprite"]
+    AVAILABLE_SPRITES: list[str] = ["webui_sprite"]
+    # AVAILABLE_SPRITES: list[str] = ["webui_sprite", "discord_sprite", "slack_sprite"]
     APP_DIR_PATH: str = "app/your_apps"
 
     class AppConfigModel(BaseModel):
@@ -36,9 +39,9 @@ class AppBase:
         """
 
         app_name: str = "base"
-        enabled_sprites: List[str] = ["webui_sprite"]
-        enabled_extensions: List[str] = []
-        disabled_extensions: List[str] = []
+        enabled_sprites: list[str] = ["webui_sprite"]
+        enabled_extensions: list[str] = []
+        disabled_extensions: list[str] = []
 
     app_config: AppConfigModel
 
@@ -46,10 +49,14 @@ class AppBase:
     discord_sprite: Type
     slack_sprite: Type
     context_index: Type
+
     log: logging.Logger
-    available_sprite_instances: List[Any] = []
-    list_of_extension_configs: List[Any]
+
+    available_sprite_instances: list[Any] = []
+    list_of_extension_configs: list[Any]
+
     secrets: Dict[str, str] = {}
+
     total_cost: Decimal = Decimal("0")
     last_request_cost: Decimal = Decimal("0")
 
@@ -80,6 +87,9 @@ class AppBase:
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
         # AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
+        from services.context_index.context_index import ContextIndex
+
+        AppBase.context_index = ContextIndex()
 
         AppBase._load_sprite_instances(app_file_dict)
 

@@ -1,4 +1,5 @@
-from typing import Any, Dict, Generator, List, Optional, Type, Union
+import typing
+from typing import Any, Dict, Generator, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
@@ -10,7 +11,7 @@ from pydantic import BaseModel
 class WebUISprite(ModuleBase):
     CLASS_NAME: str = "webui_sprite"
     CLASS_UI_NAME: str = "webui_sprite"
-    REQUIRED_CLASSES: List[Type] = [GradioUI]
+    REQUIRED_CLASSES: list[Type] = [GradioUI]
 
     class ClassConfigModel(BaseModel):
         default_local_app_enabled: bool = False
@@ -22,9 +23,9 @@ class WebUISprite(ModuleBase):
     config: ClassConfigModel
     gradio_ui: GradioUI
 
-    def __init__(self, config_file_dict={}, **kwargs):
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         GradioUI.webui_sprite = self
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def _log(self, message):
         self.log.info(message)

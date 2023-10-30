@@ -1,5 +1,6 @@
+import typing
 from decimal import Decimal
-from typing import Any, List, Type
+from typing import Any, Type
 
 import services.text_processing.text as text
 from app.module_base import ModuleBase
@@ -10,7 +11,7 @@ from pydantic import BaseModel
 class OpenAIEmbedding(ModuleBase):
     CLASS_NAME: str = "openai_embedding"
     CLASS_UI_NAME: str = "OpenAI Embedding"
-    REQUIRED_SECRETS: List[str] = ["openai_api_key"]
+    REQUIRED_SECRETS: list[str] = ["openai_api_key"]
     MODELS_TYPE: str = "embedding_models"
     OPENAI_TIMEOUT_SECONDS: float = 180
 
@@ -20,22 +21,26 @@ class OpenAIEmbedding(ModuleBase):
         COST_PER_K: float
 
     MODEL_DEFINITIONS: dict[str, Any] = {
-        "text-embedding-ada-002": {"MODEL_NAME": "text-embedding-ada-002", "TOKENS_MAX": 8192, "COST_PER_K": 0.0001}
+        "text-embedding-ada-002": {
+            "MODEL_NAME": "text-embedding-ada-002",
+            "TOKENS_MAX": 8192,
+            "COST_PER_K": 0.0001,
+        }
     }
 
     class ClassConfigModel(BaseModel):
-        current_model_name: str = "text-embedding-ada-002"
+        enabled_model_name: str = "text-embedding-ada-002"
         available_models: dict[str, "OpenAIEmbedding.ModelConfig"]
 
     config: ClassConfigModel
     embedding_models: list
     current_model_class: ModelConfig
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def get_query_embedding(self, query, model_name=None) -> list[float]:
-        model = self.get_model(self, requested_model_name=model_name)
+        model = self.get_model(requested_model_name=model_name)
         if model is None:
             return None
 
@@ -53,7 +58,7 @@ class OpenAIEmbedding(ModuleBase):
         return query_embedding
 
     def get_documents_embedding(self, documents, model_name=None) -> list[list[float]]:
-        model = self.get_model(self, requested_model_name=model_name)
+        model = self.get_model(requested_model_name=model_name)
 
         if model is None:
             return None

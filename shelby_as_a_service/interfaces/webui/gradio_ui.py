@@ -1,7 +1,8 @@
 import asyncio
 import threading
+import typing
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 import gradio as gr
 from app.config_manager import ConfigManager
@@ -19,9 +20,9 @@ class GradioUI(ModuleBase):
     settings_ui_col_scaling = 2
     primary_ui_col_scaling = 8
 
-    # REQUIRED_CLASSES: List[Type] = [MainChatView, ContextIndexView, SettingsView]
-    REQUIRED_CLASSES: List[Type] = [MainChatView, ContextIndexView]
-    # REQUIRED_CLASSES: List[Type] = [MainChatView]
+    # REQUIRED_CLASSES: list[Type] = [MainChatView, ContextIndexView, SettingsView]
+    REQUIRED_CLASSES: list[Type] = [MainChatView, ContextIndexView]
+    # REQUIRED_CLASSES: list[Type] = [MainChatView]
 
     class ClassConfigModel(BaseModel):
         current_ui_view_name: str = "Chat"
@@ -33,12 +34,12 @@ class GradioUI(ModuleBase):
     webui_sprite: Any
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_class_instances: list
+    list_of_required_class_instances: list
     list_of_extension_configs: Optional[list] = []
 
-    def __init__(self, config_file_dict={}, **kwargs):
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         ConfigManager.add_extension_views_to_gradio_ui(self, self.list_of_extension_configs)
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def create_gradio_interface(self):
         all_setting_ui_tabs = []
@@ -49,15 +50,21 @@ class GradioUI(ModuleBase):
             css=AtYourServiceTheme.css,
         ) as webui_client:
             with gr.Row(elem_id="main_row"):
-                with gr.Column(elem_id="settings_ui_col", scale=self.settings_ui_col_scaling) as settings_ui_col:
-                    for view_instance in self.list_of_class_instances:
+                with gr.Column(
+                    elem_id="settings_ui_col", scale=self.settings_ui_col_scaling
+                ) as settings_ui_col:
+                    for view_instance in self.list_of_required_class_instances:
                         all_setting_ui_tabs.append(self.settings_ui_creator(view_instance))
 
-                with gr.Column(elem_id="primary_ui_col", scale=self.primary_ui_col_scaling) as primary_ui_col:
-                    for view_instance in self.list_of_class_instances:
+                with gr.Column(
+                    elem_id="primary_ui_col", scale=self.primary_ui_col_scaling
+                ) as primary_ui_col:
+                    for view_instance in self.list_of_required_class_instances:
                         all_primary_ui_rows.append(self.primary_ui_creator(view_instance))
 
-            self.create_nav_events(all_setting_ui_tabs, all_primary_ui_rows, settings_ui_col, primary_ui_col)
+            self.create_nav_events(
+                all_setting_ui_tabs, all_primary_ui_rows, settings_ui_col, primary_ui_col
+            )
 
             webui_client.load(
                 fn=lambda: self.set_agent_view(requested_view=self.config.current_ui_view_name),
@@ -100,7 +107,9 @@ class GradioUI(ModuleBase):
 
         return agent_nav_tab
 
-    def create_nav_events(self, all_setting_ui_tabs, all_primary_ui_rows, settings_ui_col, primary_ui_col):
+    def create_nav_events(
+        self, all_setting_ui_tabs, all_primary_ui_rows, settings_ui_col, primary_ui_col
+    ):
         outputs = []
         outputs += all_primary_ui_rows
         outputs.append(settings_ui_col)
@@ -122,7 +131,7 @@ class GradioUI(ModuleBase):
         settings_ui_scale = 1
         primary_ui_scale = 1
 
-        for view_instance in self.list_of_class_instances:
+        for view_instance in self.list_of_required_class_instances:
             if requested_view == view_instance.CLASS_UI_NAME:
                 output.append(gr.Row(visible=True))
                 self.config.current_ui_view_name = view_instance.CLASS_UI_NAME

@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional, Type
+import typing
+from typing import Any, Dict, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
@@ -24,8 +25,8 @@ class SettingsView(ModuleBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def create_primary_ui(self):
         components = {}

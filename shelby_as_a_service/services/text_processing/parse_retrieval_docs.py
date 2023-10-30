@@ -4,7 +4,10 @@ import services.text_processing.text as TextProcessing
 
 
 def parse_retrieved_docs(
-    retrieved_documents: list[dict], doc_max_tokens: float = 0, max_total_tokens: float = 0, docs_max_count: float = 0
+    retrieved_documents: list[dict],
+    doc_max_tokens: float = 0,
+    max_total_tokens: float = 0,
+    docs_max_count: float = 0,
 ) -> list[Any]:
     """
     Parses a list of retrieved documents, filtering them based on their token count and/or total token count,
@@ -21,7 +24,7 @@ def parse_retrieved_docs(
             the top N documents will be returned, sorted by score. Defaults to 0, which means no limit on the number of documents.
 
     Returns:
-        List[dict]: A list of retrieved documents, sorted by score and optionally limited by token count and/or total token count.
+        list[dict]: A list of retrieved documents, sorted by score and optionally limited by token count and/or total token count.
     """
     if len(retrieved_documents) < 1:
         return []
@@ -50,7 +53,11 @@ def parse_retrieved_docs(
 
             # Find the index of the document with the highest token_count that exceeds max_total_tokens
             max_token_count_idx = max(
-                (idx for idx, document in enumerate(sorted_documents) if document["token_count"] > max_total_tokens),
+                (
+                    idx
+                    for idx, document in enumerate(sorted_documents)
+                    if document["token_count"] > max_total_tokens
+                ),
                 key=lambda idx: sorted_documents[idx]["token_count"],
                 default=None,
             )
@@ -72,7 +79,9 @@ def parse_retrieved_docs(
     if docs_max_count > 1:
         # Same as above but removes based on total count of docs instead of token count.
         while len(sorted_documents) > docs_max_count:
-            max_token_count_idx = max(enumerate(sorted_documents), key=lambda x: x[1]["token_count"])[0]
+            max_token_count_idx = max(
+                enumerate(sorted_documents), key=lambda x: x[1]["token_count"]
+            )[0]
             sorted_documents.pop(max_token_count_idx)
 
         for i, document in enumerate(sorted_documents, start=1):

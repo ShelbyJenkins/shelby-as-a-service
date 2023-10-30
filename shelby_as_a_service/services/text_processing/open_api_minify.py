@@ -76,9 +76,7 @@ class OpenAPIMinifierService:
         return minified_endpoints
 
     def create_full_spec(self, open_api_specs):
-        folder_path = (
-            f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/full_spec"
-        )
+        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/full_spec"
         # Ensure output directory exists
         os.makedirs(folder_path, exist_ok=True)
         shutil.rmtree(folder_path)
@@ -120,7 +118,9 @@ class OpenAPIMinifierService:
         return merged_open_api_spec
 
     def minify(self, open_api_spec):
-        server_url = open_api_spec["servers"][0]["url"]  # Fetch the server URL from the open_api_spec specification
+        server_url = open_api_spec["servers"][0][
+            "url"
+        ]  # Fetch the server URL from the open_api_spec specification
         # server_url = urlparse(server_url)
 
         minified_endpoints = []
@@ -163,7 +163,9 @@ class OpenAPIMinifierService:
 
                 if self.key_abbreviations_enabled:
                     # Replace common keys with abbreviations and sets all text to lower case
-                    extracted_endpoint_data = self.abbreviate(extracted_endpoint_data, self.key_abbreviations)
+                    extracted_endpoint_data = self.abbreviate(
+                        extracted_endpoint_data, self.key_abbreviations
+                    )
 
                 # Get the tag of the current endpoint
                 tags = endpoint.get("tags", [])
@@ -171,9 +173,7 @@ class OpenAPIMinifierService:
 
                 operation_id = endpoint.get("operationId", "")
                 processed_endpoint = self.write_dict_to_text(extracted_endpoint_data)
-                content_string = (
-                    f"{prompt_template} operationId: {operation_id} path: {server_url}{path} content: {processed_endpoint}"
-                )
+                content_string = f"{prompt_template} operationId: {operation_id} path: {server_url}{path} content: {processed_endpoint}"
 
                 api_url = self.api_url_format.format(tag=tag, operationId=operation_id)
 
@@ -249,11 +249,17 @@ class OpenAPIMinifierService:
                 # Loop through all the responses
                 for status_code, response in endpoint["responses"].items():
                     # Check if status_code starts with '4' or '5' (4xx or 5xx)
-                    if status_code.startswith("4") or status_code.startswith("5") or "default" in status_code:
+                    if (
+                        status_code.startswith("4")
+                        or status_code.startswith("5")
+                        or "default" in status_code
+                    ):
                         # Extract the schema or other relevant information from the response
                         bad_response_content = response
                         if bad_response_content is not None:
-                            extracted_endpoint_data["responses"][f"{status_code}"] = bad_response_content
+                            extracted_endpoint_data["responses"][
+                                f"{status_code}"
+                            ] = bad_response_content
 
         return extracted_endpoint_data
 
@@ -291,7 +297,11 @@ class OpenAPIMinifierService:
                         del current_data[k]
                     if k == "enum" and not self.keys_to_keep["enums"]:
                         del current_data[k]
-                    elif k == "description" and len(parent_keys) > 0 and not self.keys_to_keep["nested_descriptions"]:
+                    elif (
+                        k == "description"
+                        and len(parent_keys) > 0
+                        and not self.keys_to_keep["nested_descriptions"]
+                    ):
                         del current_data[k]
                     # Otherwise, if the value is a dictionary or a list, add it to the stack for further processing
                     # Check if the key still exists before accessing it
@@ -319,7 +329,9 @@ class OpenAPIMinifierService:
         for key, value in endpoint.items():
             if isinstance(value, dict):
                 # Check if the dictionary has any of the keys that need to be kept
-                if key in keep_keys or (isinstance(key, str) and (key.startswith("5") or key.startswith("4"))):
+                if key in keep_keys or (
+                    isinstance(key, str) and (key.startswith("5") or key.startswith("4"))
+                ):
                     # Keep the inner dictionaries but under the current key
                     flattened_endpoint[key] = self.flatten_endpoint(value)
                 else:
@@ -400,7 +412,9 @@ class OpenAPIMinifierService:
                     name = tag.get("name")
                     summary = tag.get("description")
                     if name and summary:
-                        tag_summaries.append({"name": name, "summary": self.write_dict_to_text(summary)})
+                        tag_summaries.append(
+                            {"name": name, "summary": self.write_dict_to_text(summary)}
+                        )
                     else:
                         tag_summaries.append({"name": name, "summary": ""})
 
@@ -424,9 +438,11 @@ class OpenAPIMinifierService:
             # Define the characters that should be considered as punctuation
             modified_punctuation = set(string.punctuation) - {"/", "#"}
             # Remove punctuation characters
-            return "".join(ch for ch in no_html_str if ch not in modified_punctuation).lower().strip()
+            return (
+                "".join(ch for ch in no_html_str if ch not in modified_punctuation).lower().strip()
+            )
 
-        # List to accumulate the formatted text parts
+        # list to accumulate the formatted text parts
         formatted_text_parts = []
 
         # Check if data is a dictionary
@@ -473,9 +489,7 @@ class OpenAPIMinifierService:
             # Load the YAML data and print the result
             yaml_content = yaml.safe_load(yaml_file)
         prompt_template = yaml_content.get("prompt_template")
-        folder_path = (
-            f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/keypoint"
-        )
+        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/keypoint"
         # Ensure output directory exists
         os.makedirs(folder_path, exist_ok=True)
         # Define output file path
@@ -494,7 +508,11 @@ class OpenAPIMinifierService:
                 current_tag_number = endpoint.get("tag_number")
                 # If we're adding tag descriptions and they exist they're added here.
                 tag_summary = endpoint.get("tag_summary")
-                if self.keys_to_keep["tag_summaries"] and tag_summary is not None and tag_summary != "":
+                if (
+                    self.keys_to_keep["tag_summaries"]
+                    and tag_summary is not None
+                    and tag_summary != ""
+                ):
                     tag_string = f"{endpoint.get('tag')}-{tag_summary}\n"
                 else:
                     tag_string = f"{endpoint.get('tag')}-\n"
@@ -512,9 +530,7 @@ class OpenAPIMinifierService:
             output_file.write(output_string)
 
     def compare_chunks(self, data_source, document_chunks):
-        folder_path = (
-            f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
-        )
+        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
         # Create the directory if it does not exist
         os.makedirs(folder_path, exist_ok=True)
         existing_files = os.listdir(folder_path)
@@ -554,9 +570,7 @@ class OpenAPIMinifierService:
         return checked_text_chunks, checked_document_chunks
 
     def write_chunks(self, data_source, document_chunks):
-        folder_path = (
-            f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
-        )
+        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
         # Clear the folder first
         shutil.rmtree(folder_path)
         os.makedirs(folder_path, exist_ok=True)

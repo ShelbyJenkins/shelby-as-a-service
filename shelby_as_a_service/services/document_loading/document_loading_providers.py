@@ -1,13 +1,19 @@
 import json
 import os
 import traceback
-from typing import Any, Iterator, List, Optional, Type
+import typing
+from typing import Any, Iterator, Optional, Type
 
 import gradio as gr
 import services.text_processing.text as TextProcess
 from app.module_base import ModuleBase
 from bs4 import BeautifulSoup
-from langchain.document_loaders import GitbookLoader, RecursiveUrlLoader, SitemapLoader, WebBaseLoader
+from langchain.document_loaders import (
+    GitbookLoader,
+    RecursiveUrlLoader,
+    SitemapLoader,
+    WebBaseLoader,
+)
 from langchain.schema import Document
 from pydantic import BaseModel
 
@@ -22,8 +28,8 @@ class GenericWebScraper(ModuleBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def _load(self, url) -> Iterator[Document]:
         documents = WebBaseLoader(web_path=url).load()
@@ -49,7 +55,7 @@ class GenericWebScraper(ModuleBase):
 class GenericRecursiveWebScraper(ModuleBase):
     CLASS_NAME: str = "generic_recursive_web_scraper"
     CLASS_UI_NAME: str = "Generic Resursive Web Scraper"
-    REQUIRED_SECRETS: List[str] = []
+    REQUIRED_SECRETS: list[str] = []
 
     class ClassConfigModel(BaseModel):
         exclude_dirs: Optional[str] = None
@@ -60,8 +66,8 @@ class GenericRecursiveWebScraper(ModuleBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:

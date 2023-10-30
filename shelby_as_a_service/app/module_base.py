@@ -1,108 +1,110 @@
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+import typing
 
 from app.app_base import AppBase
+from pydantic import BaseModel
 
 
 class ModuleBase(AppBase):
-    update_settings_file: bool = False
+    CLASS_NAME: str
+    CLASS_UI_NAME: str
     log: logging.Logger
+    ClassConfigModel: typing.Type[BaseModel]
+    ModelConfig: typing.Type[BaseModel]
+    config: BaseModel
+    list_of_class_names: list[str]
+    list_of_class_ui_names: list[str]
+    list_of_required_class_instances: list["ModuleBase"]
+    list_of_available_model_names: list[str]
+    update_settings_file: bool = False
 
-    @staticmethod
-    def setup_class_instance(class_instance, config_file_dict, **kwargs):
-        class_name = class_instance.__class__.__name__
-        class_instance.log = logging.getLogger(class_name)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs) -> None:
+        self.log = logging.getLogger(self.__class__.__name__)
 
-        if (module_config_file_dict := config_file_dict.get(class_instance.CLASS_NAME, {})) == {}:
-            module_config_file_dict = config_file_dict
-        merged_config = {**kwargs, **module_config_file_dict}
+        self.list_of_class_names = []
+        self.list_of_class_ui_names = []
+        self.list_of_required_class_instances = []
 
-        available_models = None
+        if (class_config_file_dict := config_file_dict.get(self.CLASS_NAME, {})) == {}:
+            class_config_file_dict = config_file_dict
 
-        if model_definitions := getattr(class_instance, "MODEL_DEFINITIONS", None):
+        merged_config = {**kwargs, **class_config_file_dict}
+
+        if model_definitions := getattr(self, "MODEL_DEFINITIONS", None):
+            self.list_of_available_model_names = []
             available_models = ModuleBase.create_model_instances(
-                class_instance, model_definitions, module_config_file_dict, **kwargs
+                self, model_definitions, class_config_file_dict, **kwargs
             )
             merged_config["available_models"] = available_models
 
-        class_instance.config = class_instance.ClassConfigModel(**merged_config)
+        self.config = self.ClassConfigModel(**merged_config)
 
-        list_of_class_names = []
-        list_of_class_ui_names = []
-        list_of_class_instances = []
+        self.set_secrets()
 
-        if required_classes := getattr(class_instance, "REQUIRED_CLASSES", None):
-            for required_module in required_classes:
-                if new_class_instance := ModuleBase.create_class_instance(
-                    class_instance, required_module, module_config_file_dict, **kwargs
-                ):
-                    list_of_class_names.append(new_class_instance.CLASS_NAME)
-                    list_of_class_ui_names.append(new_class_instance.CLASS_UI_NAME)
-                    list_of_class_instances.append(new_class_instance)
+        if (required_classes := getattr(self, "REQUIRED_CLASSES", None)) is None:
+            return
+        for required_class in required_classes:
+            if (class_name := getattr(required_class, "CLASS_NAME", None)) is None:
+                self.log.error(f"Class name not found for {required_class}")
+                continue
+            new_instance: "ModuleBase" = required_class(class_config_file_dict, **kwargs)
+            setattr(self, class_name, new_instance)
 
-        class_instance.list_of_class_names = list_of_class_names
-        class_instance.list_of_class_ui_names = list_of_class_ui_names
-        class_instance.list_of_class_instances = list_of_class_instances
+            self.list_of_class_names.append(new_instance.CLASS_NAME)
+            self.list_of_class_ui_names.append(new_instance.CLASS_UI_NAME)
+            self.list_of_required_class_instances.append(new_instance)
 
-        if required_secrets := getattr(class_instance, "REQUIRED_SECRETS", None):
-            for required_secret in required_secrets:
-                ModuleBase.set_secret(required_secret)
-
-    @staticmethod
-    def create_class_instance(parent_class_instance, new_module, module_config_file_dict={}, **kwargs):
-        new_class_instance = None
-        if class_name := getattr(new_module, "CLASS_NAME", None):
-            new_class_instance = new_module(module_config_file_dict, **kwargs)
-            setattr(parent_class_instance, class_name, new_class_instance)
-
-        return new_class_instance
-
-    @staticmethod
-    def create_model_instances(parent_class_instance, model_definitions, module_config_file_dict={}, **kwargs):
+    def create_model_instances(
+        self,
+        model_definitions: dict[str, typing.Any],
+        class_config_file_dict: dict[str, typing.Any] = {},
+        **kwargs,
+    ) -> dict[str, BaseModel]:
         available_models = {}
-        list_of_available_model_names = []
         for model_name, definition in model_definitions.items():
-            model_config_file_dict = module_config_file_dict.get(model_name, {})
-            new_model_instance = parent_class_instance.ModelConfig(**{**model_config_file_dict, **definition})
-            list_of_available_model_names.append(model_name)
+            model_config_file_dict = class_config_file_dict.get(model_name, {})
+            new_model_instance = self.ModelConfig(**{**model_config_file_dict, **definition})
+            self.list_of_available_model_names.append(model_name)
             available_models[model_name] = new_model_instance
 
-        if models_type := getattr(parent_class_instance, "MODELS_TYPE", None):
-            setattr(parent_class_instance, models_type, list_of_available_model_names)
+        if models_type := getattr(self, "MODELS_TYPE", None):
+            setattr(self, models_type, self.list_of_available_model_names)
         return available_models
 
-    @staticmethod
-    def set_secret(required_secret):
-        env_secret = None
-        secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
-        env_secret = os.environ.get(secret_str, None)
-        if env_secret:
-            AppBase.secrets[required_secret] = env_secret
-        else:
-            print(f"Secret: {required_secret} is None!")
+    def set_secrets(self) -> None:
+        if required_secrets := getattr(self, "REQUIRED_SECRETS", None):
+            for required_secret in required_secrets:
+                env_secret = None
+                secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
+                env_secret = os.environ.get(secret_str, None)
+                if env_secret:
+                    AppBase.secrets[required_secret] = env_secret
+                else:
+                    print(f"Secret: {required_secret} is None!")
 
-    @staticmethod
-    def get_requested_class_instance(available_class_instances, requested_class):
-        for class_instance in available_class_instances:
-            if class_instance.CLASS_NAME == requested_class or class_instance.CLASS_UI_NAME == requested_class:
-                return class_instance
+    def get_requested_class_instance(self, requested_class: str) -> "ModuleBase":
+        for instance in self.list_of_required_class_instances:
+            if instance.CLASS_NAME == requested_class or instance.CLASS_UI_NAME == requested_class:
+                return instance
         raise ValueError(f"Requested class {requested_class} not found.")
 
-    @staticmethod
-    def get_model(provider_instance, requested_model_name=None):
+    def get_model(self, requested_model_name: typing.Optional[str] = None):
         model_instance = None
-        available_models = provider_instance.config.available_models
+
         if requested_model_name:
-            for model_name, model in available_models.items():
-                if model.MODEL_NAME == requested_model_name:
+            for _, model in self.config.available_models.items():  # type: ignore
+                if model.MODEL_NAME == requested_model_name:  # type: ignore
                     model_instance = model
                     break
-        if model_instance is None:
-            for model_name, model in available_models.items():
-                if model.MODEL_NAME == provider_instance.config.current_model_name:
+            if not model_instance:
+                raise ValueError(f"Requested model {requested_model_name} not found.")
+        else:
+            for _, model in self.config.available_models.items():  # type: ignore
+                if model.MODEL_NAME == self.config.enabled_model_name:  # type: ignore
                     model_instance = model
                     break
-        if model_instance is None:
-            raise ValueError("model_instance must not be None in AppBase")
+            if model_instance is None:
+                raise ValueError(f"Model from config {self.config.enabled_model_name} not found.")  # type: ignore
+
         return model_instance

@@ -1,8 +1,8 @@
 import string
-import nltk
-from typing import List
+from typing import list
 
-from nltk import word_tokenize, SnowballStemmer
+import nltk
+from nltk import SnowballStemmer, word_tokenize
 from nltk.corpus import stopwords
 
 try:
@@ -39,7 +39,7 @@ class BM25Tokenizer:
                 "Stemming applying lower case to tokens, so lower_case must be True if stem is True"
             )
 
-    def __call__(self, text: str) -> List[str]:
+    def __call__(self, text: str) -> list[str]:
         tokens = word_tokenize(text)
         if self.lower_case:
             tokens = [word.lower() for word in tokens]
@@ -49,9 +49,7 @@ class BM25Tokenizer:
             if self.lower_case:
                 tokens = [word for word in tokens if word not in self._stop_words]
             else:
-                tokens = [
-                    word for word in tokens if word.lower() not in self._stop_words
-                ]
+                tokens = [word for word in tokens if word.lower() not in self._stop_words]
         if self.stem:
             tokens = [self._stemmer.stem(word) for word in tokens]
         return tokens

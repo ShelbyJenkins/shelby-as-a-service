@@ -1,40 +1,42 @@
-from typing import Any, Dict, List, Optional, Type, Union
+import typing
+from typing import Any, Dict, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 
 # from modules.index.data_model import DataModels
 from app.module_base import ModuleBase
-from index.context_index import ContextIndex
-from index.context_index_model import (
-    ContextModel,
-    DocDBConfigs,
-    DocIngestTemplateConfigs,
+from pydantic import BaseModel
+from services.context_index.context_index import ContextIndex
+from services.context_index.context_index_model import (
+    ContextConfigModel,
+    ContextIndexModel,
+    DocDBModel,
     DomainModel,
     SourceModel,
 )
-from pydantic import BaseModel
-from services.document_db.document_db_service import DocumentDBService
+from services.database.database_service import DataBaseService
 from services.document_loading.document_loading_service import DocLoadingService
 
 
-class IngestAgent(ModuleBase):
-    CLASS_NAME: str = "ingest_agent"
-    CLASS_UI_NAME: str = "ingest_agent"
-    REQUIRED_CLASSES: List[Type] = [DocLoadingService]
+class DocIngest(ModuleBase):
+    CLASS_NAME: str = "doc_ingest"
+    CLASS_UI_NAME: str = "doc_ingest"
+    REQUIRED_CLASSES: list[Type] = [DocLoadingService]
 
     class ClassConfigModel(BaseModel):
-        database_provider: str = "local_filestore_database"
+        database_provider: str = "local_file_database"
         doc_loading_provider: str = "generic_web_scraper"
 
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_class_instances: list[Union[DocLoadingService, DocumentDBService]]
+    list_of_required_class_instances: list[Union[DocLoadingService, DataBaseService]]
     doc_loading_service: DocLoadingService
+    context_index: ContextIndex
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def ingest_docs(self):
         # indexes = pinecone.list_indexes()
@@ -207,10 +209,10 @@ class IngestAgent(ModuleBase):
             else:
                 print("Error: documents_iterator is None")
             if documents_list:
-                self.document_db_service.write_documents_to_database(
+                self.database_service.write_documents_to_database(
                     documents_list, data_domain, data_source
                 )
                 return documents_list
 
-    def create_loader_ui(self, current_class: Union[ContextModel, DomainModel, SourceModel]):
+    def create_loader_ui(self, current_class: Union[DomainModel, SourceModel]):
         self.doc_loading_service.create_settings_ui(current_class=current_class)

@@ -1,19 +1,20 @@
-from typing import Any, Dict, List, Optional, Type
+import typing
+from typing import Any, Dict, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
-from agents.ingest.ingest_agent import IngestAgent
 from app.module_base import ModuleBase
-from index.context_index import ContextIndex
-from index.context_index_model import (
-    ContextModel,
-    DocDBConfigs,
-    DocIngestTemplateConfigs,
+from pydantic import BaseModel
+from services.context_index.context_index import ContextIndex
+from services.context_index.context_index_model import (
+    ContextConfigModel,
+    ContextIndexModel,
+    DocDBModel,
     DomainModel,
     SourceModel,
 )
-from pydantic import BaseModel
-from services.document_db.document_db_service import DocumentDBService
+from services.context_index.ingest import DocIngest
+from services.database.database_service import DataBaseService
 
 
 class ContextIndexView(ModuleBase):
@@ -21,7 +22,7 @@ class ContextIndexView(ModuleBase):
     CLASS_UI_NAME: str = "Context Index"
     SETTINGS_UI_COL = 4
     PRIMARY_UI_COL = 6
-    # REQUIRED_CLASSES: list[Type] = [IngestAgent, DocumentDBService]
+    # REQUIRED_CLASSES: list[Type] = [DocIngest, DataBaseService]
 
     class ClassConfigModel(BaseModel):
         current_domain_name: str = "default_data_domain"
@@ -32,25 +33,26 @@ class ContextIndexView(ModuleBase):
 
     config: ClassConfigModel
     list_of_class_ui_names: list
-    list_of_class_instances: list
-    ingest_agent: IngestAgent
-    document_db_service: DocumentDBService
+    list_of_required_class_instances: list
+    doc_ingest: DocIngest
+    database_service: DataBaseService
 
     context_index: ContextIndex
     # current_domain: DataDomain
     # current_source: DataSource
+    uic: dict[str, Any]
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
-        self.context_index = ContextIndex()
-        self.ingest_agent = IngestAgent()
-        self.document_db_service = DocumentDBService()
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
-        self.components = {}
+        self.doc_ingest = DocIngest()
+        self.database_service = DataBaseService()
+
+        self.uic = {}  # ui components
 
     def create_primary_ui(self):
         with gr.Column(elem_classes="primary_ui_col"):
-            self.components["chat_tab_out_text"] = gr.Textbox(
+            self.uic["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
                 placeholder=f"Welcome to {ContextIndexView.CLASS_UI_NAME}",
@@ -64,324 +66,362 @@ class ContextIndexView(ModuleBase):
     def create_settings_ui(self):
         with gr.Column():
             with gr.Tab(label="Quick Add"):
-                self.quick_add()
-            with gr.Tab(label="Index Builder"):
+                # self.quick_add()
+                pass
+            with gr.Tab(label="Context Builder"):
                 self.create_context_builder_tab()
 
             # self.create_event_handlers()
             with gr.Tab(label="Management"):
-                self.document_db_service.create_settings_ui()
+                # self.document_db_service.create_settings_ui()
+                pass
 
     def quick_add(self):
-        self.components["ingest_button"] = gr.Button(
+        self.uic["ingest_button"] = gr.Button(
             value="Ingest",
             variant="primary",
             elem_classes="chat_tab_button",
             min_width=0,
         )
-        self.components["url_textbox"] = gr.Textbox(
+        self.uic["url_textbox"] = gr.Textbox(
             placeholder="Web URL or Local Filepath (or drag and drop)",
             lines=1,
             show_label=False,
         )
         gr.Dropdown(
-            value=self.context_index.domain.source.model.enabled_doc_ingest_template.ingest_template_name,
+            value=self.context_index.domain.source.instance_model.enabled_doc_ingest_template.ingest_template_name,
             choices=self.context_index.domain.source.list_of_ingest_template_names,
             label="Ingest Preset",
             allow_custom_value=False,
         )
 
         with gr.Row():
-            self.components["domains_dropdown"] = gr.Dropdown(
-                value=self.context_index.domain.model.name,
+            self.uic["domains_dropdown"] = gr.Dropdown(
+                value=self.context_index.domain.instance_model.name,
                 choices=self.context_index.list_of_domain_names,
                 label="Current Topic",
                 allow_custom_value=False,
             )
-            self.components["sources_dropdown"] = gr.Dropdown(
-                value=self.context_index.domain.source.model.name,
+            self.uic["sources_dropdown"] = gr.Dropdown(
+                value=self.context_index.domain.source.instance_model.name,
                 choices=self.context_index.domain.list_of_source_names,
                 label="Current Source",
                 allow_custom_value=False,
             )
 
-            self.components["files_drop_box"] = gr.File(
+            self.uic["files_drop_box"] = gr.File(
                 visible=True,
                 label="Drag and drop file",
             )
 
     def create_context_builder_tab(self):
+        cbc = {}  # context builder components
         with gr.Tab(label="Docs"):
             pass
         with gr.Tab(label="Sources"):
-            self.create_builder_sources_tab()
+            cbc["sources"] = self.create_builder_sources_tab()
         with gr.Tab(label="Topics"):
-            self.create_builder_topics_tab()
+            cbc["topics"] = self.create_builder_topics_tab()
         with gr.Tab(label="Batch Update Index"):
-            self.components["ingest_button"] = gr.Button(
+            cbc["ingest_button"] = gr.Button(
                 value="Run Full Index Ingest Pipeline",
                 variant="primary",
             )
+        #   self.create_context_builder_event_handlers()
+
+        self.uic["cbc"] = cbc
 
     def create_builder_sources_tab(self):
-        source_inputs = {}
-        new_source_components = {}
-        source_buttons = {}
+        inputs = {}
+        context_template = {}
+        buttons = {}
 
         with gr.Row():
-            source_inputs["domains_dropdown"] = gr.Dropdown(
-                value=self.context_index.domain.model.name,
+            inputs["domains_dropdown"] = gr.Dropdown(
+                value=self.context_index.domain.instance_model.name,
                 choices=self.context_index.list_of_domain_names,
                 label="Current Topic",
                 allow_custom_value=False,
             )
-            source_inputs["sources_dropdown"] = gr.Dropdown(
-                value=self.context_index.domain.source.model.name,
+            inputs["sources_dropdown"] = gr.Dropdown(
+                value=self.context_index.domain.source.instance_model.name,
                 choices=self.context_index.domain.list_of_source_names,
                 label="Current Source",
                 allow_custom_value=False,
             )
 
         with gr.Row():
-            source_buttons["save_source_button"] = gr.Button(
+            buttons["save_changes_button"] = gr.Button(
                 value="Save Changes to this Source",
                 variant="primary",
                 min_width=0,
                 size="sm",
             )
 
-        with gr.Tab(label="Add New"):
-            new_source_components["new_source_name"] = gr.Textbox(
-                placeholder=self.context_index.domain.source.model.name,
-                lines=1,
-                container=True,
-                label="New Source Name",
-            )
-            new_source_components["description"] = gr.Textbox(
-                placeholder=self.context_index.domain.source.model.description,
-                lines=1,
-                container=True,
-                label="New Source Description",
-            )
-            source_inputs["batch_update_enabled"] = gr.Checkbox(
-                value=False,
-                label="Clone Current Source",
-                info="Not implemented. Currently uses defaults from models.",
-            )
-            source_buttons["new_source_button"] = gr.Button(
-                value="Add New Source",
-                variant="primary",
-                min_width=0,
-                size="sm",
-            )
+        with gr.Tab(label="Manage"):
+            with gr.Accordion(label="New Source", open=True):
+                buttons["make_new_button"] = gr.Button(
+                    value="Add New Source",
+                    variant="primary",
+                    min_width=0,
+                    size="sm",
+                )
+                inputs["make_new_name"] = gr.Textbox(
+                    placeholder=self.context_index.domain.source.instance_model.DEFAULT_SOURCE_NAME,
+                    lines=1,
+                    container=True,
+                    label="New Source Name",
+                )
+                inputs["make_new_description"] = gr.Textbox(
+                    placeholder=self.context_index.domain.source.instance_model.DEFAULT_SOURCE_DESCRIPTION,
+                    lines=1,
+                    container=True,
+                    label="New Source Description",
+                )
+                with gr.Row():
+                    inputs["make_new_from_template_dropdown"] = gr.Dropdown(
+                        value=self.context_index.domain.source.instance_model.DEFAULT_TEMPLATE_NAME,
+                        choices=self.context_index.list_of_context_template_names,
+                        label="Use Template",
+                        allow_custom_value=False,
+                    )
+                    inputs["make_new_from_template_checkbox"] = gr.Checkbox(
+                        value=False,
+                        label="Use Selected Template",
+                    )
+                with gr.Accordion(label="Clone Existing Source", open=False):
+                    with gr.Row():
+                        inputs["make_new_from_clone_dropdown"] = gr.Dropdown(
+                            value=self.context_index.domain.source.instance_model.name,
+                            choices=self.context_index.list_of_all_context_index_source_names,
+                            label="Available Sources",
+                            allow_custom_value=False,
+                        )
+                        inputs["make_new_from_clone_checkbox"] = gr.Checkbox(
+                            value=False,
+                            label="Clone Selected Source",
+                        )
+
+            with gr.Accordion(label="Config Templates", open=False):
+                inputs["load_template_dropdown"] = gr.Dropdown(
+                    value=self.context_index.list_of_context_template_names[0],
+                    choices=self.context_index.list_of_context_template_names,
+                    label="Available Templates",
+                    allow_custom_value=False,
+                )
+                buttons["load_template_button"] = gr.Button(
+                    value="Load Template",
+                    variant="primary",
+                    min_width=0,
+                )
+
+                inputs["new_template_name"] = gr.Textbox(
+                    placeholder=self.context_index.domain.source.instance_model.name,
+                    lines=1,
+                    container=True,
+                    label="New Template Name",
+                )
+                buttons["save_template_button"] = gr.Button(
+                    value="Save as Template",
+                    variant="primary",
+                    min_width=0,
+                )
+            with gr.Accordion(label="Manage Current Source", open=False):
+                inputs["delete_textbox"] = gr.Textbox(
+                    placeholder=f"Type {self.context_index.domain.source.instance_model.name} to confirm deletion.",
+                    lines=1,
+                    show_label=False,
+                )
+                buttons["delete_button"] = gr.Button(
+                    value=f"Delete {self.context_index.domain.source.instance_model.name}.",
+                    min_width=0,
+                    size="sm",
+                    variant="stop",
+                )
         with gr.Tab(label="Loader"):
-            self.components["url_textbox"] = gr.Textbox(
+            context_template["url_textbox"] = gr.Textbox(
                 placeholder="Web URL or Local Filepath",
                 lines=1,
                 show_label=False,
             )
-            self.ingest_agent.create_loader_ui(current_class=self.context_index.domain.source.model)
+            self.doc_ingest.create_loader_ui(
+                current_class=self.context_index.domain.source.instance_model
+            )
         with gr.Tab(label="Processor"):
             gr.Textbox(
                 value="Not Implemented",
                 show_label=False,
                 lines=1,
             )
-            # self.ingest_agent.create_processor_ui()
+            # self.doc_ingest.create_processor_ui()
 
         with gr.Tab(label="Database"):
-            source_inputs["database_provider"] = gr.Dropdown(
-                value=self.context_index.domain.source.model.enabled_doc_db.db_name,
-                choices=self.context_index.list_of_db_names,
+            context_template["database_dropdown"] = gr.Dropdown(
+                value=self.context_index.domain.source.instance_model.context_config.doc_db.database_provider_name,
+                choices=self.context_index.list_of_database_provider_names,
                 show_label=False,
-                info="Default document database for the Souce. Database settings are managed elsewhere.",
+                info="Default document database for the Souce. Database context_template are managed elsewhere.",
             )
 
-        with gr.Tab(label="Manage"):
-            gr.Textbox(
-                value="Not Implemented",
-                show_label=False,
-                lines=1,
-            )
-            gr.Dropdown(
-                placeholder="Not Implemented",
-                choices=["Not Implemented"],
-            )
-            with gr.Row():
-                gr.Button(
-                    value="Load Template",
-                    variant="primary",
-                    min_width=0,
-                )
-                gr.Button(
-                    value="Save Template",
-                    variant="primary",
-                    min_width=0,
-                )
-            gr.Textbox(
-                value=self.context_index.domain.source.model.name,
-                label="New source Name",
-                lines=1,
-            )
-            gr.Textbox(
-                value=self.context_index.domain.source.model.description,
-                label="New source Description",
-                lines=1,
-            )
-            with gr.Row():
-                gr.Textbox(
-                    placeholder=f"Type {self.context_index.domain.source.model.name} to confirm deletion.",
-                    lines=1,
-                    show_label=False,
-                )
-                gr.Button(
-                    value=f"Delete {self.context_index.domain.source.model.name} and all it's sources.",
-                    min_width=0,
-                    size="sm",
-                    variant="stop",
-                )
         with gr.Tab(label="Ingest Source"):
-            source_inputs["batch_update_enabled"] = gr.Checkbox(
-                value=self.context_index.domain.source.model.batch_update_enabled,
+            context_template["batch_update_enabled"] = gr.Checkbox(
+                value=self.context_index.domain.source.instance_model.context_config.batch_update_enabled,
                 label="Update Source During Topic Batch Update",
             )
-            self.components["ingest_button"] = gr.Button(
+            buttons["ingest_button"] = gr.Button(
                 value="Run Full Source Ingest Pipeline",
                 variant="primary",
             )
-            self.components["test_loader_button"] = gr.Button(
+            buttons["test_loader_button"] = gr.Button(
                 value="Test Loader",
                 variant="primary",
             )
-        self.components["source_inputs"] = source_inputs
-        self.components["new_source_components"] = new_source_components
-        self.components["source_buttons"] = source_buttons
+
+        sources = {}
+        sources["inputs"] = inputs
+        sources["context_template"] = context_template
+        sources["buttons"] = buttons
+
+        return sources
 
     def create_builder_topics_tab(self):
-        data_domain_inputs = {}
-        new_domain_components = {}
-        data_domain_buttons = {}
+        inputs = {}
+        context_template = {}
+        buttons = {}
 
         with gr.Row():
-            data_domain_inputs["domains_dropdown"] = gr.Dropdown(
-                value=self.context_index.domain.model.name,
+            inputs["domains_dropdown"] = gr.Dropdown(
+                value=self.context_index.domain.instance_model.name,
                 choices=self.context_index.list_of_domain_names,
                 label="Current Topic",
                 allow_custom_value=False,
             )
 
         with gr.Row():
-            data_domain_buttons["save_domain_button"] = gr.Button(
+            buttons["save_changes_button"] = gr.Button(
                 value="Save Changes to this topic",
                 variant="primary",
                 min_width=0,
                 size="sm",
             )
 
-        with gr.Tab(label="Add New"):
-            new_domain_components["new_domain_name"] = gr.Textbox(
-                placeholder=self.context_index.domain.model.name,
-                lines=1,
-                container=True,
-                label="New Topic Name",
-            )
-            new_domain_components["description"] = gr.Textbox(
-                placeholder=self.context_index.domain.model.description,
-                lines=1,
-                container=True,
-                label="New Topic Description",
-            )
-            data_domain_inputs["batch_update_enabled"] = gr.Checkbox(
-                value=False,
-                label="Clone Current Topic",
-                info="Not implemented. Currently uses defaults from models.",
-            )
-            data_domain_buttons["new_domain_button"] = gr.Button(
-                value="Add New Topic",
-                variant="primary",
-                min_width=0,
-                size="sm",
-            )
+        with gr.Tab(label="Manage"):
+            with gr.Accordion(label="New Domain", open=True):
+                buttons["make_new_button"] = gr.Button(
+                    value="Add New Domain",
+                    variant="primary",
+                    min_width=0,
+                    size="sm",
+                )
+                inputs["make_new_name"] = gr.Textbox(
+                    placeholder=self.context_index.domain.instance_model.DEFAULT_DOMAIN_NAME,
+                    lines=1,
+                    container=True,
+                    label="New Domain Name",
+                )
+                inputs["make_new_description"] = gr.Textbox(
+                    placeholder=self.context_index.domain.instance_model.DEFAULT_DOMAIN_DESCRIPTION,
+                    lines=1,
+                    container=True,
+                    label="New Domain Description",
+                )
+                with gr.Row():
+                    inputs["make_new_from_template_dropdown"] = gr.Dropdown(
+                        value=self.context_index.domain.instance_model.DEFAULT_TEMPLATE_NAME,
+                        choices=self.context_index.list_of_context_template_names,
+                        label="Use Template",
+                        allow_custom_value=False,
+                    )
+                    inputs["make_new_from_template_checkbox"] = gr.Checkbox(
+                        value=False,
+                        label="Use Selected Template",
+                    )
+                with gr.Accordion(label="Clone Existing Domain", open=False):
+                    with gr.Row():
+                        inputs["make_new_from_clone_dropdown"] = gr.Dropdown(
+                            value=self.context_index.domain.instance_model.name,
+                            choices=self.context_index.list_of_domain_names,
+                            label="Available Domains",
+                            allow_custom_value=False,
+                        )
+                        inputs["make_new_from_clone_checkbox"] = gr.Checkbox(
+                            value=False,
+                            label="Clone Selected Domain",
+                        )
+
+            with gr.Accordion(label="Config Templates", open=False):
+                inputs["load_template_dropdown"] = gr.Dropdown(
+                    value=self.context_index.list_of_context_template_names[0],
+                    choices=self.context_index.list_of_context_template_names,
+                    label="Available Templates",
+                    allow_custom_value=False,
+                )
+                buttons["load_template_button"] = gr.Button(
+                    value="Load Template",
+                    variant="primary",
+                    min_width=0,
+                )
+
+                inputs["new_template_name"] = gr.Textbox(
+                    placeholder=self.context_index.domain.source.instance_model.name,
+                    lines=1,
+                    container=True,
+                    label="New Template Name",
+                )
+                buttons["save_template_button"] = gr.Button(
+                    value="Save as Template",
+                    variant="primary",
+                    min_width=0,
+                )
+            with gr.Accordion(label="Manage Current Source", open=False):
+                inputs["delete_textbox"] = gr.Textbox(
+                    placeholder=f"Type {self.context_index.domain.instance_model.name} to confirm deletion.",
+                    lines=1,
+                    show_label=False,
+                )
+                buttons["delete_button"] = gr.Button(
+                    value=f"Delete {self.context_index.domain.instance_model.name} and all it's sources.",
+                    min_width=0,
+                    size="sm",
+                    variant="stop",
+                )
         with gr.Tab(label="Loader"):
-            self.ingest_agent.create_loader_ui(current_class=self.context_index.domain.model)
+            self.doc_ingest.create_loader_ui(current_class=self.context_index.domain.instance_model)
         with gr.Tab(label="Processor"):
             gr.Textbox(
                 value="Not Implemented",
                 show_label=False,
                 lines=1,
             )
-            # self.ingest_agent.create_processor_ui()
+            # self.doc_ingest.create_processor_ui()
 
         with gr.Tab(label="Database"):
-            data_domain_inputs["database_provider"] = gr.Dropdown(
-                value=self.context_index.domain.model.enabled_doc_db.db_name,
-                choices=self.context_index.list_of_db_names,
+            inputs["database_provider"] = gr.Dropdown(
+                value=self.context_index.domain.instance_model.context_config.doc_db.database_provider_name,
+                choices=self.context_index.list_of_database_provider_names,
                 show_label=False,
-                info="Default document database for the topic. Database settings are managed elsewhere.",
+                info="Default document database for the topic. Database context_template are managed elsewhere.",
             )
-
-        with gr.Tab(label="Manage"):
-            gr.Textbox(
-                value="Not Implemented",
-                show_label=False,
-                lines=1,
-            )
-            gr.Dropdown(
-                placeholder="Not Implemented",
-                choices=["Not Implemented"],
-            )
-            with gr.Row():
-                gr.Button(
-                    value="Load Template",
-                    variant="primary",
-                    min_width=0,
-                )
-                gr.Button(
-                    value="Save Template",
-                    variant="primary",
-                    min_width=0,
-                )
-            gr.Textbox(
-                value=self.context_index.domain.model.name,
-                label="New Domain Name",
-                lines=1,
-            )
-            gr.Textbox(
-                value=self.context_index.domain.model.description,
-                label="New Domain Description",
-                lines=1,
-            )
-            with gr.Row():
-                gr.Textbox(
-                    placeholder=f"Type {self.context_index.domain.model.name} to confirm deletion.",
-                    lines=1,
-                    show_label=False,
-                )
-                gr.Button(
-                    value=f"Delete {self.context_index.domain.model.name} and all it's sources.",
-                    min_width=0,
-                    size="sm",
-                    variant="stop",
-                )
         with gr.Tab(label="Ingest Topic"):
-            data_domain_inputs["batch_update_enabled"] = gr.Checkbox(
-                value=self.context_index.domain.model.batch_update_enabled,
+            inputs["batch_update_enabled"] = gr.Checkbox(
+                value=self.context_index.domain.instance_model.context_config.batch_update_enabled,
                 label="Update Topic During Full Index Batch Update",
             )
-            self.components["ingest_button"] = gr.Button(
+            self.uic["ingest_button"] = gr.Button(
                 value="Run Full Topic Ingest Pipeline",
                 variant="primary",
             )
-            self.components["test_loader_button"] = gr.Button(
+            self.uic["test_loader_button"] = gr.Button(
                 value="Test Loader",
                 variant="primary",
             )
-        self.components["data_domain_inputs"] = data_domain_inputs
-        self.components["new_domain_components"] = new_domain_components
-        self.components["data_domain_buttons"] = data_domain_buttons
+        topics = {}
+        topics["inputs"] = inputs
+        topics["context_template"] = context_template
+        topics["buttons"] = buttons
 
     def create_event_handlers(self):
-        self.components["data_source_buttons"]["new_source_button"].click(
+        self.uic["data_buttons"]["make_new_button"].click(
             fn=lambda name, description, database, batch, doc_loading: self.context_index.create_data_source(
                 data_domain=self.context_index.current_domain,
                 source_name=name,
@@ -391,59 +431,59 @@ class ContextIndexView(ModuleBase):
                 doc_loading_provider=doc_loading,
             ),
             inputs=[
-                self.components["new_source_components"]["new_source_name"],
-                self.components["new_source_components"]["new_source_description"],
-                self.components["new_source_components"]["new_source_database_provider"],
-                self.components["new_source_components"]["new_source_batch_update_enabled"],
-                self.components["new_source_components"]["new_source_doc_loading_provider"],
+                self.uic["context_template"]["new_source_name"],
+                self.uic["context_template"]["new_source_description"],
+                self.uic["context_template"]["new_source_database_provider"],
+                self.uic["context_template"]["new_source_batch_update_enabled"],
+                self.uic["context_template"]["new_source_doc_loading_provider"],
             ],
         ).then(
             fn=self.set_current_data_source,
-            outputs=list(self.components["data_source_inputs"].values()),
+            outputs=list(self.uic["data_inputs"].values()),
         ).then(
             fn=lambda: ("", ""),
             outputs=[
-                self.components["new_source_components"]["new_source_name"],
-                self.components["new_source_components"]["new_source_description"],
+                self.uic["context_template"]["new_source_name"],
+                self.uic["context_template"]["new_source_description"],
             ],
         ).then(
             fn=lambda *x: GradioHelper.update_config_classes(
                 self.context_index.current_domain.current_source.source_config,
-                self.components["data_source_inputs"],
+                self.uic["data_inputs"],
                 *x,
             ),
-            inputs=list(self.components["data_source_inputs"].values()),
+            inputs=list(self.uic["data_inputs"].values()),
         )
 
-        self.components["data_source_buttons"]["save_source_button"].click(
+        self.uic["data_buttons"]["save_source_button"].click(
             fn=lambda *x: GradioHelper.update_config_classes(
                 self.context_index.current_domain.current_source.source_config,
-                self.components["data_source_inputs"],
+                self.uic["data_inputs"],
                 *x,
             ),
-            inputs=list(self.components["data_source_inputs"].values()),
+            inputs=list(self.uic["data_inputs"].values()),
         ).then(
             fn=self.set_current_data_source,
-            inputs=self.components["data_source_inputs"]["sources_dropdown"],
-            outputs=list(self.components["data_source_inputs"].values()),
+            inputs=self.uic["data_inputs"]["sources_dropdown"],
+            outputs=list(self.uic["data_inputs"].values()),
         )
 
-        self.components["data_source_inputs"]["domains_dropdown"].input(
+        self.uic["data_inputs"]["domains_dropdown"].input(
             fn=self.set_current_data_domain,
-            inputs=self.components["data_source_inputs"]["domains_dropdown"],
-            outputs=list(self.components["data_domain_inputs"].values()),
+            inputs=self.uic["data_inputs"]["domains_dropdown"],
+            outputs=list(self.uic["inputs"].values()),
         ).then(
             fn=self.set_current_data_source,
-            outputs=list(self.components["data_source_inputs"].values()),
+            outputs=list(self.uic["data_inputs"].values()),
         )
 
-        self.components["data_source_inputs"]["sources_dropdown"].input(
+        self.uic["data_inputs"]["sources_dropdown"].input(
             fn=self.set_current_data_source,
-            inputs=self.components["data_source_inputs"]["sources_dropdown"],
-            outputs=list(self.components["data_source_inputs"].values()),
+            inputs=self.uic["data_inputs"]["sources_dropdown"],
+            outputs=list(self.uic["data_inputs"].values()),
         )
 
-        self.components["data_domain_buttons"]["new_domain_button"].click(
+        self.uic["buttons"]["new_domain_button"].click(
             fn=lambda name, description, database, batch, doc_loading: self.context_index.create_data_domain(
                 domain_name=name,
                 description=description,
@@ -452,63 +492,63 @@ class ContextIndexView(ModuleBase):
                 doc_loading_provider=doc_loading,
             ),
             inputs=[
-                self.components["new_domain_components"]["new_domain_name"],
-                self.components["new_domain_components"]["new_domain_description"],
-                self.components["new_domain_components"]["new_domain_database_provider"],
-                self.components["new_domain_components"]["new_domain_batch_update_enabled"],
-                self.components["new_domain_components"]["new_domain_doc_loading_provider"],
+                self.uic["new_domain_components"]["new_domain_name"],
+                self.uic["new_domain_components"]["new_domain_description"],
+                self.uic["new_domain_components"]["new_domain_database_provider"],
+                self.uic["new_domain_components"]["new_domain_batch_update_enabled"],
+                self.uic["new_domain_components"]["new_domain_doc_loading_provider"],
             ],
         ).then(
             fn=self.set_current_data_domain,
-            outputs=list(self.components["data_domain_inputs"].values()),
+            outputs=list(self.uic["inputs"].values()),
         ).then(
             fn=lambda: ("", ""),
             outputs=[
-                self.components["new_domain_components"]["new_domain_name"],
-                self.components["new_domain_components"]["new_domain_description"],
+                self.uic["new_domain_components"]["new_domain_name"],
+                self.uic["new_domain_components"]["new_domain_description"],
             ],
         ).then(
             fn=self.set_current_data_source,
-            outputs=list(self.components["data_source_inputs"].values()),
+            outputs=list(self.uic["data_inputs"].values()),
         ).then(
             fn=lambda *x: GradioHelper.update_config_classes(
                 self.context_index.current_domain.domain_config,
-                self.components["data_domain_inputs"],
+                self.uic["inputs"],
                 *x,
             ),
-            inputs=list(self.components["data_domain_inputs"].values()),
+            inputs=list(self.uic["inputs"].values()),
         )
 
-        self.components["data_domain_buttons"]["save_domain_button"].click(
+        self.uic["buttons"]["save_domain_button"].click(
             fn=lambda *x: GradioHelper.update_config_classes(
                 self.context_index.current_domain.domain_config,
-                self.components["data_domain_inputs"],
+                self.uic["inputs"],
                 *x,
             ),
-            inputs=list(self.components["data_domain_inputs"].values()),
+            inputs=list(self.uic["inputs"].values()),
         ).then(
             fn=self.set_current_data_domain,
-            inputs=self.components["data_domain_inputs"]["domains_dropdown"],
-            outputs=list(self.components["data_domain_inputs"].values()),
+            inputs=self.uic["inputs"]["domains_dropdown"],
+            outputs=list(self.uic["inputs"].values()),
         )
 
-        self.components["data_domain_inputs"]["domains_dropdown"].input(
+        self.uic["inputs"]["domains_dropdown"].input(
             fn=self.set_current_data_domain,
-            inputs=self.components["data_domain_inputs"]["domains_dropdown"],
-            outputs=list(self.components["data_domain_inputs"].values()),
+            inputs=self.uic["inputs"]["domains_dropdown"],
+            outputs=list(self.uic["inputs"].values()),
         ).then(
             fn=self.set_current_data_source,
-            outputs=list(self.components["data_source_inputs"].values()),
+            outputs=list(self.uic["data_inputs"].values()),
         )
 
         # gr.on(
         #     triggers=[
-        #         self.components["ingest_button"].click,
-        #         self.components["url_textbox"].submit,
-        #         self.components["file_path_textbox"].submit,
+        #         self.uic["ingest_button"].click,
+        #         self.uic["url_textbox"].submit,
+        #         self.uic["file_path_textbox"].submit,
         #     ],
-        #     inputs=list(self.components.values()),
-        #     fn=lambda val: self.ingest_agent.ingest_from_ui(self.components, val),
+        #     inputs=list(self.uic.values()),
+        #     fn=lambda val: self.doc_ingest.ingest_from_ui(self.uic, val),
         # )
 
     def set_current_data_source(self, requested_instance_ui_name: Optional[str] = None):

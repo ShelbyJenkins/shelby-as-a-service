@@ -1,9 +1,9 @@
-from typing import List, Union
+from typing import Union
 
 import torch
-from transformers import AutoTokenizer, AutoModelForMaskedLM
 from pinecone_text.sparse import SparseVector
 from pinecone_text.sparse.base_sparse_encoder import BaseSparseEncoder
+from transformers import AutoModelForMaskedLM, AutoTokenizer
 
 
 class SpladeEncoder(BaseSparseEncoder):
@@ -39,8 +39,8 @@ class SpladeEncoder(BaseSparseEncoder):
         self.device = device
 
     def encode_documents(
-        self, texts: Union[str, List[str]]
-    ) -> Union[SparseVector, List[SparseVector]]:
+        self, texts: Union[str, list[str]]
+    ) -> Union[SparseVector, list[SparseVector]]:
         """
         encode documents to a sparse vector (for upsert to pinecone)
 
@@ -50,8 +50,8 @@ class SpladeEncoder(BaseSparseEncoder):
         return self._encode(texts)
 
     def encode_queries(
-        self, texts: Union[str, List[str]]
-    ) -> Union[SparseVector, List[SparseVector]]:
+        self, texts: Union[str, list[str]]
+    ) -> Union[SparseVector, list[SparseVector]]:
         """
         encode queries to a sparse vector (for upsert to pinecone)
 
@@ -60,9 +60,7 @@ class SpladeEncoder(BaseSparseEncoder):
         """
         return self._encode(texts)
 
-    def _encode(
-        self, texts: Union[str, List[str]]
-    ) -> Union[SparseVector, List[SparseVector]]:
+    def _encode(self, texts: Union[str, list[str]]) -> Union[SparseVector, list[SparseVector]]:
         """
         Args:
             texts: single or list of texts to encode.
@@ -88,8 +86,6 @@ class SpladeEncoder(BaseSparseEncoder):
         for i in range(token_max.values.shape[0]):
             nz_tokens = nz_tokens_j[nz_tokens_i == i]
             nz_weights = token_max.values[i, nz_tokens]
-            output.append(
-                {"indices": nz_tokens.tolist(), "values": nz_weights.tolist()}
-            )
+            output.append({"indices": nz_tokens.tolist(), "values": nz_weights.tolist()})
 
         return output[0] if isinstance(texts, str) else output

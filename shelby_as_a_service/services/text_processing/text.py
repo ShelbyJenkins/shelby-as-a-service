@@ -1,7 +1,6 @@
 import os
 import re
 import string
-from typing import List
 from urllib.parse import urlparse
 
 import tiktoken
@@ -22,7 +21,7 @@ def tiktoken_len_of_document_list(documents):
     return token_count
 
 
-def tiktoken_len_of_openai_prompt(prompt, llm_model):
+def tiktoken_len_of_openai_prompt(prompt, llm_model) -> int:
     num_tokens = 0
     for message in prompt:
         num_tokens += llm_model.TOKENS_PER_MESSAGE
@@ -121,7 +120,7 @@ def remove_all_white_space_except_space(text):
     return text
 
 
-def split_text_with_regex(text: str, separator: str, keep_separator: bool) -> List[str]:
+def split_text_with_regex(text: str, separator: str, keep_separator: bool) -> list[str]:
     # Now that we have the separator, split the text
     if separator:
         if keep_separator:

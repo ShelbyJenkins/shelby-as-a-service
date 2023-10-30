@@ -1,12 +1,12 @@
-from typing import List, Union
 from abc import ABC, abstractmethod
+from typing import Union
 
 
 class BaseDenseEncoder(ABC):
     @abstractmethod
     def encode_documents(
-        self, texts: Union[str, List[str]]
-    ) -> Union[List[float], List[List[float]]]:
+        self, texts: Union[str, list[str]]
+    ) -> Union[list[float], list[list[float]]]:
         """
         encode documents to a dense vector (for upsert to pinecone)
 
@@ -16,9 +16,7 @@ class BaseDenseEncoder(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    def encode_queries(
-        self, texts: Union[str, List[str]]
-    ) -> Union[List[float], List[List[float]]]:
+    def encode_queries(self, texts: Union[str, list[str]]) -> Union[list[float], list[list[float]]]:
         """
         encode queries to a dense vector
 

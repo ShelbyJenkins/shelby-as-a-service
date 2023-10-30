@@ -1,16 +1,17 @@
-from typing import Any, Iterator, List, Type, Union
+import typing
+from typing import Any, Iterator, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from app.module_base import ModuleBase
-from index.context_index_model import (
-    ContextModel,
-    DocDBConfigs,
-    DocIngestTemplateConfigs,
+from pydantic import BaseModel, Field
+from services.context_index.context_index_model import (
+    ContextConfigModel,
+    ContextIndexModel,
+    DocDBModel,
     DomainModel,
     SourceModel,
 )
-from pydantic import BaseModel, Field
 from services.document_loading.document_loading_providers import (
     GenericRecursiveWebScraper,
     GenericWebScraper,
@@ -31,15 +32,15 @@ class DocLoadingService(ModuleBase):
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_class_instances: list[Union[GenericWebScraper, GenericRecursiveWebScraper]]
+    list_of_required_class_instances: list[Union[GenericWebScraper, GenericRecursiveWebScraper]]
     provider_instance: Any
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def load(self, data_source, doc_loading_provider=None):
         self.provider_instance = self.get_requested_class_instance(
-            self.list_of_class_instances,
+            self.list_of_required_class_instances,
             doc_loading_provider
             if doc_loading_provider is not None
             else self.config.doc_loading_provider,
@@ -50,19 +51,19 @@ class DocLoadingService(ModuleBase):
         else:
             print("rnr")
 
-    def create_settings_ui(self, current_class: Union[ContextModel, DomainModel, SourceModel]):
+    def create_settings_ui(self, current_class: Union[DomainModel, SourceModel]):
         components = {}
         provider_list = []
         with gr.Column():
             components["doc_loading_provider"] = gr.Dropdown(
-                value=current_class.enabled_doc_ingest_template.loader_name,
+                value=current_class.context_config.doc_loading_provider_name,
                 choices=self.list_of_class_names,
                 label="Doc Loader",
                 container=True,
             )
-            for provider_instance in self.list_of_class_instances:
+            for provider_instance in self.list_of_required_class_instances:
                 if (
-                    current_class.enabled_doc_ingest_template.loader_name
+                    current_class.context_config.doc_loading_provider_name
                     == provider_instance.CLASS_NAME
                 ):
                     visibility = True
@@ -85,7 +86,7 @@ class DocLoadingService(ModuleBase):
 
     def set_current_provider(self, requested_model):
         output = []
-        for provider_instance in self.list_of_class_instances:
+        for provider_instance in self.list_of_required_class_instances:
             if requested_model == provider_instance.CLASS_NAME:
                 output.append(gr.Group(visible=True))
             else:

@@ -1,6 +1,7 @@
 import json
 import types
-from typing import Any, Dict, Generator, List, Optional, Type, Union
+import typing
+from typing import Any, Dict, Generator, Optional, Type, Union
 
 import requests
 from app.module_base import ModuleBase
@@ -15,7 +16,7 @@ class TinyJMAPClient(ModuleBase):
     CLASS_NAME: str = "email_service"
     CLASS_UI_NAME: str = "email_service"
     # For intialization
-    REQUIRED_SECRETS: List[str] = [
+    REQUIRED_SECRETS: list[str] = [
         "JMAP_USERNAME",
         "JMAP_TOKEN",
     ]
@@ -31,9 +32,9 @@ class TinyJMAPClient(ModuleBase):
     username: str
     token: str
 
-    def __init__(self, config_file_dict={}, **kwargs):
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         """Initialize using a hostname, username and bearer token"""
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.session = None
         self.api_url = None
         self.account_id = None

@@ -1,4 +1,5 @@
 import os
+import typing
 from typing import Any, Dict, Type, Union
 
 import gradio as gr
@@ -36,8 +37,8 @@ class PineconeDatabase(ModuleBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
         if (api_key := self.secrets.get("pinecone_api_key")) is None:
             print("Pinecone API Key not found.")
         if api_key:
@@ -94,7 +95,9 @@ class PineconeDatabase(ModuleBase):
             returned_documents = []
             for data_domain in self.index.index_data_domains:
                 if namespace := getattr(data_domain, "data_domain_name", None):
-                    returned_documents.extend(_query_namespace(search_terms, top_k, namespace, filter))
+                    returned_documents.extend(
+                        _query_namespace(search_terms, top_k, namespace, filter)
+                    )
 
         return returned_documents
 
@@ -215,7 +218,10 @@ class PineconeDatabase(ModuleBase):
                     value=self.config.index_env, label="index_env", interactive=True, min_width=0
                 )
                 components["vectorstore_dimension"] = gr.Number(
-                    value=self.config.vectorstore_dimension, label="vectorstore_dimension", interactive=True, min_width=0
+                    value=self.config.vectorstore_dimension,
+                    label="vectorstore_dimension",
+                    interactive=True,
+                    min_width=0,
                 )
                 components["vectorstore_upsert_batch_size"] = gr.Number(
                     value=self.config.vectorstore_upsert_batch_size,
@@ -224,10 +230,16 @@ class PineconeDatabase(ModuleBase):
                     min_width=0,
                 )
                 components["vectorstore_metric"] = gr.Textbox(
-                    value=self.config.vectorstore_metric, label="vectorstore_metric", interactive=True, min_width=0
+                    value=self.config.vectorstore_metric,
+                    label="vectorstore_metric",
+                    interactive=True,
+                    min_width=0,
                 )
                 components["vectorstore_pod_type"] = gr.Textbox(
-                    value=self.config.vectorstore_pod_type, label="vectorstore_pod_type", interactive=True, min_width=0
+                    value=self.config.vectorstore_pod_type,
+                    label="vectorstore_pod_type",
+                    interactive=True,
+                    min_width=0,
                 )
                 components["indexed_metadata"] = gr.Dropdown(
                     value=self.config.indexed_metadata[0],

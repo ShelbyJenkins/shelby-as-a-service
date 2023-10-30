@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional, Type
+import typing
+from typing import Any, Dict, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
@@ -8,11 +9,11 @@ from services.embedding.embedding_service import EmbeddingService
 from services.text_processing.parse_retrieval_docs import parse_retrieved_docs
 
 
-class RetrievalAgent(ModuleBase):
-    CLASS_NAME: str = "retrieval_agent"
-    CLASS_UI_NAME: str = "Retrieval"
+class DocRetrieval(ModuleBase):
+    CLASS_NAME: str = "doc_retrieval"
+    CLASS_UI_NAME: str = "doc_retrieval"
 
-    REQUIRED_CLASSES: List[Type] = [EmbeddingService]
+    REQUIRED_CLASSES: list[Type] = [EmbeddingService]
 
     class ClassConfigModel(BaseModel):
         doc_max_tokens: float = 1400
@@ -24,11 +25,11 @@ class RetrievalAgent(ModuleBase):
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_class_instances: list[Any]
+    list_of_required_class_instances: list[Any]
     embedding_service: EmbeddingService
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def get_documents(
         self,
@@ -55,7 +56,7 @@ class RetrievalAgent(ModuleBase):
             doc_relevancy_check_enabled (bool, optional): Whether to enable document relevancy check. Defaults to None.
 
         Returns:
-            List[Dict[str, Any]]: A list of parsed documents.
+            list[Dict[str, Any]]: A list of parsed documents.
         """
 
         if enabled_data_domains is None:
@@ -64,11 +65,19 @@ class RetrievalAgent(ModuleBase):
             print("get all data domains here")
             # enabled_data_domains
 
-        if self.config.topic_constraint_enabled if topic_constraint_enabled is None else topic_constraint_enabled:
+        if (
+            self.config.topic_constraint_enabled
+            if topic_constraint_enabled is None
+            else topic_constraint_enabled
+        ):
             # get all data domains, and then check if returned value is in them
             pass
 
-        if self.config.keyword_generator_enabled if keyword_generator_enabled is None else keyword_generator_enabled:
+        if (
+            self.config.keyword_generator_enabled
+            if keyword_generator_enabled is None
+            else keyword_generator_enabled
+        ):
             #     query_to_embed = self.action_agent.keyword_generator(query)
             #     self.log.info(
             #         f"ceq_keyword_generator response: {query_to_embed}"
@@ -77,7 +86,9 @@ class RetrievalAgent(ModuleBase):
 
         query_embedding = self.embedding_service.get_query_embedding(query=query)
 
-        docs_max_count = docs_max_count if docs_max_count is not None else self.config.docs_max_count
+        docs_max_count = (
+            docs_max_count if docs_max_count is not None else self.config.docs_max_count
+        )
         retrieve_n_docs = retrieve_n_docs if retrieve_n_docs is not None else 4
 
         returned_documents_list: list[Any] = []
@@ -91,9 +102,13 @@ class RetrievalAgent(ModuleBase):
 
             returned_documents_list = parse_retrieved_docs(
                 retrieved_documents=returned_documents_list,
-                doc_max_tokens=doc_max_tokens if doc_max_tokens is not None else self.config.doc_max_tokens,
+                doc_max_tokens=doc_max_tokens
+                if doc_max_tokens is not None
+                else self.config.doc_max_tokens,
                 max_total_tokens=max_total_tokens if max_total_tokens is not None else 0,
-                docs_max_count=docs_max_count if docs_max_count is not None else self.config.docs_max_count,
+                docs_max_count=docs_max_count
+                if docs_max_count is not None
+                else self.config.docs_max_count,
             )
             if (
                 self.config.doc_relevancy_check_enabled
@@ -111,13 +126,15 @@ class RetrievalAgent(ModuleBase):
                 break
 
         if returned_documents_list is None or len(returned_documents_list) < 1:
-            raise ValueError("No supporting documents found. Currently we don't support queries without supporting context.")
+            raise ValueError(
+                "No supporting documents found. Currently we don't support queries without supporting context."
+            )
         return returned_documents_list
 
     def _retrieve_docs(self, search_terms, retrieve_n_docs, enabled_data_domains) -> list[Any]:
         returned_documents_list = []
         for data_domain_name in enabled_data_domains:
-            returned_documents = self.document_db_service.query_index(
+            returned_documents = self.database_service.query_index(
                 search_terms=search_terms,
                 retrieve_n_docs=retrieve_n_docs,
                 data_domain_name=data_domain_name,

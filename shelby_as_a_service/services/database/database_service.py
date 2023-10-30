@@ -1,19 +1,20 @@
 import os
-from typing import Any, List, Type
+import typing
+from typing import Any, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelper
 from app.module_base import ModuleBase
 from pydantic import BaseModel
-from services.document_db.document_db_local_file import LocalFileStoreDatabase
-from services.document_db.document_db_pinecone import PineconeDatabase
+from services.database.local_file import LocalFileDatabase
+from services.database.pinecone import PineconeDatabase
 
 
-class DocumentDBService(ModuleBase):
-    CLASS_NAME: str = "document_db_service"
+class DataBaseService(ModuleBase):
+    CLASS_NAME: str = "database_service"
     CLASS_UI_NAME: str = "Document Databases"
 
-    REQUIRED_CLASSES: List[Type] = [LocalFileStoreDatabase, PineconeDatabase]
+    REQUIRED_CLASSES: list[Type] = [LocalFileDatabase, PineconeDatabase]
 
     class ClassConfigModel(BaseModel):
         database_provider: str = "pinecone_database"
@@ -22,10 +23,10 @@ class DocumentDBService(ModuleBase):
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_class_instances: list[Any]
+    list_of_required_class_instances: list[Any]
 
-    def __init__(self, config_file_dict={}, **kwargs):
-        self.setup_class_instance(class_instance=self, config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def query_index(
         self,
@@ -38,14 +39,16 @@ class DocumentDBService(ModuleBase):
             database_provider = self.config.database_provider
 
         provider = self.get_requested_class_instance(
-            self.list_of_class_instances,
+            self.list_of_required_class_instances,
             database_provider if database_provider is not None else self.config.database_provider,
         )
 
         if provider:
             return provider.query_index(
                 search_terms=search_terms,
-                retrieve_n_docs=self.config.retrieve_n_docs if retrieve_n_docs is None else retrieve_n_docs,
+                retrieve_n_docs=self.config.retrieve_n_docs
+                if retrieve_n_docs is None
+                else retrieve_n_docs,
                 data_domain_name=data_domain_name,
             )
         else:
@@ -59,7 +62,7 @@ class DocumentDBService(ModuleBase):
         data_domain_name=None,
         database_provider=None,
     ):
-        provider = self.get_requested_class_instance(self.list_of_class_instances, database_provider)
+        provider = self.get_requested_class_instance(database_provider)
         if provider:
             return provider.fetch_by_ids(
                 ids=ids,
@@ -77,7 +80,7 @@ class DocumentDBService(ModuleBase):
         data_source=None,
         database_provider=None,
     ):
-        provider = self.get_requested_class_instance(self.list_of_class_instances, database_provider)
+        provider = self.get_requested_class_instance(database_provider)
         if provider:
             return provider.write_documents_to_database(documents, data_domain, data_source)
         else:
@@ -88,16 +91,23 @@ class DocumentDBService(ModuleBase):
 
         with gr.Column():
             components["database_provider"] = gr.Dropdown(
-                value=GradioHelper.get_class_ui_name_from_str(self.list_of_class_instances, self.config.database_provider),
-                choices=GradioHelper.get_list_of_class_ui_names(self.list_of_class_instances),
+                value=GradioHelper.get_class_ui_name_from_str(
+                    self.list_of_required_class_instances, self.config.database_provider
+                ),
+                choices=GradioHelper.get_list_of_class_ui_names(
+                    self.list_of_required_class_instances
+                ),
                 label="Source Type",
                 container=True,
                 min_width=0,
             )
             components["retrieve_n_docs"] = gr.Number(
-                value=self.config.retrieve_n_docs, label="Number of Documents to Retrieve", container=True, min_width=0
+                value=self.config.retrieve_n_docs,
+                label="Number of Documents to Retrieve",
+                container=True,
+                min_width=0,
             )
-            for provider_instance in self.list_of_class_instances:
+            for provider_instance in self.list_of_required_class_instances:
                 provider_instance.create_settings_ui()
 
             GradioHelper.create_settings_event_listener(self.config, components)
