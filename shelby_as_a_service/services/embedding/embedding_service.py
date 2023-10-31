@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any, Type
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 import services.text_processing.text as text
 from app.module_base import ModuleBase
 from pydantic import BaseModel
@@ -46,10 +46,10 @@ class EmbeddingService(ModuleBase):
         components = {}
 
         components["embedding_provider"] = gr.Dropdown(
-            value=GradioHelper.get_class_ui_name_from_str(
+            value=GradioHelpers.get_class_ui_name_from_str(
                 self.list_of_required_class_instances, self.config.embedding_provider
             ),
-            choices=GradioHelper.get_list_of_class_ui_names(self.list_of_required_class_instances),
+            choices=GradioHelpers.get_list_of_class_ui_names(self.list_of_required_class_instances),
             label=self.CLASS_UI_NAME,
             container=True,
             min_width=0,
@@ -58,6 +58,6 @@ class EmbeddingService(ModuleBase):
         for provider_instance in self.list_of_required_class_instances:
             provider_instance.create_settings_ui()
 
-        GradioHelper.create_settings_event_listener(self.config, components)
+        GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components

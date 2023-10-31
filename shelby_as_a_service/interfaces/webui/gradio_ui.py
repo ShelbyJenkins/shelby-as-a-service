@@ -53,8 +53,9 @@ class GradioUI(ModuleBase):
                 with gr.Column(
                     elem_id="settings_ui_col", scale=self.settings_ui_col_scaling
                 ) as settings_ui_col:
-                    for view_instance in self.list_of_required_class_instances:
-                        all_setting_ui_tabs.append(self.settings_ui_creator(view_instance))
+                    with gr.Tabs(selected=self.config.current_ui_view_name):
+                        for view_instance in self.list_of_required_class_instances:
+                            all_setting_ui_tabs.append(self.settings_ui_creator(view_instance))
 
                 with gr.Column(
                     elem_id="primary_ui_col", scale=self.primary_ui_col_scaling
@@ -100,6 +101,7 @@ class GradioUI(ModuleBase):
         agent_ui_name = view_instance.CLASS_UI_NAME
 
         with gr.Tab(
+            id=agent_ui_name,
             label=agent_ui_name,
             elem_id=f"{agent_name}_settings_ui_tab",
         ) as agent_nav_tab:

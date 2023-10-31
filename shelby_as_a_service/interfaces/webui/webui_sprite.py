@@ -2,7 +2,7 @@ import typing
 from typing import Any, Dict, Generator, Optional, Type, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel

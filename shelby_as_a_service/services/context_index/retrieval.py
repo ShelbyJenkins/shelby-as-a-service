@@ -2,7 +2,7 @@ import typing
 from typing import Any, Dict, Optional, Type
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.embedding.embedding_service import EmbeddingService
@@ -180,6 +180,6 @@ class DocRetrieval(ModuleBase):
                 min_width=0,
             )
 
-        GradioHelper.create_settings_event_listener(self.config, components)
+        GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components

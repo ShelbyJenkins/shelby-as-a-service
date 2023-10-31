@@ -3,7 +3,7 @@ import typing
 from typing import Any, Type
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.database.local_file import LocalFileDatabase
@@ -91,10 +91,10 @@ class DataBaseService(ModuleBase):
 
         with gr.Column():
             components["database_provider"] = gr.Dropdown(
-                value=GradioHelper.get_class_ui_name_from_str(
+                value=GradioHelpers.get_class_ui_name_from_str(
                     self.list_of_required_class_instances, self.config.database_provider
                 ),
-                choices=GradioHelper.get_list_of_class_ui_names(
+                choices=GradioHelpers.get_list_of_class_ui_names(
                     self.list_of_required_class_instances
                 ),
                 label="Source Type",
@@ -110,6 +110,6 @@ class DataBaseService(ModuleBase):
             for provider_instance in self.list_of_required_class_instances:
                 provider_instance.create_settings_ui()
 
-            GradioHelper.create_settings_event_listener(self.config, components)
+            GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components

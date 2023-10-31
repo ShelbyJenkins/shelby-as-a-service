@@ -3,7 +3,7 @@ import typing
 from typing import Any, Dict, Type, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 import pinecone
 from app.module_base import ModuleBase
 from pydantic import BaseModel
@@ -248,6 +248,6 @@ class PineconeDatabase(ModuleBase):
                     interactive=True,
                     min_width=0,
                 )
-                GradioHelper.create_settings_event_listener(self.config, components)
+                GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components

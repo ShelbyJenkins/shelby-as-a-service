@@ -3,7 +3,7 @@ import typing
 from typing import Annotated, Any, Dict, Generator, Optional, Type, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.llm.llm_openai import OpenAILLM
@@ -26,6 +26,7 @@ class LLMService(ModuleBase):
     list_of_class_ui_names: list
     list_of_required_class_instances: list[Any]
     current_llm_provider: Any
+    provider_instance: OpenAILLM
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
@@ -37,13 +38,12 @@ class LLMService(ModuleBase):
         prompt_template_path=None,
         documents=None,
         llm_provider=None,
-        llm_model=None,
+        llm_model_name=None,
         logit_bias=None,
         max_tokens=None,
         stream=None,
     ):
         provider_instance = self.get_requested_class_instance(
-            self.list_of_required_class_instances,
             llm_provider if llm_provider is not None else self.config.llm_provider,
         )
         if provider_instance:
@@ -52,7 +52,7 @@ class LLMService(ModuleBase):
                 query=query,
                 prompt_template_path=prompt_template_path,
                 documents=documents,
-                llm_model=llm_model,
+                llm_model_name=llm_model_name,
                 logit_bias=logit_bias,
                 max_tokens=max_tokens,
                 stream=stream,
@@ -74,10 +74,9 @@ class LLMService(ModuleBase):
         model_token_utilization=None,
         context_to_response_ratio=0.00,
         llm_provider=None,
-        llm_model=None,
+        llm_model_name=None,
     ) -> tuple[int, int]:
         provider_instance = self.get_requested_class_instance(
-            self.list_of_required_class_instances,
             llm_provider if llm_provider is not None else self.config.llm_provider,
         )
 
@@ -85,7 +84,7 @@ class LLMService(ModuleBase):
             _, llm_model, total_prompt_tokens = provider_instance.prep_chat(
                 query=query,
                 prompt_template_path=prompt_template_path,
-                llm_model=llm_model,
+                llm_model_name=llm_model_name,
             )
             available_tokens = llm_model.TOKENS_MAX - 10  # for safety in case of model changes
             available_tokens = available_tokens * (
@@ -127,6 +126,6 @@ class LLMService(ModuleBase):
         for provider_instance in self.list_of_required_class_instances:
             provider_instance.create_settings_ui()
 
-        GradioHelper.create_settings_event_listener(self.config, components)
+        GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components

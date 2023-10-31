@@ -23,10 +23,11 @@ class GenericWebScraper(ModuleBase):
     CLASS_UI_NAME: str = "Generic Web Scraper"
 
     class ClassConfigModel(BaseModel):
-        continue_on_failue: bool = True
+        continue_on_failure: bool = True
 
     config: ClassConfigModel
-
+    ui_components: dict[str, Any]
+    
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
@@ -38,17 +39,15 @@ class GenericWebScraper(ModuleBase):
         return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
     def create_settings_ui(self):
-        components = {}
+        self.ui_components = {}
 
         with gr.Column():
-            components["continue_on_failue"] = gr.Checkbox(
-                value=self.config.continue_on_failue,
+            self.ui_components["continue_on_failure"] = gr.Checkbox(
+                value=self.config.continue_on_failure,
                 label="Continue On Failure",
                 interactive=True,
             )
-        # GradioHelper.create_settings_event_listener(self.config, components)
-
-        return components
+        # GradioHelpers.create_settings_event_listener(self.config, components)
 
 
 class GenericRecursiveWebScraper(ModuleBase):
@@ -115,7 +114,7 @@ class GenericRecursiveWebScraper(ModuleBase):
                 info="IDK",
                 interactive=True,
             )
-            # GradioHelper.create_settings_event_listener(self.config, components)
+            # GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components
 

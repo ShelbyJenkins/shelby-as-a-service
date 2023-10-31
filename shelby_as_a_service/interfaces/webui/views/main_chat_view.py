@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Any, Dict, Optional, Type
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 from agents.ceq.ceq_agent import CEQAgent
 from agents.vanillallm.vanillallm_agent import VanillaLLM
 from app.module_base import ModuleBase
@@ -190,7 +190,7 @@ class MainChatView(ModuleBase):
 
         create_nav_events(agent_settings_list)
 
-        GradioHelper.create_settings_event_listener(self.config, components)
+        GradioHelpers.create_settings_event_listener(self.config, components)
 
     def create_event_handlers(self, components):
         def get_spend():

@@ -3,7 +3,7 @@ import typing
 from typing import Annotated, Any, Generator, Optional, Type, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 import services.text_processing.text as text
 from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
@@ -59,7 +59,7 @@ class CEQAgent(ModuleBase):
         self,
         chat_in,
         llm_provider: Optional[str] = None,
-        llm_model: Optional[str] = None,
+        llm_model_name: Optional[str] = None,
         model_token_utilization: Optional[float] = None,
         context_to_response_ratio: Optional[float] = None,
         stream: Optional[bool] = None,
@@ -72,7 +72,7 @@ class CEQAgent(ModuleBase):
         Args:
             chat_in (str): The user input to generate a response for.
             llm_provider (Optional[str]): The LLM provider to use for generating the response.
-            llm_model (Optional[str]): The LLM model to use for generating the response.
+            llm_model_name (Optional[str]): The LLM model to use for generating the response.
             model_token_utilization (Optional[float]): The percentage of available tokens to use for generating the response.
             context_to_response_ratio (Optional[float]): The ratio of context tokens to response tokens to use for generating the response.
             stream (Optional[bool]): Whether to stream the response or not.
@@ -89,7 +89,7 @@ class CEQAgent(ModuleBase):
             if context_to_response_ratio is not None
             else self.config.context_to_response_ratio,
             llm_provider=llm_provider,
-            llm_model=llm_model,
+            llm_model_name=llm_model_name,
         )
 
         documents = self.doc_retrieval.get_documents(
@@ -105,7 +105,7 @@ class CEQAgent(ModuleBase):
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
             documents=documents,
             llm_provider=llm_provider,
-            llm_model=llm_model,
+            llm_model_name=llm_model_name,
             max_tokens=max_tokens,
             stream=stream,
         ):
@@ -220,4 +220,4 @@ class CEQAgent(ModuleBase):
         with gr.Tab(label=self.llm_service.CLASS_UI_NAME):
             self.llm_service.create_settings_ui()
 
-        GradioHelper.create_settings_event_listener(self.config, components)
+        GradioHelpers.create_settings_event_listener(self.config, components)

@@ -2,7 +2,7 @@ import typing
 from typing import Annotated, Any, Dict, Generator, Optional, Type, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.llm.llm_service import LLMService
@@ -33,7 +33,7 @@ class VanillaLLM(ModuleBase):
         self,
         chat_in: str,
         llm_provider: Optional[str] = None,
-        llm_model: Optional[str] = None,
+        llm_model_name: Optional[str] = None,
         model_token_utilization: Optional[float] = None,
         stream: Optional[bool] = None,
         sprite_name: Optional[str] = "webui_sprite",
@@ -43,7 +43,7 @@ class VanillaLLM(ModuleBase):
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
             model_token_utilization=model_token_utilization,
             llm_provider=llm_provider,
-            llm_model=llm_model,
+            llm_model_name=llm_model_name,
         )
 
         for response in self.llm_service.create_chat(
@@ -60,4 +60,4 @@ class VanillaLLM(ModuleBase):
             with gr.Tab(label=class_instance.CLASS_UI_NAME):
                 class_instance.create_settings_ui()
 
-        GradioHelper.create_settings_event_listener(self.config, components)
+        GradioHelpers.create_settings_event_listener(self.config, components)

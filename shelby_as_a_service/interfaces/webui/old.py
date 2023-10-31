@@ -2,7 +2,7 @@ import typing
 from typing import Any, Dict, Optional
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 from services.llm.llm_service import LLMService, OpenAILLM
 from sprites.web.gradio_themes import AtYourServiceTheme
 from sprites.web.vanillm_interface import VanallmInterface

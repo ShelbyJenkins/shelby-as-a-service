@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Any, Optional, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 import openai
 import services.prompt_templates.prompt_templates as PromptTemplates
 import services.text_processing.text as TextProcess
@@ -309,7 +309,7 @@ class OpenAILLM(ModuleBase):
                 )
 
             models_list.append(model_settings)
-            GradioHelper.create_settings_event_listener(model, model_compoments)
+            GradioHelpers.create_settings_event_listener(model, model_compoments)
 
         model_dropdown.change(
             fn=self.set_current_model,

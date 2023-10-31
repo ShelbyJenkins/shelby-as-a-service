@@ -3,7 +3,7 @@ import typing
 from typing import Any, Dict, Type, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelper
+import interfaces.webui.gradio_helpers as GradioHelpers
 import services.text_processing.text as TextProcess
 from app.module_base import ModuleBase
 from pydantic import BaseModel
@@ -48,6 +48,6 @@ class LocalFileDatabase(ModuleBase):
         #             label="max_response_tokens",
         #             interactive=True,
         #         )
-        #     GradioHelper.create_settings_event_listener(self.config, components)
+        #     GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components
