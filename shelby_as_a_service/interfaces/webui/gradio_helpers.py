@@ -5,14 +5,70 @@ import gradio as gr
 from app.module_base import ModuleBase
 
 
-def toggle_current_ui_provider(list_of_class_names: list[str], requested_model: str):
-    output = []
-    for provider_name in list_of_class_names:
-        if requested_model == provider_name:
-            output.append(gr.Group(visible=True))
+def abstract_service_ui_components(
+    enabled_provider_name: str,
+    required_classes: list,
+    provider_configs_dict: dict,
+    groups_rendered: bool = True,
+):
+    ui_components_list: list = []
+    ui_components_dict: Dict[str, Any] = {}
+    provider_ui_views: list = []
+
+    provider_select_dropdown = gr.Dropdown(
+        value=enabled_provider_name,
+        choices=[required_class.CLASS_NAME for required_class in required_classes],
+        label="Available Providers",
+        container=True,
+    )
+
+    ui_components_dict["provider_select_dropdown"] = provider_select_dropdown
+    ui_components_list.append(provider_select_dropdown)
+
+    for provider_class in required_classes:
+        provider_name = provider_class.CLASS_NAME
+        provider_config = provider_configs_dict.get(provider_name, {})
+        provider_instance = provider_class(config_file_dict=provider_config)
+        if groups_rendered:
+            ui_components_dict[provider_name] = provider_instance.create_provider_ui_components()
         else:
-            output.append(gr.Group(visible=False))
-    return output
+            visibility = set_current_ui_provider(provider_name, enabled_provider_name)
+            with gr.Group(visible=visibility) as provider_view:
+                ui_components_dict[
+                    provider_name
+                ] = provider_instance.create_provider_ui_components()
+            provider_ui_views.append(provider_view)
+
+        ui_components_list.extend(ui_components_dict[provider_name].values())
+
+    if groups_rendered is False:
+
+        def toggle_current_ui_provider(list_of_class_names: list[str], requested_model: str):
+            output = []
+            for provider_name in list_of_class_names:
+                visibility = set_current_ui_provider(provider_name, requested_model)
+                output.append(gr.Group(visible=visibility))
+            return output
+
+        provider_select_dropdown.change(
+            fn=lambda x: toggle_current_ui_provider(
+                list_of_class_names=[
+                    required_class.CLASS_NAME for required_class in required_classes
+                ],
+                requested_model=x,
+            ),
+            inputs=provider_select_dropdown,
+            outputs=provider_ui_views,
+        )
+
+    return ui_components_list, ui_components_dict
+
+
+def set_current_ui_provider(provider_name: str, enabled_provider_name: str):
+    if provider_name == enabled_provider_name:
+        return True
+    else:
+        return False
 
 
 # This updates the config model with the values from the UI

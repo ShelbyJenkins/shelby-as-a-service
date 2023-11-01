@@ -27,7 +27,7 @@ class GenericWebScraper(ModuleBase):
 
     config: ClassConfigModel
     ui_components: dict[str, Any]
-    
+
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
@@ -38,16 +38,16 @@ class GenericWebScraper(ModuleBase):
 
         return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
-    def create_settings_ui(self):
-        self.ui_components = {}
+    def create_provider_ui_components(self):
+        ui_components = {}
 
-        with gr.Column():
-            self.ui_components["continue_on_failure"] = gr.Checkbox(
-                value=self.config.continue_on_failure,
-                label="Continue On Failure",
-                interactive=True,
-            )
-        # GradioHelpers.create_settings_event_listener(self.config, components)
+        ui_components["continue_on_failure"] = gr.Checkbox(
+            value=self.config.continue_on_failure,
+            label="Continue On Failure",
+            interactive=True,
+        )
+
+        return ui_components
 
 
 class GenericRecursiveWebScraper(ModuleBase):
@@ -80,43 +80,41 @@ class GenericRecursiveWebScraper(ModuleBase):
 
         return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
-    def create_settings_ui(self):
-        components = {}
+    def create_provider_ui_components(self):
+        ui_components = {}
 
-        with gr.Column():
-            components["exclude_dirs"] = gr.Textbox(
-                value=self.config.exclude_dirs,
-                label="Exclude dirs.",
-                info="A list of subdirectories to exclude.",
-                interactive=True,
-            )
-            components["max_depth"] = gr.Number(
-                value=self.config.max_depth,
-                label="Max Depth",
-                info="The max depth of the recursive loading.",
-                interactive=True,
-            )
-            components["timeout"] = gr.Number(
-                value=self.config.timeout,
-                label="Timeout Time",
-                info="The timeout for the requests, in the unit of seconds.",
-                interactive=True,
-            )
-            components["use_async"] = gr.Checkbox(
-                value=self.config.use_async,
-                label="Use Async",
-                info="Whether to use asynchronous loading, if use_async is true, this function will not be lazy, but it will still work in the expected way, just not lazy.",
-                interactive=True,
-            )
-            components["prevent_outside"] = gr.Checkbox(
-                value=self.config.prevent_outside,
-                label="Prevent Outside",
-                info="IDK",
-                interactive=True,
-            )
-            # GradioHelpers.create_settings_event_listener(self.config, components)
+        ui_components["exclude_dirs"] = gr.Textbox(
+            value=self.config.exclude_dirs,
+            label="Exclude dirs.",
+            info="A list of subdirectories to exclude.",
+            interactive=True,
+        )
+        ui_components["max_depth"] = gr.Number(
+            value=self.config.max_depth,
+            label="Max Depth",
+            info="The max depth of the recursive loading.",
+            interactive=True,
+        )
+        ui_components["timeout"] = gr.Number(
+            value=self.config.timeout,
+            label="Timeout Time",
+            info="The timeout for the requests, in the unit of seconds.",
+            interactive=True,
+        )
+        ui_components["use_async"] = gr.Checkbox(
+            value=self.config.use_async,
+            label="Use Async",
+            info="Whether to use asynchronous loading, if use_async is true, this function will not be lazy, but it will still work in the expected way, just not lazy.",
+            interactive=True,
+        )
+        ui_components["prevent_outside"] = gr.Checkbox(
+            value=self.config.prevent_outside,
+            label="Prevent Outside",
+            info="IDK",
+            interactive=True,
+        )
 
-        return components
+        return ui_components
 
     # class OpenAPILoader(ServiceBase):
     #     def __init__(self, data_source_config: DataSourceConfig):

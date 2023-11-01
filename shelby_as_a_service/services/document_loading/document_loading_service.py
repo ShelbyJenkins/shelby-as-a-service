@@ -5,13 +5,7 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
-from services.context_index.context_index_model import (
-    ContextConfigModel,
-    ContextIndexModel,
-    DocDBModel,
-    DomainModel,
-    SourceModel,
-)
+from services.context_index.context_index_model import ContextConfigModel
 from services.document_loading.document_loading_providers import (
     GenericRecursiveWebScraper,
     GenericWebScraper,
@@ -51,41 +45,26 @@ class DocLoadingService(ModuleBase):
         else:
             print("rnr")
 
-    def create_settings_ui(self, domain_or_source_instance):
-        provider_instances = {}
-        provider_views = []
+    def create_service_ui_components(
+        self, context_config: ContextConfigModel, groups_rendered: bool = True
+    ) -> tuple:
+        provider_configs_dict = {}
 
-        with gr.Column():
-            doc_loading_provider = gr.Dropdown(
-                value=domain_or_source_instance.context_config.doc_loader.doc_loader_provider_name,
-                choices=self.list_of_class_names,
-                label="Doc Loader",
-                container=True,
-            )
-            for provider_class in self.REQUIRED_CLASSES:
-                provider_instance = provider_class()
-                with gr.Group(visible=False) as provider_view:
-                    provider_instance.create_settings_ui()
-                    provider_instances[provider_instance.CLASS_NAME] = provider_instance
+        for provider in context_config.doc_loaders:
+            name = provider.doc_loader_provider_name
+            config = provider.doc_loader_config
+            provider_configs_dict[name] = config
 
-                provider_views.append(provider_view)
+        enabled_provider_name = context_config.doc_loader.doc_loader_provider_name
 
-            doc_loading_provider.change(
-                fn=lambda x: GradioHelpers.toggle_current_ui_provider(
-                    list_of_class_names=self.list_of_class_names, requested_model=x
-                ),
-                inputs=doc_loading_provider,
-                outputs=provider_views,
-            )
+        (
+            ui_components_list,
+            ui_components_dict,
+        ) = GradioHelpers.abstract_service_ui_components(
+            enabled_provider_name=enabled_provider_name,
+            required_classes=self.REQUIRED_CLASSES,
+            provider_configs_dict=provider_configs_dict,
+            groups_rendered=groups_rendered,
+        )
 
-        return provider_instances
-
-    # Change source/domain
-    # Recieve call from context index view
-    # Iterate through providers components
-    # Find matching configs from source/domain instance
-    # Emit new components
-    # change visibility of providers
-
-
-# Save config
+        return ui_components_list, ui_components_dict

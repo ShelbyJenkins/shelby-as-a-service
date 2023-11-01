@@ -116,7 +116,6 @@ class AtYourServiceTheme(Base):
             background_fill_primary_dark="black",
             background_fill_secondary_dark="black",
             input_background_fill_dark="black",  # Leave same as main background
-            chatbot_code_background_color_dark="black",
             block_background_fill_dark="black",
             border_color_primary_dark="#653b12",
             block_border_color_dark="black",

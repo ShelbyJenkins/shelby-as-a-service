@@ -24,14 +24,12 @@ from .context_templates import ContextTemplates
 
 
 def check_and_handle_name_collision(existing_names: list[str], new_name: str) -> str:
-    if new_name not in existing_names:
-        return new_name
-    existing_name = new_name
     i = 0
-    while existing_name == new_name:
-        new_name = f"{new_name}_{i}"
+    test_name = new_name
+    while test_name in existing_names:
+        test_name = f"{new_name}_{i}"
         i += 1
-    return new_name
+    return test_name
 
 
 class ContextIndex(IndexBase):
@@ -158,14 +156,17 @@ class ContextIndex(IndexBase):
     def create_domain(
         self,
         new_domain_name: Optional[str] = None,
+        new_description: Optional[str] = None,
         requested_template_name: Optional[str] = None,
-    ):
-        if new_domain_name is None:
+    ) -> tuple[str, int]:
+        if not new_domain_name:
             new_domain_name = DomainModel.DEFAULT_DOMAIN_NAME
         new_domain_name = check_and_handle_name_collision(
             existing_names=self.list_of_domain_names, new_name=new_domain_name
         )
-        default_domain = DomainModel(name=new_domain_name)
+        if not new_description:
+            new_description = DomainModel.DEFAULT_DOMAIN_DESCRIPTION
+        default_domain = DomainModel(name=new_domain_name, description=new_description)
         ContextIndex.context_index_model.domains.append(default_domain)
         ContextIndex.session.flush()
         if not ContextIndex.context_index_model.domain_id:
@@ -176,26 +177,31 @@ class ContextIndex(IndexBase):
         ContextConfig.set_context_config_from_template(
             instance_model=default_domain, requested_template_name=requested_template_name
         )
+        default_domain_instance = DomainInstance(domain_model=default_domain)
+        default_domain_instance.create_source()
 
-        self.domain.create_source()
+        return default_domain.name, default_domain.id
 
     def clone_domain(
         self,
         new_domain_name: Optional[str] = None,
+        new_description: Optional[str] = None,
         clone_domain_name: Optional[str] = None,
         clone_domain_id: Optional[int] = None,
-    ):
+    ) -> tuple[str, int]:
         domain_instance_to_clone = self.get_domain(
             requested_domain_id=clone_domain_id, requested_domain_name=clone_domain_name
         )
-        if new_domain_name is None:
+        if not new_domain_name:
             new_domain_name = domain_instance_to_clone.domain_model.name
-        if new_domain_name is None:
+        if not new_domain_name:
             new_domain_name = DomainModel.DEFAULT_DOMAIN_NAME
         new_domain_name = check_and_handle_name_collision(
             existing_names=self.list_of_domain_names, new_name=new_domain_name
         )
-        domain_model_clone = DomainModel(name=new_domain_name)
+        if not new_description:
+            new_description = domain_instance_to_clone.domain_model.description
+        domain_model_clone = DomainModel(name=new_domain_name, description=new_description)
         ContextIndex.context_index_model.domains.append(domain_model_clone)
         ContextIndex.session.flush()
         for existing_context_config in self.instance_model.context_configs:
@@ -214,11 +220,12 @@ class ContextIndex(IndexBase):
                 new_source_name=source_model_to_clone.name,
                 source_instance_to_clone=source_instance_to_clone,
             )
+        return domain_model_clone.name, domain_model_clone.id
 
     def set_domain(self, domain_id: Optional[int] = None, domain_name: Optional[str] = None):
         domain = self.get_domain(requested_domain_id=domain_id, requested_domain_name=domain_name)
 
-        ContextIndex.context_index_model.domain_id = domain.domain_model.id
+        ContextIndex.context_index_model.domain = domain.domain_model
         ContextIndex.session.flush()
 
     def get_domain(
@@ -297,14 +304,17 @@ class DomainInstance(ContextIndex):
     def create_source(
         self,
         new_source_name: Optional[str] = None,
+        new_description: Optional[str] = None,
         requested_template_name: Optional[str] = None,
-    ):
-        if new_source_name is None:
+    ) -> tuple[str, int]:
+        if not new_source_name:
             new_source_name = SourceModel.DEFAULT_SOURCE_NAME
         new_source_name = check_and_handle_name_collision(
             existing_names=self.list_of_source_names, new_name=new_source_name
         )
-        default_source = SourceModel(name=new_source_name)
+        if not new_description:
+            new_description = SourceModel.DEFAULT_SOURCE_DESCRIPTION
+        default_source = SourceModel(name=new_source_name, description=new_description)
         self.domain_model.sources.append(default_source)
         ContextIndex.session.flush()
         if not self.domain_model.source_id:
@@ -326,27 +336,32 @@ class DomainInstance(ContextIndex):
                 requested_config_name=self.domain_model.context_config.context_config_name,
             )
 
+        return default_source.name, default_source.id
+
     def clone_source(
         self,
         new_source_name: Optional[str] = None,
+        new_description: Optional[str] = None,
         clone_source_name: Optional[str] = None,
         clone_source_id: Optional[int] = None,
         source_instance_to_clone: Optional["SourceInstance"] = None,
-    ):
+    ) -> tuple[str, int]:
         if source_instance_to_clone is None:
             if clone_source_name or clone_source_id:
                 source_instance_to_clone = self.get_source(
                     requested_source_id=clone_source_id, requested_source_name=clone_source_name
                 )
-                if new_source_name is None:
+                if not new_source_name:
                     new_source_name = source_instance_to_clone.source_model.name
 
-        if new_source_name is None:
+        if not new_source_name:
             new_source_name = SourceModel.DEFAULT_SOURCE_NAME
         new_source_name = check_and_handle_name_collision(
             existing_names=self.list_of_source_names, new_name=new_source_name
         )
-        source_model_clone = SourceModel(name=new_source_name)
+        if not new_description:
+            new_description = SourceModel.DEFAULT_SOURCE_DESCRIPTION
+        source_model_clone = SourceModel(name=new_source_name, description=new_description)
         self.domain_model.sources.append(source_model_clone)
         ContextIndex.session.flush()
         if source_instance_to_clone is None:
@@ -365,9 +380,11 @@ class DomainInstance(ContextIndex):
             requested_config_name=source_instance_to_clone.source_model.context_config.context_config_name,
         )
 
+        return source_model_clone.name, source_model_clone.id
+
     def set_source(self, source_id: Optional[int] = None, source_name: Optional[str] = None):
         source = self.get_source(requested_source_id=source_id, requested_source_name=source_name)
-        self.domain_model.source_id = source.source_model.id
+        self.domain_model.source = source.source_model
         ContextIndex.session.flush()
 
     def get_source(
