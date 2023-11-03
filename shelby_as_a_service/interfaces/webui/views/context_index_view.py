@@ -172,13 +172,13 @@ class ContextIndexView(ModuleBase):
                     size="sm",
                 )
                 input_components["make_new_name"] = gr.Textbox(
-                    placeholder=self.context_index.domain.object_model.DEFAULT_DOMAIN_NAME,
+                    placeholder=self.context_index.domain.object_model.DEFAULT_NAME,
                     lines=1,
                     container=True,
                     label="New Domain Name",
                 )
                 input_components["make_new_description"] = gr.Textbox(
-                    placeholder=self.context_index.domain.object_model.DEFAULT_DOMAIN_DESCRIPTION,
+                    placeholder=self.context_index.domain.object_model.DEFAULT_DESCRIPTION,
                     lines=1,
                     container=True,
                     label="New Domain Description",
@@ -314,13 +314,13 @@ class ContextIndexView(ModuleBase):
                     size="sm",
                 )
                 input_components["make_new_name"] = gr.Textbox(
-                    placeholder=self.context_index.domain.source.object_model.DEFAULT_SOURCE_NAME,
+                    placeholder=self.context_index.domain.source.object_model.DEFAULT_NAME,
                     lines=1,
                     container=True,
                     label="New Source Name",
                 )
                 input_components["make_new_description"] = gr.Textbox(
-                    placeholder=self.context_index.domain.source.object_model.DEFAULT_SOURCE_DESCRIPTION,
+                    placeholder=self.context_index.domain.source.object_model.DEFAULT_DESCRIPTION,
                     lines=1,
                     container=True,
                     label="New Source Description",

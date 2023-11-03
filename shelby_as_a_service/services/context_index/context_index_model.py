@@ -19,9 +19,9 @@ class DocLoaderModel(Base):
     context_template_model = relationship(
         "ContextTemplateModel", foreign_keys=[context_template_id]
     )
-
+    DEFAULT_DOC_LOADER_NAME: str = "generic_recursive_web_scraper"
     name: Mapped[str] = mapped_column(String)
-    provider_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
+    config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
 
 class DocDBModel(Base):
@@ -33,8 +33,9 @@ class DocDBModel(Base):
     context_index_model = relationship(
         "ContextIndexModel", back_populates="doc_dbs", foreign_keys=[context_id]
     )
+    DEFAULT_DOC_DB_NAME: str = "pinecone_database"
     name: Mapped[str] = mapped_column(String, unique=True)
-    provider_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
+    config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
 
 class ContextTemplateModel(Base):
@@ -46,21 +47,11 @@ class ContextTemplateModel(Base):
     )
     context_index_model = relationship("ContextIndexModel", foreign_keys=[context_id])
 
-    doc_loader_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_loaders.id"), nullable=True)
-    enabled_doc_loader = relationship("DocLoaderModel", foreign_keys=[doc_loader_id])
-    doc_loaders: Mapped[list[DocLoaderModel]] = relationship(
-        "DocLoaderModel",
-        back_populates="context_template_model",
-        cascade="all, delete-orphan",
-        foreign_keys=[DocLoaderModel.context_template_id],
-    )
-
-    @property
-    def list_of_doc_loader_names(self) -> list:
-        return [doc_loader.name for doc_loader in self.doc_loaders]
+    enabled_doc_loader_name: Mapped[str] = mapped_column(String)
+    enabled_doc_loader_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
-    ennabled_doc_db = relationship("DocDBModel")
+    enabled_doc_db = relationship("DocDBModel")
 
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     name: Mapped[str] = mapped_column(String)
@@ -95,13 +86,13 @@ class SourceModel(Base):
         return [doc_loader.name for doc_loader in self.doc_loaders]
 
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
-    ennabled_doc_db = relationship("DocDBModel")
+    enabled_doc_db = relationship("DocDBModel")
 
-    DEFAULT_SOURCE_NAME: str = "default_source_name"
+    DEFAULT_NAME: str = "DEFAULT_NAME"
     DEFAULT_TEMPLATE_NAME: str = "default_template_name"
-    DEFAULT_SOURCE_DESCRIPTION: str = "A default source description"
+    DEFAULT_DESCRIPTION: str = "A default source description"
     name: Mapped[str] = mapped_column(String)
-    description: Mapped[str] = mapped_column(String, default=DEFAULT_SOURCE_DESCRIPTION)
+    description: Mapped[str] = mapped_column(String, default=DEFAULT_DESCRIPTION)
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -137,14 +128,19 @@ class DomainModel(Base):
         cascade="all, delete-orphan",
         foreign_keys=[DocLoaderModel.domain_id],
     )
-    doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
-    ennabled_doc_db = relationship("DocDBModel")
 
-    DEFAULT_DOMAIN_NAME: str = "default_domain_name"
+    @property
+    def list_of_doc_loader_names(self) -> list:
+        return [doc_loader.name for doc_loader in self.doc_loaders]
+
+    doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
+    enabled_doc_db = relationship("DocDBModel")
+
+    DEFAULT_NAME: str = "DEFAULT_NAME"
     DEFAULT_TEMPLATE_NAME: str = "default_template_name"
-    DEFAULT_DOMAIN_DESCRIPTION: str = "A default domain description"
+    DEFAULT_DESCRIPTION: str = "A default domain description"
     name: Mapped[str] = mapped_column(String)
-    description: Mapped[str] = mapped_column(String, default=DEFAULT_DOMAIN_DESCRIPTION)
+    description: Mapped[str] = mapped_column(String, default=DEFAULT_DESCRIPTION)
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 

@@ -52,14 +52,14 @@ class ContextIndex(IndexBase):
     def setup_context_index(self):
         if context_index_model := self.session.query(ContextIndexModel).first():
             ContextIndex.context_index_model = context_index_model
-            DocDB.add_doc_dbs_to_index()
+            self.add_doc_dbs_to_index()
             self.add_default_context_templates_to_index()
         else:
             ContextIndex.context_index_model = ContextIndexModel()
             ContextIndex.session.add(ContextIndex.context_index_model)
             ContextIndex.session.flush()
 
-            DocDB.add_doc_dbs_to_index()
+            self.add_doc_dbs_to_index()
             self.add_default_context_templates_to_index()
 
             self.create_domain()
@@ -199,7 +199,7 @@ class ContextIndex(IndexBase):
             parent_object = self.parse_parent_object(
                 parent_domain=parent_domain, parent_source=parent_source
             )
-            parent_object.ennabled_doc_db = set_object
+            parent_object.enabled_doc_db = set_object
         elif set_model_type is DocLoaderModel:
             set_object = self.get_model_object(
                 DocLoaderModel,
@@ -219,272 +219,237 @@ class ContextIndex(IndexBase):
 
     def create_domain(
         self,
-        new_domain_name: Optional[str] = None,
+        new_name: Optional[str] = None,
         new_description: Optional[str] = None,
         requested_template_name: Optional[str] = None,
+        clone_name: Optional[str] = None,
+        clone_id: Optional[int] = None,
     ) -> tuple[str, int]:
-        if not new_domain_name:
-            new_domain_name = DomainModel.DEFAULT_DOMAIN_NAME
-        new_domain_name = check_and_handle_name_collision(
-            existing_names=self.list_of_all_context_index_domain_names, new_name=new_domain_name
+        if not new_name:
+            new_name = DomainModel.DEFAULT_NAME
+        new_name = check_and_handle_name_collision(
+            existing_names=self.list_of_all_context_index_domain_names, new_name=new_name
         )
         if not new_description:
-            new_description = DomainModel.DEFAULT_DOMAIN_DESCRIPTION
-        new_domain_model = DomainModel(name=new_domain_name, description=new_description)
-        ContextIndex.context_index_model.domains.append(new_domain_model)
+            new_description = DomainModel.DEFAULT_DESCRIPTION
+        new_model = DomainModel(name=new_name, description=new_description)
+
+        ContextIndex.context_index_model.domains.append(new_model)
         ContextIndex.session.flush()
-        if not ContextIndex.context_index_model.current_domain_id:
-            self.set_object(set_model_type=DomainModel, set_id=new_domain_model.id)
 
-        if not requested_template_name:
-            requested_template_name = new_domain_model.DEFAULT_TEMPLATE_NAME
-        ContextConfig.set_context_config_from_template(
-            object_model=new_domain_model, requested_template_name=requested_template_name
-        )
+        if not ContextIndex.context_index_model.current_domain:
+            self.set_object(set_model_type=DomainModel, set_id=new_model.id)
 
-        self.create_source(parent_domain=new_domain_model)
-
-        return new_domain_model.name, new_domain_model.id
-
-    def clone_domain(
-        self,
-        new_domain_name: Optional[str] = None,
-        new_description: Optional[str] = None,
-        clone_domain_name: Optional[str] = None,
-        clone_domain_id: Optional[int] = None,
-    ) -> tuple[str, int]:
-        domain_instance_to_clone = self.get_domain(
-            requested_domain_id=clone_domain_id, requested_domain_name=clone_domain_name
-        )
-        if not new_domain_name:
-            new_domain_name = domain_instance_to_clone.domain_model.name
-        if not new_domain_name:
-            new_domain_name = DomainModel.DEFAULT_DOMAIN_NAME
-        new_domain_name = check_and_handle_name_collision(
-            existing_names=self.list_of_domain_names, new_name=new_domain_name
-        )
-        if not new_description:
-            new_description = domain_instance_to_clone.domain_model.description
-        domain_model_clone = DomainModel(name=new_domain_name, description=new_description)
-        ContextIndex.context_index_model.domains.append(domain_model_clone)
-        ContextIndex.session.flush()
-        for existing_context_config in self.object_model.context_configs:
-            ContextConfig.clone_config(
-                existing_context_config=existing_context_config,
-                target_object_model=domain_model_clone,
+        if not clone_name and not clone_id:
+            if not requested_template_name:
+                requested_template_name = new_model.DEFAULT_TEMPLATE_NAME
+            context_template = self.get_model_object(
+                ContextTemplateModel,
+                name=requested_template_name,
             )
-        ContextConfig.set_config(
-            object_model=domain_model_clone,
-            requested_config_name=domain_instance_to_clone.object_model.context_config.context_config_name,
-        )
-        domain_instance_clone = DomainInstance(domain_model=domain_model_clone)
-        for source_model_to_clone in domain_instance_to_clone.domain_model.sources:
-            source_instance_to_clone = SourceInstance(source_model=source_model_to_clone)
-            domain_instance_clone.clone_source(
-                new_source_name=source_model_to_clone.name,
-                source_instance_to_clone=source_instance_to_clone,
+            if context_template is not ContextTemplateModel:
+                raise Exception(
+                    "Unexpected error: context_template should not be of type ContextTemplateModel."
+                )
+            self.set_domain_or_source_config(
+                target_object=new_model,
+                enabled_doc_loader_name=context_template.enabled_doc_loader_name,
+                enabled_doc_db_name=context_template.enabled_doc_db.name,
+                batch_update_enabled=context_template.batch_update_enabled,
             )
-        return domain_model_clone.name, domain_model_clone.id
+            self.create_source(parent_domain=new_model)
+        else:
+            object_to_clone = self.get_model_object(
+                requested_model_type=DomainModel,
+                id=clone_id,
+                name=clone_name,
+            )
+            if not isinstance(object_to_clone, DomainModel):
+                raise Exception("Unexpected error: object_to_clone should be of type DomainModel.")
+            for source_model_to_clone in object_to_clone.sources:
+                self.create_source(
+                    parent_domain=new_model,
+                    clone_name=source_model_to_clone.name,
+                    clone_id=source_model_to_clone.id,
+                )
+
+            self.set_domain_or_source_config(
+                target_object=new_model,
+                enabled_doc_loader_name=object_to_clone.enabled_doc_loader.name,
+                enabled_doc_db_name=object_to_clone.enabled_doc_db.name,
+                batch_update_enabled=object_to_clone.batch_update_enabled,
+            )
+
+        self.populate_service_providers(
+            target_object=new_model, requested_model_type=DocLoaderModel
+        )
+
+        return new_model.name, new_model.id
 
     def create_source(
         self,
         parent_domain: DomainModel,
-        new_source_name: Optional[str] = None,
+        new_name: Optional[str] = None,
         new_description: Optional[str] = None,
         requested_template_name: Optional[str] = None,
+        clone_name: Optional[str] = None,
+        clone_id: Optional[int] = None,
     ) -> tuple[str, int]:
-        if not new_source_name:
-            new_source_name = SourceModel.DEFAULT_SOURCE_NAME
-        new_source_name = check_and_handle_name_collision(
-            existing_names=parent_domain.list_of_source_names, new_name=new_source_name
+        if not new_name:
+            new_name = SourceModel.DEFAULT_NAME
+        new_name = check_and_handle_name_collision(
+            existing_names=self.list_of_all_context_index_domain_names, new_name=new_name
         )
         if not new_description:
-            new_description = SourceModel.DEFAULT_SOURCE_DESCRIPTION
-        new_source_model = SourceModel(name=new_source_name, description=new_description)
-        parent_domain.sources.append(new_source_model)
-        ContextIndex.session.flush()
-        if not parent_domain.current_source_id:
-            self.set_object(set_model_type=SourceModel, set_id=new_source_model.id)
+            new_description = SourceModel.DEFAULT_DESCRIPTION
+        new_model = SourceModel(name=new_name, description=new_description)
 
-        if requested_template_name:
+        parent_domain.sources.append(new_model)
+        ContextIndex.session.flush()
+
+        if not ContextIndex.context_index_model.current_domain:
+            self.set_object(set_model_type=SourceModel, set_id=new_model.id)
+
+        if not clone_name and not clone_id:
             if not requested_template_name:
-                requested_template_name = new_source_model.DEFAULT_TEMPLATE_NAME
-            ContextConfig.set_context_config_from_template(
-                object_model=new_source_model, requested_template_name=requested_template_name
+                requested_template_name = new_model.DEFAULT_TEMPLATE_NAME
+            context_template = self.get_model_object(
+                ContextTemplateModel,
+                name=requested_template_name,
+                parent_domain=parent_domain,
+            )
+            if context_template is not ContextTemplateModel:
+                raise Exception(
+                    "Unexpected error: context_template should not be of type ContextTemplateModel."
+                )
+            self.set_domain_or_source_config(
+                target_object=new_model,
+                enabled_doc_loader_name=context_template.enabled_doc_loader_name,
+                enabled_doc_db_name=context_template.enabled_doc_db.name,
+                batch_update_enabled=context_template.batch_update_enabled,
             )
         else:
-            ContextConfig.clone_config(
-                existing_context_config=self.object_model.context_config,
-                target_object_model=new_source_model,
+            object_to_clone = self.get_model_object(
+                requested_model_type=SourceModel,
+                id=clone_id,
+                name=clone_name,
             )
-            ContextConfig.set_config(
-                object_model=new_source_model,
-                requested_config_name=self.domain_model.context_config.context_config_name,
-            )
-
-        return new_source_model.name, new_source_model.id
-
-    def clone_source(
-        self,
-        new_source_name: Optional[str] = None,
-        new_description: Optional[str] = None,
-        clone_source_name: Optional[str] = None,
-        clone_source_id: Optional[int] = None,
-        source_instance_to_clone: Optional["SourceInstance"] = None,
-    ) -> tuple[str, int]:
-        if source_instance_to_clone is None:
-            if clone_source_name or clone_source_id:
-                source_instance_to_clone = self.get_source(
-                    requested_source_id=clone_source_id, requested_source_name=clone_source_name
+            if object_to_clone is not SourceModel:
+                raise Exception(
+                    "Unexpected error: object_to_clone should not be of type SourceModel."
                 )
-                if not new_source_name:
-                    new_source_name = source_instance_to_clone.source_model.name
 
-        if not new_source_name:
-            new_source_name = SourceModel.DEFAULT_SOURCE_NAME
-        new_source_name = check_and_handle_name_collision(
-            existing_names=self.list_of_source_names, new_name=new_source_name
-        )
-        if not new_description:
-            new_description = SourceModel.DEFAULT_SOURCE_DESCRIPTION
-        source_model_clone = SourceModel(name=new_source_name, description=new_description)
-        self.domain_model.sources.append(source_model_clone)
-        ContextIndex.session.flush()
-        if source_instance_to_clone is None:
-            raise Exception(
-                "Unexpected error: source_instance_to_clone should not be None at this point."
+            self.set_domain_or_source_config(
+                target_object=new_model,
+                enabled_doc_loader_name=object_to_clone.enabled_doc_loader.name,
+                enabled_doc_db_name=object_to_clone.enabled_doc_db.name,
+                batch_update_enabled=object_to_clone.batch_update_enabled,
             )
 
-        for existing_context_config in source_instance_to_clone.source_model.context_configs:
-            ContextConfig.clone_config(
-                existing_context_config=existing_context_config,
-                target_object_model=source_model_clone,
-            )
-
-        ContextConfig.set_config(
-            object_model=source_model_clone,
-            requested_config_name=source_instance_to_clone.source_model.context_config.context_config_name,
+        self.populate_service_providers(
+            target_object=new_model, requested_model_type=DocLoaderModel
         )
 
-        return source_model_clone.name, source_model_clone.id
+        return new_model.name, new_model.id
 
-    def set_context_config_from_template(
+    def set_domain_or_source_config(
         self,
-        parent_object: Union[DomainModel, SourceModel],
-        requested_template_id: Optional[int] = None,
-        requested_template_name: Optional[str] = None,
+        target_object: Union[DomainModel, SourceModel],
+        batch_update_enabled: bool,
+        enabled_doc_loader_name: Optional[str] = None,
+        enabled_doc_loader_config: Optional[dict] = None,
+        enabled_doc_db_name: Optional[str] = None,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
     ):
-        context_template = self.get_model_object(
-            ContextTemplateModel,
-            id=requested_template_id,
-            name=requested_template_name,
+        if name:
+            target_object.name = name
+        if description:
+            target_object.description = description
+        target_object.batch_update_enabled = batch_update_enabled
+        if enabled_doc_loader_name is None:
+            enabled_doc_loader_name = DocLoaderModel.DEFAULT_DOC_LOADER_NAME
+        target_object.enabled_doc_loader = self.create_service_provider_model(
+            requested_model_type=DocLoaderModel,
+            requested_provider_name=enabled_doc_loader_name,
+            config=enabled_doc_loader_config,
         )
-        if context_template is not ContextTemplateModel:
-            raise Exception(
-                "Unexpected error: context_template should not be of type ContextTemplateModel."
-            )
-
-        parent_object.enabled_doc_loader = context_template.enabled_doc_loader
-        parent_object.ennabled_doc_db = context_template.ennabled_doc_db
-        parent_object.batch_update_enabled = context_template.batch_update_enabled
-
+        if enabled_doc_db_name is None:
+            enabled_doc_db_name = DocDBModel.DEFAULT_DOC_DB_NAME
+        target_object.enabled_doc_db = self.get_model_object(DocDBModel, name=enabled_doc_db_name)
         ContextIndex.session.flush()
 
-        DocLoading.add_doc_loaders_to_config_or_template(
-            enabled_doc_loader_name=requested_context_template.doc_loader.provider_name,
-            enabled_doc_loader_config=requested_context_template.doc_loader.provider_config,
-            context_config_or_template=new_context_config,
-        )
+    def create_service_provider_model(
+        self,
+        requested_model_type: Union[
+            Type[DocLoaderModel],
+            Type[DocDBModel],
+        ],
+        requested_provider_name: str,
+        config: Optional[dict] = None,
+    ):
+        if requested_model_type is DocLoaderModel:
+            list_of_service_providers = DocLoadingService.REQUIRED_CLASSES
+            class_model = DocLoaderModel
+        elif requested_model_type is DocDBModel:
+            list_of_service_providers = DataBaseService.REQUIRED_CLASSES
+            class_model = DocDBModel
+        else:
+            raise Exception(f"Unexpected error: {requested_model_type.__name__} not found.")
 
-    @staticmethod
-    def add_default_context_templates_to_index():
-        for available_template in ContextTemplates.AVAILABLE_TEMPLATES:
-            existing_config = next(
+        if (
+            requested_object := next(
                 (
-                    index_context_template
-                    for index_context_template in ContextIndex.context_index_model.index_context_templates
-                    if index_context_template.context_template_name
-                    == available_template.TEMPLATE_NAME
+                    object
+                    for object in list_of_service_providers
+                    if object.CLASS_NAME == requested_provider_name
                 ),
                 None,
             )
-            if not existing_config:
-                new_template = ContextTemplateModel(
-                    context_template_name=available_template.TEMPLATE_NAME,
-                    doc_db_id=DocDB.get_doc_db(
-                        requested_database_name=available_template.provider_name
-                    ).id,
-                    batch_update_enabled=available_template.batch_update_enabled,
-                )
+        ) is None:
+            raise Exception(
+                f"name {requested_provider_name} not found in {list_of_service_providers}."
+            )
 
-                ContextIndex.context_index_model.index_context_templates.append(new_template)
-                ContextIndex.session.flush()
-                DocLoading.add_doc_loaders_to_config_or_template(
-                    enabled_doc_loader_name=available_template.doc_loader_provider_name,
-                    enabled_doc_loader_config=available_template.doc_loader_config.model_dump(),
-                    context_config_or_template=new_template,
-                )
+        provider_model = class_model(
+            name=requested_object.CLASS_NAME,
+            config=requested_object.ClassConfigModel(**config).model_dump(),
+        )
+        return provider_model
 
-    @staticmethod
-    def save_config_as_template(
-        object_model: Union[DomainModel, SourceModel],
-        requested_config_id: Optional[int] = None,
-        requested_config_name: Optional[str] = None,
+    def populate_service_providers(
+        self,
+        target_object: Union[DomainModel, SourceModel],
+        requested_model_type: Type[DocLoaderModel],
     ):
-        requested_context_config = ContextConfig.get_config(
-            object_model=object_model,
-            requested_config_id=requested_config_id,
-            requested_config_name=requested_config_name,
-        )
-        existing_context_template_names = [
-            existing_template.context_template_name
-            for existing_template in ContextIndex.context_index_model.index_context_templates
-        ]
-        new_context_template_name = check_and_handle_name_collision(
-            existing_names=existing_context_template_names,
-            new_name=requested_context_config.context_config_name,
-        )
+        if requested_model_type is DocLoaderModel:
+            list_of_available_providers = DocLoadingService.REQUIRED_CLASSES
+            list_of_current_providers = target_object.doc_loaders
+        else:
+            raise Exception(f"Unexpected error: {requested_model_type.__name__} not found.")
 
-        # create new context_config from template
-        new_context_template = ContextTemplateModel(
-            context_template_name=new_context_template_name,
-            doc_db_id=requested_context_config.doc_db_id,
-            batch_update_enabled=requested_context_config.batch_update_enabled,
-        )
-        # Append it to the index's list of context_configs
-        ContextIndex.context_index_model.index_context_templates.append(new_context_template)
-        ContextIndex.session.flush()
+        for available_provider_class in list_of_available_providers:
+            if available_provider_class.CLASS_NAME in [
+                current_provider.name for current_provider in list_of_current_providers
+            ]:
+                continue
+            list_of_current_providers.append(
+                self.create_service_provider_model(  # type: ignore
+                    requested_model_type=requested_model_type,
+                    requested_provider_name=available_provider_class.CLASS_NAME,
+                )
+            )
 
-    @staticmethod
-    def clone_config(
-        existing_context_config: ContextConfigModel,
-        target_object_model: Union[DomainModel, SourceModel],
-    ):
-        new_context_config = ContextConfigModel(
-            context_config_name=existing_context_config.context_config_name,
-            doc_db_id=existing_context_config.doc_db_id,
-            batch_update_enabled=existing_context_config.batch_update_enabled,
-        )
+            ContextIndex.session.flush()
 
-        target_object_model.context_configs.append(new_context_config)
-        ContextIndex.session.flush()
-        DocLoading.add_doc_loaders_to_config_or_template(
-            enabled_doc_loader_name=existing_context_config.doc_loader.provider_name,
-            enabled_doc_loader_config=existing_context_config.doc_loader.provider_config,
-            context_config_or_template=new_context_config,
-        )
-
-
-class DocDB:
-    @staticmethod
-    def add_doc_dbs_to_index():
+    def add_doc_dbs_to_index(self):
         for db_class in DataBaseService.REQUIRED_CLASSES:
-            provider_name = db_class.CLASS_NAME
+            doc_db_provider_name = db_class.CLASS_NAME
             existing_config = next(
                 (
                     doc_db
                     for doc_db in ContextIndex.context_index_model.doc_dbs
-                    if doc_db.provider_name == provider_name
+                    if doc_db.name == doc_db_provider_name
                 ),
                 None,
             )
@@ -492,27 +457,75 @@ class DocDB:
             if not existing_config:
                 db_config = db_class.ClassConfigModel().model_dump()
                 ContextIndex.context_index_model.doc_dbs.append(
-                    DocDBModel(provider_name=provider_name, db_config=db_config)
+                    DocDBModel(name=doc_db_provider_name, db_config=db_config)
                 )
                 ContextIndex.session.flush()
 
-
-class DocLoading:
-    @staticmethod
-    def populate_context_index_default_template_with_doc_loader(
-        enabled_doc_loader_name,
-        enabled_doc_loader_config,
-        context_template: ContextTemplateModel,
-    ):
-        for available_doc_loader in DocLoadingService.REQUIRED_CLASSES:
-            if available_doc_loader.CLASS_NAME == enabled_doc_loader_name:
-                doc_loader_config = enabled_doc_loader_config
-            else:
-                continue
-
-            context_template.enabled_doc_loader = DocLoaderModel(
-                provider_name=available_doc_loader.CLASS_NAME,
-                provider_config=doc_loader_config,
+    def add_default_context_templates_to_index(self):
+        for available_template in ContextTemplates.AVAILABLE_TEMPLATES:
+            existing_config = next(
+                (
+                    index_context_template
+                    for index_context_template in ContextIndex.context_index_model.index_context_templates
+                    if index_context_template.name == available_template.TEMPLATE_NAME
+                ),
+                None,
             )
+            if not existing_config:
+                enabled_doc_db = self.get_model_object(
+                    DocDBModel, name=available_template.doc_db_provider_name
+                )
+                if enabled_doc_db is not DocDBModel:
+                    raise Exception(
+                        "Unexpected error: enabled_doc_db should not be of type DocDBModel."
+                    )
+                new_template = self.create_template(
+                    new_template_name=available_template.TEMPLATE_NAME,
+                    enabled_doc_loader_name=available_template.doc_loader_provider_name,
+                    enabled_doc_loader_config=available_template.doc_loader_config.model_dump(),
+                    enabled_doc_db=enabled_doc_db,
+                    batch_update_enabled=available_template.batch_update_enabled,
+                )
 
-            ContextIndex.session.flush()
+                ContextIndex.context_index_model.index_context_templates.append(new_template)
+                ContextIndex.session.flush()
+
+    def save_config_as_template(
+        self,
+        parent_object: Union[DomainModel, SourceModel],
+        new_template_name: Optional[str] = None,
+    ):
+        if not new_template_name:
+            new_template_name = parent_object.name
+
+        new_context_template_name = check_and_handle_name_collision(
+            existing_names=ContextIndex.context_index_model.list_of_context_template_names,
+            new_name=new_template_name,
+        )
+        new_template = self.create_template(
+            new_template_name=new_context_template_name,
+            enabled_doc_loader_name=parent_object.enabled_doc_loader.name,
+            enabled_doc_loader_config=parent_object.enabled_doc_loader.config,
+            enabled_doc_db=parent_object.enabled_doc_db,
+            batch_update_enabled=parent_object.batch_update_enabled,
+        )
+
+        # Append it to the index's list of context_configs
+        ContextIndex.context_index_model.index_context_templates.append(new_template)
+        ContextIndex.session.flush()
+
+    def create_template(
+        self,
+        new_template_name: str,
+        enabled_doc_loader_name: str,
+        enabled_doc_loader_config: dict,
+        enabled_doc_db: DocDBModel,
+        batch_update_enabled: bool,
+    ):
+        return ContextTemplateModel(
+            name=new_template_name,
+            enabled_doc_loader_name=enabled_doc_loader_name,
+            enabled_doc_loader_config=enabled_doc_loader_config,
+            enabled_doc_db=enabled_doc_db,
+            batch_update_enabled=batch_update_enabled,
+        )
