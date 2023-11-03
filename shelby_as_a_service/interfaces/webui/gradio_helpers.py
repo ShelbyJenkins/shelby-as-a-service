@@ -13,6 +13,7 @@ def abstract_service_ui_components(
 ):
     ui_components_list: list = []
     ui_components_dict: Dict[str, Any] = {}
+    ui_components_config_dict: Dict[str, Any] = {}
     provider_ui_views: list = []
 
     provider_select_dropdown = gr.Dropdown(
@@ -22,24 +23,20 @@ def abstract_service_ui_components(
         container=True,
     )
 
-    ui_components_dict["provider_select_dropdown"] = provider_select_dropdown
-    ui_components_list.append(provider_select_dropdown)
-
     for provider_class in required_classes:
         provider_name = provider_class.CLASS_NAME
         provider_config = provider_configs_dict.get(provider_name, {})
         provider_instance = provider_class(config_file_dict=provider_config)
         if groups_rendered:
-            ui_components_dict[provider_name] = provider_instance.create_provider_ui_components()
+            provider_components = provider_instance.create_provider_ui_components()
         else:
             visibility = set_current_ui_provider(provider_name, enabled_provider_name)
             with gr.Group(visible=visibility) as provider_view:
-                ui_components_dict[
-                    provider_name
-                ] = provider_instance.create_provider_ui_components()
+                provider_components = provider_instance.create_provider_ui_components()
             provider_ui_views.append(provider_view)
+            ui_components_config_dict[provider_name] = provider_components
 
-        ui_components_list.extend(ui_components_dict[provider_name].values())
+        ui_components_list.extend(list(provider_components.values()))
 
     if groups_rendered is False:
 
@@ -60,8 +57,11 @@ def abstract_service_ui_components(
             inputs=provider_select_dropdown,
             outputs=provider_ui_views,
         )
+    ui_components_dict["ui_components_config_dict"] = ui_components_config_dict
+    ui_components_dict["provider_select_dropdown"] = provider_select_dropdown
+    ui_components_dict["ui_components_list"] = ui_components_list
 
-    return ui_components_list, ui_components_dict
+    return ui_components_dict
 
 
 def set_current_ui_provider(provider_name: str, enabled_provider_name: str):

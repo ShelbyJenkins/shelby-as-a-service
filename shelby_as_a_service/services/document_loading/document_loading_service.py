@@ -47,24 +47,21 @@ class DocLoadingService(ModuleBase):
 
     def create_service_ui_components(
         self, context_config: ContextConfigModel, groups_rendered: bool = True
-    ) -> tuple:
+    ):
         provider_configs_dict = {}
 
-        for provider in context_config.doc_loaders:
-            name = provider.doc_loader_provider_name
-            config = provider.doc_loader_config
+        for provider in doc_loaders:
+            name = provider.provider_name
+            config = provider.provider_config
             provider_configs_dict[name] = config
 
-        enabled_provider_name = context_config.doc_loader.doc_loader_provider_name
+        enabled_provider_name = context_config.doc_loader.provider_name
 
-        (
-            ui_components_list,
-            ui_components_dict,
-        ) = GradioHelpers.abstract_service_ui_components(
+        ui_components_dict = GradioHelpers.abstract_service_ui_components(
             enabled_provider_name=enabled_provider_name,
             required_classes=self.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )
 
-        return ui_components_list, ui_components_dict
+        return ui_components_dict

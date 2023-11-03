@@ -12,7 +12,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .context_index_model import (
-    ContextConfigModel,
     ContextIndexModel,
     ContextTemplateModel,
     DocDBModel,
@@ -36,8 +35,7 @@ class ContextIndex(IndexBase):
     context_index_model: ContextIndexModel
     session: Session
     log: logging.Logger
-    instance_model: Union[DomainModel, SourceModel]
-    context_config: ContextConfigModel
+    object_model: Union[DomainModel, SourceModel]
     context_template: ContextTemplateModel
 
     def __init__(self) -> None:
@@ -55,14 +53,14 @@ class ContextIndex(IndexBase):
         if context_index_model := self.session.query(ContextIndexModel).first():
             ContextIndex.context_index_model = context_index_model
             DocDB.add_doc_dbs_to_index()
-            ContextConfig.add_default_context_templates_to_index()
+            self.add_default_context_templates_to_index()
         else:
             ContextIndex.context_index_model = ContextIndexModel()
             ContextIndex.session.add(ContextIndex.context_index_model)
             ContextIndex.session.flush()
 
             DocDB.add_doc_dbs_to_index()
-            ContextConfig.add_default_context_templates_to_index()
+            self.add_default_context_templates_to_index()
 
             self.create_domain()
 
@@ -74,84 +72,150 @@ class ContextIndex(IndexBase):
         ContextIndex.session.add(ContextIndex.context_index_model)
 
     @property
-    def list_of_domain_names(self) -> list:
+    def list_of_all_context_index_domain_names(self) -> list:
         return [domain.name for domain in ContextIndex.context_index_model.domains]
 
     @property
-    def domain(self) -> "DomainInstance":
-        if getattr(ContextIndex.context_index_model, "domain", None) is None:
+    def index(self) -> "ContextIndexModel":
+        return ContextIndex.context_index_model
+
+    @property
+    def domain(self) -> "DomainModel":
+        if getattr(ContextIndex.context_index_model, "current_domain", None) is None:
             raise Exception(f"{ContextIndex.context_index_model} has no domain.")
-        return DomainInstance(domain_model=ContextIndex.context_index_model.domain)
+        return ContextIndex.context_index_model.current_domain
+
+    @property
+    def source(self) -> "SourceModel":
+        if getattr(self.domain, "source", None) is None:
+            raise Exception(f"{self.domain} has no source.")
+        return self.domain.current_source
 
     @property
     def list_of_all_context_index_source_names(self) -> list:
         all_sources = ContextIndex.session.query(SourceModel).all()
         return [source.name for source in all_sources]
 
-    @property
-    def context_config_name(self) -> str:
-        return self.instance_model.context_config.context_config_name
-
-    @property
-    def list_of_context_config_names(self) -> list:
-        return [
-            context_config.context_config_name
-            for context_config in self.instance_model.context_configs
-        ]
-
-    @property
-    def list_of_context_template_names(self) -> list:
-        return [
-            context_template.context_template_name
-            for context_template in ContextIndex.context_index_model.index_context_templates
-        ]
-
-    # @property
-    # def doc_ingest(self) -> DocLoadingService:
-
-    #     if loader_config := getattr(enabled_doc_ingest_template, "loader_config", None):
-    #         raise Exception(f"{enabled_doc_ingest_template} has no loader_config.")
-    #     return DocLoadingService(
-    #         config_file_dict=loader_config,
-    #         doc_loading_provider=enabled_doc_ingest_template.loader_name,
-    #     )
-
-    @property
-    def doc_database_provider_name(self) -> str:
-        if (enabled_doc_db := getattr(self.instance_model, "enabled_doc_db", None)) is None:
-            raise Exception(f"{self.instance_model} has no enabled_doc_db.")
-        if database_provider_name := getattr(enabled_doc_db, "database_provider_name", None):
-            raise Exception(f"{enabled_doc_db} has no database_provider_name.")
-        if database_provider_name is None:
+    def parse_parent_object(
+        self,
+        parent_domain: Optional[DomainModel] = None,
+        parent_source: Optional[SourceModel] = None,
+    ) -> Union[DomainModel, SourceModel]:
+        if (parent_source is not None) != (parent_domain is not None):
+            parent_object = parent_source if parent_source is not None else parent_domain
+        else:
             raise Exception(
-                "Unexpected error: database_provider_name should not be None at this point."
+                "Unexpected error: Either parent_source or parent_domain must be set, but not both or neither."
             )
-        return database_provider_name
+        if parent_object is None:
+            raise Exception("Unexpected error: parent_object should not be None at this point.")
+        return parent_object
 
-    @property
-    def list_of_database_provider_names(self) -> list:
-        return [
-            doc_db.database_provider_name for doc_db in ContextIndex.context_index_model.doc_dbs
-        ]
+    def get_model_object(
+        self,
+        requested_model_type: Union[
+            Type[DomainModel],
+            Type[SourceModel],
+            Type[ContextTemplateModel],
+            Type[DocDBModel],
+            Type[DocLoaderModel],
+        ],
+        parent_domain: Optional[DomainModel] = None,
+        parent_source: Optional[SourceModel] = None,
+        id: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> Union[DomainModel, SourceModel, ContextTemplateModel, DocDBModel, DocLoaderModel]:
+        if requested_model_type is DomainModel:
+            list_of_model_objects = ContextIndex.context_index_model.domains
+        elif requested_model_type is SourceModel:
+            if parent_domain is None:
+                raise Exception("Unexpected error: parent_domain should not be None at this point.")
+            list_of_model_objects = parent_domain.sources
+        elif requested_model_type is ContextTemplateModel:
+            list_of_model_objects = self.index.index_context_templates
+        elif requested_model_type is DocDBModel:
+            list_of_model_objects = ContextIndex.context_index_model.doc_dbs
+        elif requested_model_type is DocLoaderModel:
+            parent_object = self.parse_parent_object(
+                parent_domain=parent_domain, parent_source=parent_source
+            )
+            list_of_model_objects = parent_object.doc_loaders
 
-    @property
-    def list_of_doc_loader_provider_names(self) -> list:
-        return [
-            doc_loader.doc_loader_provider_name
-            for doc_loader in self.instance_model.context_config.doc_loaders
-        ]
+        else:
+            raise Exception(f"Unexpected error: {requested_model_type.__name__} not found.")
 
-    @property
-    def doc_db(self) -> DataBaseService:
-        if (context_config := getattr(self.instance_model, "context_config", None)) is None:
-            raise Exception(f"{self.instance_model} has no context_config.")
-        if (doc_db := getattr(context_config, "doc_db", None)) is None:
-            raise Exception(f"{context_config} has no doc_db.")
-        if (db_config := getattr(doc_db, "db_config", None)) is None:
-            raise Exception(f"{doc_db} has no db_config.")
-        return DataBaseService(
-            config_file_dict=db_config, database_provider=self.doc_database_provider_name
-        )
+        if id:
+            if (
+                requested_object := next(
+                    (object for object in list_of_model_objects if object.id == id),
+                    None,
+                )
+            ) is None:
+                raise Exception(f"id {id} not found in {list_of_model_objects}.")
+        elif name:
+            if (
+                requested_object := next(
+                    (object for object in list_of_model_objects if object.name == name),
+                    None,
+                )
+            ) is None:
+                raise Exception(f"name {name} not found in {list_of_model_objects}.")
+        else:
+            raise Exception("Unexpected error: id or name should not be None at this point.")
+
+        if requested_object is None:
+            raise Exception("Unexpected error: domain should not be None at this point.")
+
+        return requested_object
+
+    def set_object(
+        self,
+        set_model_type: Union[
+            Type[DomainModel], Type[SourceModel], Type[DocDBModel], Type[DocLoaderModel]
+        ],
+        parent_domain: Optional[DomainModel] = None,
+        parent_source: Optional[SourceModel] = None,
+        set_id: Optional[int] = None,
+        set_name: Optional[str] = None,
+    ):
+        if set_model_type is DomainModel:
+            set_object = self.get_model_object(DomainModel, id=set_id, name=set_name)
+            ContextIndex.context_index_model.current_domain = set_object
+        elif set_model_type is SourceModel:
+            if parent_domain is None:
+                raise Exception("Unexpected error: parent_domain should not be None at this point.")
+            set_object = self.get_model_object(
+                SourceModel, parent_domain=parent_domain, id=set_id, name=set_name
+            )
+            parent_domain.current_source = set_object
+        elif set_model_type is DocDBModel:
+            set_object = self.get_model_object(
+                DocDBModel,
+                parent_domain=parent_domain,
+                parent_source=parent_source,
+                id=set_id,
+                name=set_name,
+            )
+            parent_object = self.parse_parent_object(
+                parent_domain=parent_domain, parent_source=parent_source
+            )
+            parent_object.ennabled_doc_db = set_object
+        elif set_model_type is DocLoaderModel:
+            set_object = self.get_model_object(
+                DocLoaderModel,
+                parent_domain=parent_domain,
+                parent_source=parent_source,
+                id=set_id,
+                name=set_name,
+            )
+            parent_object = self.parse_parent_object(
+                parent_domain=parent_domain, parent_source=parent_source
+            )
+            parent_object.enabled_doc_loader = set_object
+        else:
+            raise Exception(f"Unexpected error: {set_model_type.__name__} not found.")
+
+        ContextIndex.session.flush()
 
     def create_domain(
         self,
@@ -162,25 +226,25 @@ class ContextIndex(IndexBase):
         if not new_domain_name:
             new_domain_name = DomainModel.DEFAULT_DOMAIN_NAME
         new_domain_name = check_and_handle_name_collision(
-            existing_names=self.list_of_domain_names, new_name=new_domain_name
+            existing_names=self.list_of_all_context_index_domain_names, new_name=new_domain_name
         )
         if not new_description:
             new_description = DomainModel.DEFAULT_DOMAIN_DESCRIPTION
-        default_domain = DomainModel(name=new_domain_name, description=new_description)
-        ContextIndex.context_index_model.domains.append(default_domain)
+        new_domain_model = DomainModel(name=new_domain_name, description=new_description)
+        ContextIndex.context_index_model.domains.append(new_domain_model)
         ContextIndex.session.flush()
-        if not ContextIndex.context_index_model.domain_id:
-            self.set_domain()
+        if not ContextIndex.context_index_model.current_domain_id:
+            self.set_object(set_model_type=DomainModel, set_id=new_domain_model.id)
 
         if not requested_template_name:
-            requested_template_name = default_domain.DEFAULT_TEMPLATE_NAME
+            requested_template_name = new_domain_model.DEFAULT_TEMPLATE_NAME
         ContextConfig.set_context_config_from_template(
-            instance_model=default_domain, requested_template_name=requested_template_name
+            object_model=new_domain_model, requested_template_name=requested_template_name
         )
-        default_domain_instance = DomainInstance(domain_model=default_domain)
-        default_domain_instance.create_source()
 
-        return default_domain.name, default_domain.id
+        self.create_source(parent_domain=new_domain_model)
+
+        return new_domain_model.name, new_domain_model.id
 
     def clone_domain(
         self,
@@ -204,14 +268,14 @@ class ContextIndex(IndexBase):
         domain_model_clone = DomainModel(name=new_domain_name, description=new_description)
         ContextIndex.context_index_model.domains.append(domain_model_clone)
         ContextIndex.session.flush()
-        for existing_context_config in self.instance_model.context_configs:
+        for existing_context_config in self.object_model.context_configs:
             ContextConfig.clone_config(
                 existing_context_config=existing_context_config,
-                target_instance_model=domain_model_clone,
+                target_object_model=domain_model_clone,
             )
         ContextConfig.set_config(
-            instance_model=domain_model_clone,
-            requested_config_name=domain_instance_to_clone.instance_model.context_config.context_config_name,
+            object_model=domain_model_clone,
+            requested_config_name=domain_instance_to_clone.object_model.context_config.context_config_name,
         )
         domain_instance_clone = DomainInstance(domain_model=domain_model_clone)
         for source_model_to_clone in domain_instance_to_clone.domain_model.sources:
@@ -222,87 +286,9 @@ class ContextIndex(IndexBase):
             )
         return domain_model_clone.name, domain_model_clone.id
 
-    def set_domain(self, domain_id: Optional[int] = None, domain_name: Optional[str] = None):
-        domain = self.get_domain(requested_domain_id=domain_id, requested_domain_name=domain_name)
-
-        ContextIndex.context_index_model.domain = domain.domain_model
-        ContextIndex.session.flush()
-
-    def get_domain(
-        self, requested_domain_id: Optional[int] = None, requested_domain_name: Optional[str] = None
-    ) -> "DomainInstance":
-        if requested_domain_id:
-            if (
-                requested_domain := next(
-                    (
-                        domain
-                        for domain in ContextIndex.context_index_model.domains
-                        if domain.id == requested_domain_id
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(
-                    f"requested_domain_id {requested_domain_id} not found in {ContextIndex.context_index_model.domains}."
-                )
-        elif requested_domain_name:
-            if (
-                requested_domain := next(
-                    (
-                        domain
-                        for domain in ContextIndex.context_index_model.domains
-                        if domain.name == requested_domain_name
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(
-                    f"requested_domain_name {requested_domain_name} not found in {ContextIndex.context_index_model.domains}."
-                )
-        else:
-            if (
-                requested_domain := next(
-                    (
-                        domain
-                        for domain in ContextIndex.context_index_model.domains
-                        if domain.name == DomainModel.DEFAULT_DOMAIN_NAME
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(
-                    f"DEFAULT_DOMAIN_NAME {DomainModel.DEFAULT_DOMAIN_NAME} not found in {DomainModel}."
-                )
-
-        if requested_domain is None:
-            raise Exception("Unexpected error: domain should not be None at this point.")
-
-        return DomainInstance(domain_model=requested_domain)
-
-
-class DomainInstance(ContextIndex):
-    domain_model: DomainModel
-    context_index: ContextIndex
-
-    def __init__(self, domain_model) -> None:
-        self.domain_model = domain_model
-
-    @property
-    def instance_model(self) -> DomainModel:
-        return self.domain_model
-
-    @property
-    def list_of_source_names(self) -> list:
-        return [source.name for source in self.domain_model.sources]
-
-    @property
-    def source(self) -> "SourceInstance":
-        if getattr(self.domain_model, "source", None) is None:
-            raise Exception(f"{self.domain_model} has no source.")
-        return SourceInstance(self.domain_model.source)
-
     def create_source(
         self,
+        parent_domain: DomainModel,
         new_source_name: Optional[str] = None,
         new_description: Optional[str] = None,
         requested_template_name: Optional[str] = None,
@@ -310,33 +296,33 @@ class DomainInstance(ContextIndex):
         if not new_source_name:
             new_source_name = SourceModel.DEFAULT_SOURCE_NAME
         new_source_name = check_and_handle_name_collision(
-            existing_names=self.list_of_source_names, new_name=new_source_name
+            existing_names=parent_domain.list_of_source_names, new_name=new_source_name
         )
         if not new_description:
             new_description = SourceModel.DEFAULT_SOURCE_DESCRIPTION
-        default_source = SourceModel(name=new_source_name, description=new_description)
-        self.domain_model.sources.append(default_source)
+        new_source_model = SourceModel(name=new_source_name, description=new_description)
+        parent_domain.sources.append(new_source_model)
         ContextIndex.session.flush()
-        if not self.domain_model.source_id:
-            self.set_source()
+        if not parent_domain.current_source_id:
+            self.set_object(set_model_type=SourceModel, set_id=new_source_model.id)
 
         if requested_template_name:
             if not requested_template_name:
-                requested_template_name = default_source.DEFAULT_TEMPLATE_NAME
+                requested_template_name = new_source_model.DEFAULT_TEMPLATE_NAME
             ContextConfig.set_context_config_from_template(
-                instance_model=default_source, requested_template_name=requested_template_name
+                object_model=new_source_model, requested_template_name=requested_template_name
             )
         else:
             ContextConfig.clone_config(
-                existing_context_config=self.instance_model.context_config,
-                target_instance_model=default_source,
+                existing_context_config=self.object_model.context_config,
+                target_object_model=new_source_model,
             )
             ContextConfig.set_config(
-                instance_model=default_source,
+                object_model=new_source_model,
                 requested_config_name=self.domain_model.context_config.context_config_name,
             )
 
-        return default_source.name, default_source.id
+        return new_source_model.name, new_source_model.id
 
     def clone_source(
         self,
@@ -372,86 +358,43 @@ class DomainInstance(ContextIndex):
         for existing_context_config in source_instance_to_clone.source_model.context_configs:
             ContextConfig.clone_config(
                 existing_context_config=existing_context_config,
-                target_instance_model=source_model_clone,
+                target_object_model=source_model_clone,
             )
 
         ContextConfig.set_config(
-            instance_model=source_model_clone,
+            object_model=source_model_clone,
             requested_config_name=source_instance_to_clone.source_model.context_config.context_config_name,
         )
 
         return source_model_clone.name, source_model_clone.id
 
-    def set_source(self, source_id: Optional[int] = None, source_name: Optional[str] = None):
-        source = self.get_source(requested_source_id=source_id, requested_source_name=source_name)
-        self.domain_model.source = source.source_model
+    def set_context_config_from_template(
+        self,
+        parent_object: Union[DomainModel, SourceModel],
+        requested_template_id: Optional[int] = None,
+        requested_template_name: Optional[str] = None,
+    ):
+        context_template = self.get_model_object(
+            ContextTemplateModel,
+            id=requested_template_id,
+            name=requested_template_name,
+        )
+        if context_template is not ContextTemplateModel:
+            raise Exception(
+                "Unexpected error: context_template should not be of type ContextTemplateModel."
+            )
+
+        parent_object.enabled_doc_loader = context_template.enabled_doc_loader
+        parent_object.ennabled_doc_db = context_template.ennabled_doc_db
+        parent_object.batch_update_enabled = context_template.batch_update_enabled
+
         ContextIndex.session.flush()
 
-    def get_source(
-        self, requested_source_id: Optional[int] = None, requested_source_name: Optional[str] = None
-    ) -> "SourceInstance":
-        if requested_source_id:
-            if (
-                requested_source := next(
-                    (
-                        source
-                        for source in self.domain_model.sources
-                        if source.id == requested_source_id
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(
-                    f"requested_source_id {requested_source_id} not found in {self.domain_model.sources}."
-                )
-        elif requested_source_name:
-            if (
-                requested_source := next(
-                    (
-                        source
-                        for source in self.domain_model.sources
-                        if source.name == requested_source_name
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(
-                    f"requested_source_name {requested_source_name} not found in {self.domain_model.sources}."
-                )
-        else:
-            if (
-                requested_source := next(
-                    (
-                        source
-                        for source in self.domain_model.sources
-                        if source.name == SourceModel.DEFAULT_SOURCE_NAME
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(
-                    f"DEFAULT_SOURCE_NAME {SourceModel.DEFAULT_SOURCE_NAME} not found in {SourceModel}."
-                )
-
-        if requested_source is None:
-            raise Exception("Unexpected error: source should not be None at this point.")
-
-        return SourceInstance(source_model=requested_source)
-
-
-class SourceInstance(DomainInstance):
-    source_model: SourceModel
-
-    def __init__(self, source_model) -> None:
-        self.source_model = source_model
-
-    @property
-    def instance_model(self) -> SourceModel:
-        return self.source_model
-
-
-class ContextConfig:
-    instance_model: Union[DomainModel, SourceModel]
+        DocLoading.add_doc_loaders_to_config_or_template(
+            enabled_doc_loader_name=requested_context_template.doc_loader.provider_name,
+            enabled_doc_loader_config=requested_context_template.doc_loader.provider_config,
+            context_config_or_template=new_context_config,
+        )
 
     @staticmethod
     def add_default_context_templates_to_index():
@@ -469,7 +412,7 @@ class ContextConfig:
                 new_template = ContextTemplateModel(
                     context_template_name=available_template.TEMPLATE_NAME,
                     doc_db_id=DocDB.get_doc_db(
-                        requested_database_name=available_template.database_provider_name
+                        requested_database_name=available_template.provider_name
                     ).id,
                     batch_update_enabled=available_template.batch_update_enabled,
                 )
@@ -483,122 +426,13 @@ class ContextConfig:
                 )
 
     @staticmethod
-    def get_template(
-        requested_template_id: Optional[int] = None,
-        requested_template_name: Optional[str] = None,
-    ) -> ContextTemplateModel:
-        # get template
-        if requested_template_id:
-            if (
-                requested_context_template := next(
-                    (
-                        context_template
-                        for context_template in ContextIndex.context_index_model.index_context_templates
-                        if context_template.id == requested_template_id
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(
-                    f"DocDB {requested_template_id} not found in {ContextIndex.context_index_model.index_context_templates}."
-                )
-        else:
-            if (
-                requested_context_template := next(
-                    (
-                        context_template
-                        for context_template in ContextIndex.context_index_model.index_context_templates
-                        if context_template.context_template_name == requested_template_name
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(
-                    f"DocDB {requested_template_name} not found in {ContextIndex.context_index_model.index_context_templates}."
-                )
-
-        return requested_context_template
-
-    @staticmethod
-    def set_context_config_from_template(
-        instance_model: Union[DomainModel, SourceModel],
-        requested_template_id: Optional[int] = None,
-        requested_template_name: Optional[str] = None,
-    ):
-        requested_context_template = ContextConfig.get_template(
-            requested_template_id=requested_template_id,
-            requested_template_name=requested_template_name,
-        )
-
-        existing_context_config_names = [
-            existing_config.context_config_name
-            for existing_config in instance_model.context_configs
-        ]
-
-        new_context_config_name = check_and_handle_name_collision(
-            existing_names=existing_context_config_names,
-            new_name=requested_context_template.context_template_name,
-        )
-
-        # create new context_config from template
-        new_context_config = ContextConfigModel(
-            context_config_name=new_context_config_name,
-            doc_db_id=requested_context_template.doc_db_id,
-            batch_update_enabled=requested_context_template.batch_update_enabled,
-        )
-        # Append it to the class's list of context_configs
-        instance_model.context_configs.append(new_context_config)
-        ContextIndex.session.flush()
-        instance_model.context_config_id = new_context_config.id
-        ContextIndex.session.flush()
-        DocLoading.add_doc_loaders_to_config_or_template(
-            enabled_doc_loader_name=requested_context_template.doc_loader.doc_loader_provider_name,
-            enabled_doc_loader_config=requested_context_template.doc_loader.doc_loader_config,
-            context_config_or_template=new_context_config,
-        )
-
-    @staticmethod
-    def get_config(
-        instance_model: Union[DomainModel, SourceModel],
-        requested_config_id: Optional[int] = None,
-        requested_config_name: Optional[str] = None,
-    ) -> ContextConfigModel:
-        # get config
-        if requested_config_id:
-            if (
-                requested_context_config := next(
-                    (
-                        context_config
-                        for context_config in instance_model.context_configs
-                        if context_config.id == requested_config_id
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(f"DocDB {requested_config_id} not found in {instance_model}.")
-        else:
-            if (
-                requested_context_config := next(
-                    (
-                        context_config
-                        for context_config in instance_model.context_configs
-                        if context_config.context_config_name == requested_config_name
-                    ),
-                    None,
-                )
-            ) is None:
-                raise Exception(f"DocDB {requested_config_name} not found in {instance_model}.")
-
-        return requested_context_config
-
-    @staticmethod
     def save_config_as_template(
-        instance_model: Union[DomainModel, SourceModel],
+        object_model: Union[DomainModel, SourceModel],
         requested_config_id: Optional[int] = None,
         requested_config_name: Optional[str] = None,
     ):
         requested_context_config = ContextConfig.get_config(
-            instance_model=instance_model,
+            object_model=object_model,
             requested_config_id=requested_config_id,
             requested_config_name=requested_config_name,
         )
@@ -624,7 +458,7 @@ class ContextConfig:
     @staticmethod
     def clone_config(
         existing_context_config: ContextConfigModel,
-        target_instance_model: Union[DomainModel, SourceModel],
+        target_object_model: Union[DomainModel, SourceModel],
     ):
         new_context_config = ContextConfigModel(
             context_config_name=existing_context_config.context_config_name,
@@ -632,39 +466,25 @@ class ContextConfig:
             batch_update_enabled=existing_context_config.batch_update_enabled,
         )
 
-        target_instance_model.context_configs.append(new_context_config)
+        target_object_model.context_configs.append(new_context_config)
         ContextIndex.session.flush()
         DocLoading.add_doc_loaders_to_config_or_template(
-            enabled_doc_loader_name=existing_context_config.doc_loader.doc_loader_provider_name,
-            enabled_doc_loader_config=existing_context_config.doc_loader.doc_loader_config,
+            enabled_doc_loader_name=existing_context_config.doc_loader.provider_name,
+            enabled_doc_loader_config=existing_context_config.doc_loader.provider_config,
             context_config_or_template=new_context_config,
         )
-
-    @staticmethod
-    def set_config(
-        instance_model: Union[DomainModel, SourceModel],
-        requested_config_id: Optional[int] = None,
-        requested_config_name: Optional[str] = None,
-    ):
-        requested_context_config = ContextConfig.get_config(
-            instance_model=instance_model,
-            requested_config_id=requested_config_id,
-            requested_config_name=requested_config_name,
-        )
-        instance_model.context_config_id = requested_context_config.id
-        ContextIndex.session.flush()
 
 
 class DocDB:
     @staticmethod
     def add_doc_dbs_to_index():
         for db_class in DataBaseService.REQUIRED_CLASSES:
-            database_provider_name = db_class.CLASS_NAME
+            provider_name = db_class.CLASS_NAME
             existing_config = next(
                 (
                     doc_db
                     for doc_db in ContextIndex.context_index_model.doc_dbs
-                    if doc_db.database_provider_name == database_provider_name
+                    if doc_db.provider_name == provider_name
                 ),
                 None,
             )
@@ -672,115 +492,27 @@ class DocDB:
             if not existing_config:
                 db_config = db_class.ClassConfigModel().model_dump()
                 ContextIndex.context_index_model.doc_dbs.append(
-                    DocDBModel(database_provider_name=database_provider_name, db_config=db_config)
+                    DocDBModel(provider_name=provider_name, db_config=db_config)
                 )
                 ContextIndex.session.flush()
-
-    @staticmethod
-    def get_doc_db(
-        requested_database_id: Optional[int] = None,
-        requested_database_name: Optional[str] = None,
-    ) -> DocDBModel:
-        if requested_database_id:
-            doc_db = next(
-                (
-                    doc_db
-                    for doc_db in ContextIndex.context_index_model.doc_dbs
-                    if doc_db.id == requested_database_id
-                ),
-                None,
-            )
-            if doc_db is None:
-                raise Exception(
-                    f"DocDB {requested_database_id} not found in {ContextIndex.context_index_model.doc_dbs}"
-                )
-        else:
-            doc_db = next(
-                (
-                    doc_db
-                    for doc_db in ContextIndex.context_index_model.doc_dbs
-                    if doc_db.database_provider_name == requested_database_name
-                ),
-                None,
-            )
-            if doc_db is None:
-                raise Exception(
-                    f"DocDB {requested_database_name} not found in {ContextIndex.context_index_model.doc_dbs}"
-                )
-        return doc_db
 
 
 class DocLoading:
     @staticmethod
-    def add_doc_loaders_to_config_or_template(
+    def populate_context_index_default_template_with_doc_loader(
         enabled_doc_loader_name,
         enabled_doc_loader_config,
-        context_config_or_template: Union[ContextConfigModel, ContextTemplateModel],
+        context_template: ContextTemplateModel,
     ):
         for available_doc_loader in DocLoadingService.REQUIRED_CLASSES:
             if available_doc_loader.CLASS_NAME == enabled_doc_loader_name:
                 doc_loader_config = enabled_doc_loader_config
             else:
-                doc_loader_config = available_doc_loader.ClassConfigModel().model_dump()
+                continue
 
-            context_config_or_template.doc_loaders.append(
-                DocLoaderModel(
-                    doc_loader_provider_name=available_doc_loader.CLASS_NAME,
-                    doc_loader_config=doc_loader_config,
-                )
+            context_template.enabled_doc_loader = DocLoaderModel(
+                provider_name=available_doc_loader.CLASS_NAME,
+                provider_config=doc_loader_config,
             )
+
             ContextIndex.session.flush()
-
-        DocLoading.set_doc_loader(
-            context_config_or_template=context_config_or_template,
-            requested_doc_loader_name=enabled_doc_loader_name,
-        )
-
-    @staticmethod
-    def set_doc_loader(
-        context_config_or_template: Union[ContextConfigModel, ContextTemplateModel],
-        requested_doc_loader_id: Optional[int] = None,
-        requested_doc_loader_name: Optional[str] = None,
-    ):
-        doc_loader = DocLoading.get_doc_loader(
-            list_of_doc_loaders=context_config_or_template.doc_loaders,
-            requested_doc_loader_id=requested_doc_loader_id,
-            requested_doc_loader_name=requested_doc_loader_name,
-        )
-
-        context_config_or_template.doc_loader_id = doc_loader.id
-        ContextIndex.session.flush()
-
-    @staticmethod
-    def get_doc_loader(
-        list_of_doc_loaders: list[DocLoaderModel],
-        requested_doc_loader_id: Optional[int] = None,
-        requested_doc_loader_name: Optional[str] = None,
-    ) -> DocLoaderModel:
-        if requested_doc_loader_id:
-            doc_loader = next(
-                (
-                    doc_loader
-                    for doc_loader in list_of_doc_loaders
-                    if doc_loader.id == requested_doc_loader_id
-                ),
-                None,
-            )
-            if doc_loader is None:
-                raise Exception(
-                    f"DocDB {requested_doc_loader_id} not found in {list_of_doc_loaders}"
-                )
-        else:
-            doc_loader = next(
-                (
-                    doc_loader
-                    for doc_loader in list_of_doc_loaders
-                    if doc_loader.doc_loader_provider_name == requested_doc_loader_name
-                ),
-                None,
-            )
-            if doc_loader is None:
-                raise Exception(
-                    f"DocDB {requested_doc_loader_name} not found in {list_of_doc_loaders}"
-                )
-        return doc_loader
