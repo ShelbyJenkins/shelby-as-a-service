@@ -5,7 +5,7 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
-from services.context_index.context_index_model import ContextConfigModel
+from services.context_index.context_index_model import DomainModel, SourceModel
 from services.document_loading.document_loading_providers import (
     GenericRecursiveWebScraper,
     GenericWebScraper,
@@ -46,22 +46,24 @@ class DocLoadingService(ModuleBase):
             print("rnr")
 
     def create_service_ui_components(
-        self, context_config: ContextConfigModel, groups_rendered: bool = True
+        self,
+        parent_model: Union[DomainModel, SourceModel],
+        groups_rendered: bool = True,
     ):
         provider_configs_dict = {}
 
-        for provider in doc_loaders:
-            name = provider.provider_name
-            config = provider.provider_config
+        for provider in parent_model.doc_loaders:
+            name = provider.name
+            config = provider.config
             provider_configs_dict[name] = config
 
-        enabled_provider_name = context_config.doc_loader.provider_name
+        enabled_doc_loader_name = parent_model.enabled_doc_loader.name
 
-        ui_components_dict = GradioHelpers.abstract_service_ui_components(
-            enabled_provider_name=enabled_provider_name,
+        doc_loader_components_dict = GradioHelpers.abstract_service_ui_components(
+            enabled_provider_name=enabled_doc_loader_name,
             required_classes=self.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )
 
-        return ui_components_dict
+        return doc_loader_components_dict

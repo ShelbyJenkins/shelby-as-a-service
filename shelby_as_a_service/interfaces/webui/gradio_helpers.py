@@ -10,61 +10,61 @@ def abstract_service_ui_components(
     required_classes: list,
     provider_configs_dict: dict,
     groups_rendered: bool = True,
-):
-    ui_components_list: list = []
-    ui_components_dict: Dict[str, Any] = {}
-    ui_components_config_dict: Dict[str, Any] = {}
+) -> dict:
+    service_dict: Dict[str, Any] = {}
+    service_components_list: list = []
     provider_ui_views: list = []
 
-    provider_select_dropdown = gr.Dropdown(
+    provider_select_dd = gr.Dropdown(
         value=enabled_provider_name,
         choices=[required_class.CLASS_NAME for required_class in required_classes],
         label="Available Providers",
         container=True,
     )
 
+    service_dict["provider_select_dd"] = provider_select_dd
+
     for provider_class in required_classes:
+        provider_dict: Dict[str, Any] = {}
+
         provider_name = provider_class.CLASS_NAME
         provider_config = provider_configs_dict.get(provider_name, {})
         provider_instance = provider_class(config_file_dict=provider_config)
         if groups_rendered:
-            provider_components = provider_instance.create_provider_ui_components()
+            provider_config_components = provider_instance.create_provider_ui_components()
         else:
-            visibility = set_current_ui_provider(provider_name, enabled_provider_name)
+            visibility = set_current_ui_provider_visible(provider_name, enabled_provider_name)
             with gr.Group(visible=visibility) as provider_view:
-                provider_components = provider_instance.create_provider_ui_components()
+                provider_config_components = provider_instance.create_provider_ui_components()
             provider_ui_views.append(provider_view)
-            ui_components_config_dict[provider_name] = provider_components
-
-        ui_components_list.extend(list(provider_components.values()))
+            provider_dict["provider_config_dict"] = provider_config_components
+            provider_dict["provider_config_list"] = list(provider_config_components.values())
+            service_dict[provider_name] = provider_dict
 
     if groups_rendered is False:
 
         def toggle_current_ui_provider(list_of_class_names: list[str], requested_model: str):
             output = []
             for provider_name in list_of_class_names:
-                visibility = set_current_ui_provider(provider_name, requested_model)
+                visibility = set_current_ui_provider_visible(provider_name, requested_model)
                 output.append(gr.Group(visible=visibility))
             return output
 
-        provider_select_dropdown.change(
+        provider_select_dd.change(
             fn=lambda x: toggle_current_ui_provider(
                 list_of_class_names=[
                     required_class.CLASS_NAME for required_class in required_classes
                 ],
                 requested_model=x,
             ),
-            inputs=provider_select_dropdown,
+            inputs=provider_select_dd,
             outputs=provider_ui_views,
         )
-    ui_components_dict["ui_components_config_dict"] = ui_components_config_dict
-    ui_components_dict["provider_select_dropdown"] = provider_select_dropdown
-    ui_components_dict["ui_components_list"] = ui_components_list
 
-    return ui_components_dict
+    return service_dict
 
 
-def set_current_ui_provider(provider_name: str, enabled_provider_name: str):
+def set_current_ui_provider_visible(provider_name: str, enabled_provider_name: str):
     if provider_name == enabled_provider_name:
         return True
     else:

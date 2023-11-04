@@ -9,7 +9,6 @@ from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.context_index.context_index import ContextIndex
 from services.context_index.context_index_model import (
-    ContextConfigModel,
     ContextIndexModel,
     DocDBModel,
     DomainModel,

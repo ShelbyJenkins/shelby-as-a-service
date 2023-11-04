@@ -13,12 +13,6 @@ class DocLoaderModel(Base):
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
     source_model = relationship("SourceModel", foreign_keys=[source_id])
 
-    context_template_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("index_context_templates.id"), nullable=True
-    )
-    context_template_model = relationship(
-        "ContextTemplateModel", foreign_keys=[context_template_id]
-    )
     DEFAULT_DOC_LOADER_NAME: str = "generic_recursive_web_scraper"
     name: Mapped[str] = mapped_column(String)
     config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
