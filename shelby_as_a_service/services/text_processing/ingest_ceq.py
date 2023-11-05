@@ -1,20 +1,42 @@
-class CEQPreprocess:
-    def __init__(self, data_source_config):
-        self.index_agent = data_source_config.index_agent
-        self.config = data_source_config.index_agent.config
-        self.data_source_config = data_source_config
-        self.info = self.index_agent.log.info
-        self.tiktoken_encoding_model = self.config.index_tiktoken_encoding_model
+import json
+import os
+import re
+import shutil
+from typing import Any, Dict, Optional, Type, Union
+from urllib.parse import urlparse
 
-        self.tiktoken_len = TextProcessing.tiktoken_len
+import gradio as gr
+from app.module_base import ModuleBase
+from pydantic import BaseModel
 
-        self.dfs_splitter = DFSTextSplitter(
-            goal_length=self.config.index_text_splitter_goal_length,
-            overlap_percent=self.config.index_text_splitter_overlap_percent,
-            info=self.index_agent.log.info,
+from . import text_utils
+from .dfs_text_splitter import DFSTextSplitter
+
+
+class IngestCEQ(ModuleBase):
+    CLASS_NAME: str = "ceq_ingest_processor"
+    CLASS_UI_NAME: str = "Context Enhanced Query Ingest Processor"
+    available_text_splitters: list[str] = ["dfs_text_splitter"]
+
+    class ClassConfigModel(BaseModel):
+        enabled_text_splitter: str = "dfs_text_splitter"
+        preprocessor_min_length: int = 150
+        text_splitter_goal_length: int = 750
+        text_splitter_overlap_percent: int = 15  # In percent
+
+    config: ClassConfigModel
+    domain_name: str
+    source_name: str
+
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
+
+        self.text_splitter = DFSTextSplitter(
+            goal_length=self.config.text_splitter_goal_length,
+            overlap_percent=self.config.text_splitter_overlap_percent,
         )
 
-    def run(self, documents) -> []:
+    def process_documents(self, documents) -> Optional[list[str]]:
         processed_document_chunks = []
         processed_text_chunks = []
 
@@ -25,45 +47,47 @@ class CEQPreprocess:
                 _, tail = os.path.split(parsed_url.path)
                 # Strip anything with "." like ".html"
                 root, _ = os.path.splitext(tail)
-                doc.metadata["title"] = f"{self.data_source_config.data_source_name}: {root}"
+                doc.metadata["title"] = f"{self.source_name}: {root}"
 
             # Remove bad chars and extra whitespace chars
-            doc.page_content = TextProcessing.strip_excess_whitespace(doc.page_content)
-            doc.metadata["title"] = TextProcessing.strip_excess_whitespace(doc.metadata["title"])
+            doc.page_content = text_utils.clean_text_content(doc.page_content)
+            doc.metadata["title"] = text_utils.clean_text_content(doc.metadata["title"])
 
-            self.info(f"Processing: {doc.metadata['title']}")
+            self.log.info(f"Processing: {doc.metadata['title']}")
 
-            if self.tiktoken_len(doc.page_content) < self.data_source_config.config.index_preprocessor_min_length:
-                self.info(
-                    f"🔴 Skipping doc because content length: {self.tiktoken_len(doc.page_content)} is shorter than minimum: { self.data_source_config.config.index_preprocessor_min_length}"
+            if text_utils.tiktoken_len(doc.page_content) < self.config.preprocessor_min_length:
+                self.log.info(
+                    f"🔴 Skipping doc because content length: {text_utils.tiktoken_len(doc.page_content)} is shorter than minimum: { self.config.preprocessor_min_length}"
                 )
                 continue
 
-            text_chunks = self.dfs_splitter.split_text(doc.page_content)
+            text_chunks = self.text_splitter.split_text(doc.page_content)
             if text_chunks is None:
-                self.info("🔴 Something went wrong with the text splitter.")
+                self.log.info("🔴 Something went wrong with the text splitter.")
                 continue
             # If it's not a list, wrap it inside a list
             if not isinstance(text_chunks, list):
                 text_chunks = [text_chunks]
 
-            token_counts = [self.tiktoken_len(chunk) for chunk in text_chunks]
-            self.info(f"🟢 Doc split into {len(text_chunks)} of averge length {int(sum(token_counts) / len(text_chunks))}")
+            token_counts = [text_utils.tiktoken_len(chunk) for chunk in text_chunks]
+            self.log.info(
+                f"🟢 Doc split into {len(text_chunks)} of averge length {int(sum(token_counts) / len(text_chunks))}"
+            )
 
             for text_chunk in text_chunks:
                 document_chunk, text_chunk = self.append_metadata(text_chunk, doc)
                 processed_document_chunks.append(document_chunk)
                 processed_text_chunks.append(text_chunk.lower())
 
-        self.info(f"Total docs: {len(documents)}")
-        self.info(f"Total chunks: {len(processed_document_chunks)}")
+        self.log.info(f"Total docs: {len(documents)}")
+        self.log.info(f"Total chunks: {len(processed_document_chunks)}")
         if not processed_document_chunks:
-            return
-        token_counts = [self.tiktoken_len(chunk) for chunk in processed_text_chunks]
-        self.info(f"Min: {min(token_counts)}")
-        self.info(f"Avg: {int(sum(token_counts) / len(token_counts))}")
-        self.info(f"Max: {max(token_counts)}")
-        self.info(f"Total tokens: {int(sum(token_counts))}")
+            return None
+        token_counts = [text_utils.tiktoken_len(chunk) for chunk in processed_text_chunks]
+        self.log.info(f"Min: {min(token_counts)}")
+        self.log.info(f"Avg: {int(sum(token_counts) / len(token_counts))}")
+        self.log.info(f"Max: {max(token_counts)}")
+        self.log.info(f"Total tokens: {int(sum(token_counts))}")
 
         return processed_document_chunks
 
@@ -73,10 +97,8 @@ class CEQPreprocess:
             "content": text_chunk,
             "url": page.metadata["source"].strip(),
             "title": page.metadata["title"],
-            "data_domain_name": self.data_source_config.data_domain_name,
-            "data_source_name": self.data_source_config.data_source_name,
-            "target_type": self.data_source_config.target_type,
-            "doc_type": self.data_source_config.doc_type,
+            "data_domain_name": self.domain_name,
+            "data_source_name": self.source_name,
         }
         # Text chunks here are used to create embeddings
         text_chunk = f"{text_chunk} title: {page.metadata['title']}"
@@ -84,7 +106,7 @@ class CEQPreprocess:
         return document_chunk, text_chunk
 
     def compare_chunks(self, data_source, document_chunks):
-        folder_path = f"{self.index_agent.index_dir}/outputs/{data_source.data_domain_name}/{data_source.data_source_name}"
+        folder_path = f"{self.local_index_dir}/outputs/{data_source.data_domain_name}/{data_source.data_source_name}"
         # Create the directory if it does not exist
         os.makedirs(folder_path, exist_ok=True)
         existing_files = os.listdir(folder_path)
@@ -98,7 +120,7 @@ class CEQPreprocess:
             text_chunk = f"{document_chunk['content']} title: {document_chunk['title']}"
             # Skip overly long chunks
             # if (
-            #     self.tiktoken_len(text_chunk)
+            #     text_utils.tiktoken_len(text_chunk)
             #     > self.config.index_text_splitter_max_length
             # ):
             #     continue
@@ -136,7 +158,7 @@ class CEQPreprocess:
             text_chunk = f"{document_chunk['content']} title: {document_chunk['title']}"
             # Skip overly long chunks
             # if (
-            #     self.tiktoken_len(text_chunk)
+            #     text_utils.tiktoken_len(text_chunk)
             #     > self.config.index_text_splitter_max_length
             # ):
             #     continue
@@ -146,7 +168,7 @@ class CEQPreprocess:
         return checked_text_chunks, checked_document_chunks
 
     def write_chunks(self, data_source, document_chunks):
-        folder_path = f"{self.index_agent.index_dir}/outputs/{data_source.data_domain_name}/{data_source.data_source_name}"
+        folder_path = f"{self.local_index_dir}/outputs/{data_source.data_domain_name}/{data_source.data_source_name}"
         # Clear the folder first
         shutil.rmtree(folder_path)
         os.makedirs(folder_path, exist_ok=True)
@@ -157,7 +179,7 @@ class CEQPreprocess:
             text_chunk = f"{document_chunk['content']} title: {document_chunk['title']}"
             # Skip overly long chunks
             # if (
-            #     self.tiktoken_len(text_chunk)
+            #     text_utils.tiktoken_len(text_chunk)
             #     > self.config.index_text_splitter_max_length
             # ):
             #     continue
@@ -170,3 +192,28 @@ class CEQPreprocess:
             file_path = os.path.join(folder_path, file_name)
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(document_chunk, f, indent=4)
+
+    def create_provider_ui_components(self, visibility: bool = True) -> dict[str, Any]:
+        ui_components = {}
+        ui_components["enabled_text_splitter"] = gr.Dropdown(
+            value=self.config.enabled_text_splitter,
+            label="Enabled text splitter",
+            choices=list(self.available_text_splitters),
+            visible=visibility,
+        )
+        ui_components["preprocessor_min_length"] = gr.Number(
+            value=self.config.preprocessor_min_length,
+            label="Preprocessor min length",
+            visible=visibility,
+        )
+        ui_components["text_splitter_goal_length"] = gr.Number(
+            value=self.config.text_splitter_goal_length,
+            label="Text splitter goal length",
+            visible=visibility,
+        )
+        ui_components["text_splitter_overlap_percent"] = gr.Number(
+            value=self.config.text_splitter_overlap_percent,
+            label="Text splitter overlap percent",
+            visible=visibility,
+        )
+        return ui_components

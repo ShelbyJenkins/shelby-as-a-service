@@ -18,7 +18,6 @@ class IndexBase(AppBase):
 
     @classmethod
     def setup_index(cls):
-        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app_config.app_name, "index")
         db_path = os.path.join(cls.local_index_dir, "database.db")
         os.makedirs(cls.local_index_dir, exist_ok=True)
         engine = create_engine(f"sqlite:///{db_path}")

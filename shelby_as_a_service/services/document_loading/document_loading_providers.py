@@ -5,7 +5,7 @@ import typing
 from typing import Any, Iterator, Optional, Type
 
 import gradio as gr
-import services.text_processing.text as TextProcess
+import services.text_processing.text_utils as text_utils
 from app.module_base import ModuleBase
 from bs4 import BeautifulSoup
 from langchain.document_loaders import (

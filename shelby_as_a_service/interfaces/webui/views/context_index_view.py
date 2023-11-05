@@ -1,5 +1,5 @@
 import typing
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
@@ -9,6 +9,7 @@ from services.context_index.context_index import ContextIndex
 from services.context_index.context_index_model import (
     ContextIndexModel,
     DocDBModel,
+    DocIngestProcessorModel,
     DocLoaderModel,
     DomainModel,
     SourceModel,
@@ -16,6 +17,7 @@ from services.context_index.context_index_model import (
 from services.context_index.ingest import DocIngest
 from services.database.database_service import DataBaseService
 from services.document_loading.document_loading_service import DocLoadingService
+from services.text_processing.ingest_processing_service import IngestProcessingService
 
 
 class ContextIndexView(ModuleBase):
@@ -23,7 +25,6 @@ class ContextIndexView(ModuleBase):
     CLASS_UI_NAME: str = "Context Index"
     SETTINGS_UI_COL = 4
     PRIMARY_UI_COL = 6
-    # REQUIRED_CLASSES: list[Type] = [DocIngest, DataBaseService]
 
     class ClassConfigModel(BaseModel):
         current_domain_name: str = "default_data_domain"
@@ -36,21 +37,24 @@ class ContextIndexView(ModuleBase):
     list_of_class_ui_names: list
     list_of_required_class_instances: list
     doc_ingest: DocIngest
-    database_service: DataBaseService
+    doc_ingest_processor_service: IngestProcessingService
     doc_loader_service: DocLoadingService
+    database_service: DataBaseService
     context_index: ContextIndex
-    # current_domain: DataDomain
-    # current_source: DataSource
+
     uic: dict[str, Any]
     domain_tab_dict: dict[str, Any]
     source_tab_dict: dict[str, Any]
+    domains_dd: gr.Dropdown
+    sources_dd: gr.Dropdown
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
         self.doc_loader_service = DocLoadingService()
-        self.doc_ingest = DocIngest()
         self.database_service = DataBaseService()
+        self.doc_ingest_processor_service = IngestProcessingService()
+        self.doc_ingest = DocIngest()
 
         self.uic = {}  # ui components
 
@@ -76,8 +80,9 @@ class ContextIndexView(ModuleBase):
                 self.create_context_builder_tab()
 
             with gr.Tab(label="Management"):
-                # self.document_db_service.create_settings_ui()
-                pass
+                save_button = gr.Button(value="Save Changes", variant="primary", min_width=0)
+                ui_components = self.database_service.create_service_management_settings_ui()
+                self.create_management_tab_event_handlers(ui_components, save_button)
 
     def quick_add(self):
         self.uic["ingest_button"] = gr.Button(
@@ -119,6 +124,21 @@ class ContextIndexView(ModuleBase):
 
     def create_context_builder_tab(self):
         self.uic["cbc"] = {}  # context builder components
+        with gr.Row():
+            self.domains_dd = gr.Dropdown(
+                value=self.context_index.domain.name,
+                choices=self.context_index.list_of_all_context_index_domain_names,
+                label="Current Domain",
+                allow_custom_value=False,
+                multiselect=False,
+            )
+            self.sources_dd = gr.Dropdown(
+                value=self.context_index.source.name,
+                choices=self.context_index.domain.list_of_source_names,
+                label="Current Source",
+                allow_custom_value=False,
+                multiselect=False,
+            )
 
         with gr.Tab(label="Docs"):
             pass
@@ -158,32 +178,11 @@ class ContextIndexView(ModuleBase):
         if domain_or_source is DomainModel:
             parent_instance = self.context_index.domain
             parent_instance_name_str = "Domain"
-            with gr.Row():
-                dropdowns["domains_tab_sources_dd"] = gr.Dropdown(
-                    value=self.context_index.domain.current_source.name,
-                    choices=self.context_index.domain.list_of_source_names,
-                    label="Current Source",
-                    allow_custom_value=False,
-                    multiselect=False,
-                )
+
         elif domain_or_source is SourceModel:
             parent_instance = self.context_index.source
             parent_instance_name_str = "Source"
-            with gr.Row():
-                dropdowns["source_tab_domains_dd"] = gr.Dropdown(
-                    value=self.context_index.domain.name,
-                    choices=self.context_index.list_of_all_context_index_domain_names,
-                    label="Current Topic",
-                    allow_custom_value=False,
-                    multiselect=False,
-                )
-                dropdowns["source_tab_sources_dd"] = gr.Dropdown(
-                    value=self.context_index.domain.current_source.name,
-                    choices=self.context_index.domain.list_of_source_names,
-                    label="Current Source",
-                    allow_custom_value=False,
-                    multiselect=False,
-                )
+
         else:
             raise ValueError(f"domain_or_source must be DomainModel or SourceModel")
 
@@ -271,44 +270,56 @@ class ContextIndexView(ModuleBase):
                     label=f"New {parent_instance_name_str} Description",
                     elem_id="update_description",
                 )
-                input_components["delete_textbox"] = gr.Textbox(
-                    placeholder=f"Type {parent_instance_name_str} Name to confirm deletion.",
-                    lines=1,
-                    show_label=False,
-                )
                 buttons["delete_button"] = gr.Button(
                     value=f"Delete {parent_instance_name_str} and all it's configs and documents.",
                     min_width=0,
                     size="sm",
                     variant="stop",
                 )
+                input_components["delete_textbox"] = gr.Textbox(
+                    placeholder=f"Type {parent_instance_name_str} Name to confirm deletion.",
+                    lines=1,
+                    show_label=False,
+                )
         with gr.Tab(label="Loader"):
+            if isinstance(parent_instance, SourceModel):
+                domain_or_source_config["source_uri"] = gr.Textbox(
+                    value=parent_instance.source_uri,
+                    label="Source URI",
+                    elem_id="source_uri",
+                    placeholder="URL or Filepath",
+                )
             (
-                dd,
-                components_dict,
+                doc_loaders_dd,
+                doc_loader_components_dict,
             ) = self.doc_loader_service.create_service_ui_components(
                 parent_instance=parent_instance,
                 groups_rendered=False,
             )
-            dropdowns["doc_loaders_dd"] = dd
-            services_components["doc_loaders"] = components_dict
+            dropdowns["doc_loaders_dd"] = doc_loaders_dd
+            services_components["doc_loaders"] = doc_loader_components_dict
 
-        with gr.Tab(label="Processor"):
-            gr.Textbox(
-                value="Not Implemented",
-                show_label=False,
-                lines=1,
+        with gr.Tab(label="Ingest Processor"):
+            (
+                doc_ingest_proc_dd,
+                doc_ingest_processor_components_dict,
+            ) = self.doc_ingest_processor_service.create_service_ui_components(
+                parent_instance=parent_instance,
+                groups_rendered=False,
             )
-            # self.doc_ingest.create_processor_ui()
+            dropdowns["doc_ingest_proc_dd"] = doc_ingest_proc_dd
+            services_components["doc_ingest_procs"] = doc_ingest_processor_components_dict
 
         with gr.Tab(label="Database"):
-            services_components["doc_dbs"] = {}
-            dropdowns["doc_dbs_dd"] = gr.Dropdown(
-                value=parent_instance.enabled_doc_db.name,
-                choices=self.context_index.index.list_of_doc_db_names,
-                show_label=False,
-                info=f"Default document database for the {parent_instance_name_str}. Database context_config are managed elsewhere.",
+            (
+                doc_dbs_dd,
+                doc_dbs_components_dict,
+            ) = self.database_service.create_service_ui_components(
+                parent_instance=parent_instance,
+                groups_rendered=False,
             )
+            dropdowns["doc_dbs_dd"] = doc_dbs_dd
+            services_components["doc_dbs"] = doc_dbs_components_dict
 
         with gr.Tab(label=f"Ingest {parent_instance_name_str}"):
             domain_or_source_config["batch_update_enabled"] = gr.Checkbox(
@@ -343,6 +354,22 @@ class ContextIndexView(ModuleBase):
             groups_rendered=True,
         )
         services_components["doc_loaders"] = doc_loader_components_dict
+        (
+            _,
+            doc_ingest_processor_components_dict,
+        ) = self.doc_ingest_processor_service.create_service_ui_components(
+            parent_instance=parent_instance,
+            groups_rendered=False,
+        )
+        services_components["doc_ingest_procs"] = doc_ingest_processor_components_dict
+        (
+            _,
+            doc_dbs_components_dict,
+        ) = self.database_service.create_service_ui_components(
+            parent_instance=parent_instance,
+            groups_rendered=True,
+        )
+        services_components["doc_dbs"] = doc_dbs_components_dict
 
         return GradioHelpers.list_provider_config_components(services_components)
 
@@ -373,8 +400,43 @@ class ContextIndexView(ModuleBase):
 
             return output
 
-        self.source_tab_dict["dropdowns"]["source_tab_sources_dd"].input(
-            fn=lambda *x: save_provider_settings(
+        self.domains_dd.change(
+            fn=lambda *x: self.save_provider_settings(
+                provider_config_components_values=x,
+                parent_domain=self.context_index.domain,
+            ),
+            inputs=set(
+                GradioHelpers.list_provider_config_components(
+                    self.domain_tab_dict["services_components"]
+                )
+            ),
+        ).success(
+            fn=lambda *x: save_domain_or_source_config_settings(
+                domain_or_source_config_values=x,
+                parent_domain=self.context_index.domain,
+            ),
+            inputs=set(self.domain_tab_dict["domain_or_source_config"].values()),
+        ).success(
+            fn=lambda x: update_domain_or_source_tab_config_components(
+                domain_or_source=DomainModel,
+                set_instance_name=x,
+            ),
+            inputs=self.domains_dd,
+            outputs=list(self.domain_tab_dict["domain_or_source_config"].values()),
+        ).success(
+            fn=lambda: self.update_services_and_providers(
+                parent_instance=self.context_index.domain
+            ),
+            outputs=GradioHelpers.list_provider_config_components(
+                self.domain_tab_dict["services_components"]
+            ),
+        ).success(
+            fn=lambda: update_domain_or_source_dd(SourceModel),
+            outputs=[self.sources_dd],
+        )
+
+        self.sources_dd.change(
+            fn=lambda *x: self.save_provider_settings(
                 provider_config_components_values=x,
                 parent_source=self.context_index.source,
             ),
@@ -394,7 +456,7 @@ class ContextIndexView(ModuleBase):
                 domain_or_source=SourceModel,
                 set_instance_name=x,
             ),
-            inputs=self.source_tab_dict["dropdowns"]["source_tab_sources_dd"],
+            inputs=self.sources_dd,
             outputs=list(self.source_tab_dict["domain_or_source_config"].values()),
         ).success(
             fn=lambda: self.update_services_and_providers(
@@ -405,24 +467,6 @@ class ContextIndexView(ModuleBase):
             ),
         )
 
-        # self.sources_dd.change(
-        #     fn=lambda: save_settings(
-        #         context_config=self.context_index.domain.source.object_model.context_config,
-        #         config_dict_from_gradio=sources,
-        #     )
-        # ).success(
-        #     fn=lambda: gr.Info(f"Saved Changes to {self.context_index.domain.source.source_name}")
-        # ).success(
-        #     fn=lambda x: update_source_tab_ui_components(x),
-        #     inputs=self.sources_dd,
-        #     outputs=list(sources["model_config_components"].values()),
-        # ).success(
-        #     fn=lambda: self.update_services_and_providers(
-        #         self.context_index.domain.source.object_model.context_config
-        #     ),
-        #     outputs=self.listify_dict(dict=sources["services_components"]),
-        # )
-
         self.domain_tab_dict["buttons"]["make_new_button"].click(
             fn=lambda *x: create_new_domain_or_source(
                 domain_or_source=DomainModel,
@@ -430,7 +474,7 @@ class ContextIndexView(ModuleBase):
                 component_values=x,
             ),
             inputs=list(self.domain_tab_dict["input_components"].values()),
-        )
+        ).success(fn=lambda: update_domain_or_source_dd(DomainModel), outputs=[self.domains_dd])
         self.source_tab_dict["buttons"]["make_new_button"].click(
             fn=lambda *x: create_new_domain_or_source(
                 domain_or_source=SourceModel,
@@ -438,7 +482,7 @@ class ContextIndexView(ModuleBase):
                 component_values=x,
             ),
             inputs=list(self.source_tab_dict["input_components"].values()),
-        )
+        ).success(fn=lambda: update_domain_or_source_dd(SourceModel), outputs=[self.sources_dd])
         self.domain_tab_dict["buttons"]["save_changes_button"].click(
             fn=lambda *x: save_domain_or_source_config_settings(
                 domain_or_source_config_values=x,
@@ -446,7 +490,7 @@ class ContextIndexView(ModuleBase):
             ),
             inputs=set(self.domain_tab_dict["domain_or_source_config"].values()),
         ).success(
-            fn=lambda *x: save_provider_settings(
+            fn=lambda *x: self.save_provider_settings(
                 provider_config_components_values=x,
                 parent_domain=self.context_index.domain,
             ),
@@ -457,7 +501,7 @@ class ContextIndexView(ModuleBase):
             ),
         )
         self.source_tab_dict["buttons"]["save_changes_button"].click(
-            fn=lambda *x: save_provider_settings(
+            fn=lambda *x: self.save_provider_settings(
                 provider_config_components_values=x,
                 parent_source=self.context_index.source,
             ),
@@ -539,21 +583,21 @@ class ContextIndexView(ModuleBase):
                     setattr(parent_instance, component.elem_id, component_value)
             gr.Info(f"Saved Changes to {self.context_index.source.name}")
 
-        def save_provider_settings(
-            provider_config_components_values,
-            parent_domain: Optional[DomainModel] = None,
-            parent_source: Optional[SourceModel] = None,
+        def update_domain_or_source_dd(
+            domain_or_source: Union[Type[DomainModel], Type[SourceModel]],
         ):
-            for component, component_value in provider_config_components_values[0].items():
-                self.save_component_value_to_provider_config_dict(
-                    parent_domain=parent_domain,
-                    parent_source=parent_source,
-                    service_name=component.elem_classes[0],
-                    provider_name=component.elem_classes[1],
-                    provider_config_key=component.elem_id,
-                    component_value=component_value,
+            if domain_or_source is DomainModel:
+                return gr.update(
+                    value=self.context_index.domain.name,
+                    choices=self.context_index.list_of_all_context_index_domain_names,
                 )
-            ContextIndex.commit_context_index()
+            elif domain_or_source is SourceModel:
+                return gr.update(
+                    value=self.context_index.source.name,
+                    choices=self.context_index.domain.list_of_source_names,
+                )
+            else:
+                raise ValueError(f"domain_or_source must be DomainModel or SourceModel")
 
     def create_service_provider_select_events(
         self,
@@ -562,7 +606,9 @@ class ContextIndexView(ModuleBase):
     ):
         def select_enabled_provider_event(
             provider_select_dd: gr.Dropdown,
-            set_model_type: Union[Type[DocDBModel], Type[DocLoaderModel]],
+            set_model_type: Union[
+                Type[DocDBModel], Type[DocLoaderModel], Type[DocIngestProcessorModel]
+            ],
         ):
             provider_select_dd.input(
                 fn=lambda x: self.context_index.set_current_domain_or_source_provider_instance(
@@ -574,7 +620,25 @@ class ContextIndexView(ModuleBase):
             )
 
         select_enabled_provider_event(dropdowns["doc_loaders_dd"], DocLoaderModel)
+        select_enabled_provider_event(dropdowns["doc_ingest_proc_dd"], DocIngestProcessorModel)
         select_enabled_provider_event(dropdowns["doc_dbs_dd"], DocDBModel)
+
+    def save_provider_settings(
+        self,
+        provider_config_components_values,
+        parent_domain: Optional[DomainModel] = None,
+        parent_source: Optional[SourceModel] = None,
+    ):
+        for component, component_value in provider_config_components_values[0].items():
+            self.save_component_value_to_provider_config_dict(
+                parent_domain=parent_domain,
+                parent_source=parent_source,
+                service_name=component.elem_classes[0],
+                provider_name=component.elem_classes[1],
+                provider_config_key=component.elem_id,
+                component_value=component_value,
+            )
+        ContextIndex.commit_context_index()
 
     def save_component_value_to_provider_config_dict(
         self,
@@ -592,15 +656,35 @@ class ContextIndexView(ModuleBase):
                     parent_source=parent_source,
                     name=provider_name,
                 )
+            case IngestProcessingService.CLASS_NAME:
+                provider_model = self.context_index.get_or_create_doc_ingest_processor_instance(
+                    parent_domain=parent_domain,
+                    parent_source=parent_source,
+                    name=provider_name,
+                )
             case DataBaseService.CLASS_NAME:
                 provider_model = self.context_index.get_or_create_doc_db_instance(
                     name=provider_name,
                 )
             case _:
                 raise ValueError(
-                    f"service_name must be {DocLoadingService.CLASS_NAME} or {DataBaseService.CLASS_NAME}"
+                    f"service_name must be {DocLoadingService.CLASS_NAME}, {IngestProcessingService.CLASS_NAME}, or {DataBaseService.CLASS_NAME}"
                 )
 
         if hasattr(provider_model, "config"):
             if provider_model.config.get(provider_config_key, None):
                 provider_model.config[provider_config_key] = component_value
+
+    def create_management_tab_event_handlers(self, ui_components, save_button):
+        for name, component_dict in ui_components.items():
+            GradioHelpers.set_components_elem_id_and_classes(
+                provider_config_components=component_dict,
+                provider_name=name,
+                service_name=DataBaseService.CLASS_NAME,
+            )
+        save_button.click(
+            fn=lambda *x: self.save_provider_settings(
+                provider_config_components_values=x,
+            ),
+            inputs=set(ui_components["pinecone_database"].values()),
+        )

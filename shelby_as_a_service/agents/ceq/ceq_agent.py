@@ -4,7 +4,7 @@ from typing import Annotated, Any, Generator, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-import services.text_processing.text as text
+import services.text_processing.text_utils as text_utils
 from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.context_index.retrieval import DocRetrieval

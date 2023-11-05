@@ -87,6 +87,7 @@ class AppBase:
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
         # AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
+        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app_config.app_name, "index")
         from services.context_index.context_index import ContextIndex
 
         AppBase.context_index = ContextIndex()

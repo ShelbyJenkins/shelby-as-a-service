@@ -6,7 +6,7 @@ import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.embedding.embedding_service import EmbeddingService
-from services.text_processing.parse_retrieval_docs import parse_retrieved_docs
+from services.text_processing.process_retrieval import process_retrieved_docs
 
 
 class DocRetrieval(ModuleBase):
@@ -100,7 +100,7 @@ class DocRetrieval(ModuleBase):
                 enabled_data_domains=enabled_data_domains,
             )
 
-            returned_documents_list = parse_retrieved_docs(
+            returned_documents_list = process_retrieved_docs(
                 retrieved_documents=returned_documents_list,
                 doc_max_tokens=doc_max_tokens
                 if doc_max_tokens is not None

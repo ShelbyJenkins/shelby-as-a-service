@@ -3,61 +3,94 @@ import os
 import re
 import shutil
 import string
+from typing import Any, Dict, Type, Union
 from urllib.parse import urlparse
 
+import gradio as gr
 import yaml
-from services.data_processing.data_processing_service import TextProcessing
+from app.module_base import ModuleBase
+from pydantic import BaseModel
 
 
-class OpenAPIMinifierService:
-    def __init__(self, data_source_config):
-        self.index_agent = data_source_config.index_agent
-        self.config = data_source_config.index_agent.config
-        self.data_source_config = data_source_config
+class OpenAPIMinifier(ModuleBase):
+    CLASS_NAME: str = "open_api_minifier"
+    CLASS_UI_NAME: str = "Open API Minifier"
 
-        self.api_url_format = data_source_config.api_url_format
+    # Saves tokens be abbreviating in a way understood by the LLM
+    # Must be lowercase
+    key_abbreviations = {
+        "operationid": "opid",
+        "parameters": "params",
+        "requestbody": "reqBody",
+        "properties": "props",
+        "schemaname": "schName",
+        "description": "desc",
+        "summary": "sum",
+        "string": "str",
+        "number": "num",
+        "object": "obj",
+        "boolean": "bool",
+        "array": "arr",
+        "object": "obj",
+    }
+    available_methods_to_handle: list[str] = [
+        "get",
+        "post",
+        "patch",
+        "delete",
+    ]
+    available_keys_to_keep: list[str] = [
+        # Root level keys to populate
+        "parameters",
+        "good_responses",
+        "bad_responses",
+        "request_bodies",
+        "schemas",
+        "endpoint_descriptions",
+        "endpoint_summaries",
+        # Keys to exclude
+        "enums",
+        "nested_descriptions",
+        "examples",
+        "tag_summaries",
+        "deprecated",
+    ]
 
-        self.tiktoken_len = TextProcessing.tiktoken_len
+    class ClassConfigModel(BaseModel):
+        key_abbreviations_enabled: bool = True
+        methods_to_handle: list[str] = [
+            "get",
+            "post",
+            "patch",
+            "delete",
+        ]
+        # Decide what fields you want to keep in the documents
+        keys_to_keep: list[str] = [
+            "parameters",
+            "good_responses",
+            "bad_responses",
+            "request_bodies",
+            "schemas",
+            "endpoint_descriptions",
+            "endpoint_summaries",
+            "enums",
+            "nested_descriptions",
+            "examples",
+            "deprecated",
+        ]
+
+    config: ClassConfigModel
+
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
+
+        # self.index_agent = data_source_config.index_agent
+        # self.config = data_source_config.index_agent.config
+        # self.data_source_config = data_source_config
+
+        # self.api_url_format = data_source_config.api_url_format
 
         self.operationID_counter = 0
-
-        # Decide what fields you want to keep in the documents
-        self.keys_to_keep = {
-            # Root level keys to populate
-            "parameters": True,
-            "good_responses": True,
-            "bad_responses": False,
-            "request_bodies": True,
-            "schemas": True,
-            "endpoint_descriptions": True,
-            "endpoint_summaries": True,
-            # Keys to exclude
-            "enums": False,
-            "nested_descriptions": True,
-            "examples": False,
-            "tag_summaries": False,
-            "deprecated": False,
-        }
-        self.methods_to_handle = {"get", "post", "patch", "delete"}
-        # Saves tokens be abbreviating in a way understood by the LLM
-        # Must be lowercase
-        self.key_abbreviations = {
-            "operationid": "opid",
-            "parameters": "params",
-            "requestbody": "reqBody",
-            "properties": "props",
-            "schemaname": "schName",
-            "description": "desc",
-            "summary": "sum",
-            "string": "str",
-            "number": "num",
-            "object": "obj",
-            "boolean": "bool",
-            "array": "arr",
-            "object": "obj",
-        }
-
-        self.key_abbreviations_enabled = True
 
     def run(self, open_api_specs):
         # Merge all specs and save a copy locally
@@ -590,3 +623,26 @@ class OpenAPIMinifierService:
             file_path = f"{folder_path}/{file_name}.txt"
             with open(file_path, "w") as f:
                 json.dump(document_chunk, f, indent=4)
+
+    def create_provider_ui_components(self, visibility: bool = True):
+        ui_components = {}
+        ui_components["key_abbreviations_enabled"] = gr.Checkbox(
+            value=self.config.key_abbreviations_enabled,
+            label="Enable key abbreviations",
+            visible=visibility,
+        )
+        ui_components["methods_to_handle"] = gr.CheckboxGroup(
+            value=list(self.config.methods_to_handle),
+            label="Methods to handle",
+            choices=list(self.available_methods_to_handle),
+            visible=visibility,
+        )
+        ui_components["keys_to_keep"] = gr.Dropdown(
+            value=list(self.config.keys_to_keep),
+            label="Keys to keep",
+            choices=list(self.available_keys_to_keep),
+            multiselect=True,
+            visible=visibility,
+        )
+
+        return ui_components

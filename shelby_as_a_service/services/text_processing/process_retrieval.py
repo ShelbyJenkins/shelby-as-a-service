@@ -1,9 +1,9 @@
 from typing import Any
 
-import services.text_processing.text as TextProcessing
+import services.text_processing.text_utils as text_utils
 
 
-def parse_retrieved_docs(
+def process_retrieved_docs(
     retrieved_documents: list[dict],
     doc_max_tokens: float = 0,
     max_total_tokens: float = 0,
@@ -34,7 +34,7 @@ def parse_retrieved_docs(
 
     docs_total_tokens = 0
     for document in sorted_documents:
-        token_count = TextProcessing.tiktoken_len(document["content"])
+        token_count = text_utils.tiktoken_len(document["content"])
         document["token_count"] = token_count
         docs_total_tokens += token_count
 
@@ -90,7 +90,7 @@ def parse_retrieved_docs(
     return sorted_documents
 
 
-# def old_parse_retrieved_docs(retrieved_documents=None):
+# def old_process_retrieved_docs(retrieved_documents=None):
 #     if not retrieved_documents:
 #         return None
 

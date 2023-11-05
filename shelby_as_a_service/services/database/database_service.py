@@ -1,11 +1,12 @@
 import os
 import typing
-from typing import Any, Type
+from typing import Any, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel
+from services.context_index.context_index_model import ContextIndexModel, DomainModel, SourceModel
 from services.database.local_file import LocalFileDatabase
 from services.database.pinecone import PineconeDatabase
 
@@ -39,7 +40,6 @@ class DataBaseService(ModuleBase):
             database_provider = self.config.database_provider
 
         provider = self.get_requested_class_instance(
-            self.list_of_required_class_instances,
             database_provider if database_provider is not None else self.config.database_provider,
         )
 
@@ -86,30 +86,40 @@ class DataBaseService(ModuleBase):
         else:
             print("rnr")
 
-    def create_settings_ui(self):
-        components = {}
+    def create_service_management_settings_ui(self):
+        ui_components = {}
 
-        with gr.Column():
-            components["database_provider"] = gr.Dropdown(
-                value=GradioHelpers.get_class_ui_name_from_str(
-                    self.list_of_required_class_instances, self.config.database_provider
-                ),
-                choices=GradioHelpers.get_list_of_class_ui_names(
-                    self.list_of_required_class_instances
-                ),
-                label="Source Type",
-                container=True,
-                min_width=0,
+        with gr.Accordion(label="Pinecone"):
+            pinecone_model_instance = self.context_index.get_or_create_doc_db_instance(
+                name="pinecone_database"
             )
-            components["retrieve_n_docs"] = gr.Number(
-                value=self.config.retrieve_n_docs,
-                label="Number of Documents to Retrieve",
-                container=True,
-                min_width=0,
-            )
-            for provider_instance in self.list_of_required_class_instances:
-                provider_instance.create_settings_ui()
+            pinecone_database = PineconeDatabase(config_file_dict=pinecone_model_instance.config)
+            ui_components[
+                "pinecone_database"
+            ] = pinecone_database.create_provider_management_settings_ui()
 
-            GradioHelpers.create_settings_event_listener(self.config, components)
+        return ui_components
 
-        return components
+    def create_service_ui_components(
+        self,
+        parent_instance: Union[DomainModel, SourceModel],
+        groups_rendered: bool = True,
+    ):
+        provider_configs_dict = {}
+
+        for provider in self.context_index.index.doc_dbs:
+            name = provider.name
+            config = provider.config
+            provider_configs_dict[name] = config
+
+        enabled_doc_db_name = parent_instance.enabled_doc_db.name
+
+        provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
+            service_name=self.CLASS_NAME,
+            enabled_provider_name=enabled_doc_db_name,
+            required_classes=self.REQUIRED_CLASSES,
+            provider_configs_dict=provider_configs_dict,
+            groups_rendered=groups_rendered,
+        )
+
+        return provider_select_dd, service_providers_dict

@@ -6,19 +6,18 @@ import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.context_index.context_index_model import DomainModel, SourceModel
-from services.document_loading.document_loading_providers import (
-    GenericRecursiveWebScraper,
-    GenericWebScraper,
-)
+
+from .ingest_ceq import IngestCEQ
+from .ingest_open_api import OpenAPIMinifier
 
 
-class DocLoadingService(ModuleBase):
-    CLASS_NAME: str = "doc_loader_service"
-    CLASS_UI_NAME: str = "Document Loading Service"
-    REQUIRED_CLASSES = [GenericWebScraper, GenericRecursiveWebScraper]
+class IngestProcessingService(ModuleBase):
+    CLASS_NAME: str = "ingest_processing_service"
+    CLASS_UI_NAME: str = "Ingest Processing Service"
+    REQUIRED_CLASSES = [OpenAPIMinifier, IngestCEQ]
 
     class ClassConfigModel(BaseModel):
-        doc_loading_provider: str = "generic_web_scraper"
+        text_processing_provider: str = "ceq_ingest_processor"
 
         class Config:
             extra = "ignore"
@@ -26,17 +25,17 @@ class DocLoadingService(ModuleBase):
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_required_class_instances: list[Union[GenericWebScraper, GenericRecursiveWebScraper]]
-    provider_instance: Union[GenericWebScraper, GenericRecursiveWebScraper]
+    list_of_required_class_instances: list[Union[OpenAPIMinifier, IngestCEQ]]
+    provider_instance: Union[OpenAPIMinifier, IngestCEQ]
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
-    def load(self, data_source, doc_loading_provider=None):
+    def load(self, data_source, text_proc_provider=None):
         self.provider_instance = self.get_requested_class_instance(
-            doc_loading_provider
-            if doc_loading_provider is not None
-            else self.config.doc_loading_provider,
+            text_proc_provider
+            if text_proc_provider is not None
+            else self.config.text_proc_provider,
         )
 
         if self.provider_instance:
@@ -56,11 +55,11 @@ class DocLoadingService(ModuleBase):
             config = provider.config
             provider_configs_dict[name] = config
 
-        enabled_doc_loader_name = parent_instance.enabled_doc_loader.name
+        text_processing_provider_name = parent_instance.enabled_doc_ingest_processor.name
 
         provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
             service_name=self.CLASS_NAME,
-            enabled_provider_name=enabled_doc_loader_name,
+            enabled_provider_name=text_processing_provider_name,
             required_classes=self.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,

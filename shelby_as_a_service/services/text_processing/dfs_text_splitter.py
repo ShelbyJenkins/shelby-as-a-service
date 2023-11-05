@@ -1,3 +1,11 @@
+import logging
+from typing import Optional
+
+import spacy
+
+from . import text_utils
+
+
 class DFSTextSplitter:
     """Splits text that attempts to split by paragraph, newlines, sentences, spaces, and finally chars.
     Splits with regex for all but sentences and words.
@@ -6,31 +14,29 @@ class DFSTextSplitter:
     After splitting, creating the chunks is used with a DFS algo utilizing memoization and a heuristic prefilter.
     """
 
+    max_length: int
+    goal_length_max_threshold: int
+    goal_length_min_threshold: int
+    chunk_overlap_max_threshold: int
+    chunk_overlap_min_threshold: int
+    chunk_overlap: int
+    average_range_min: int
+
     def __init__(
         self,
-        goal_length,
-        overlap_percent,
-        info,
+        goal_length: int,
+        overlap_percent: int,
     ) -> None:
-        self.info = info
-
-        self.split_with_regex = TextProcessing.split_text_with_regex
+        self.log = logging.getLogger(self.__class__.__name__)
+        self.split_with_regex = text_utils.split_text_with_regex
         self.spacy = spacy.load("en_core_web_sm")
-        self.tiktoken_len = TextProcessing.tiktoken_len
 
-        self.memo = {}
+        self.memo: dict = {}
         self.original_goal_length = goal_length
         self.goal_length = goal_length
         self.overlap_percent = overlap_percent
         if not overlap_percent or overlap_percent < 10:
             self.overlap_percent = 10
-        self.max_length = None
-        self.goal_length_max_threshold = None
-        self.goal_length_min_threshold = None
-        self.chunk_overlap = None
-        self.chunk_overlap_max_threshold = None
-        self.chunk_overlap_min_threshold = None
-        self.average_range_min = None
 
         self._separators = ["\n\n", "\n", "spacy_sentences", "spacy_words", " ", ""]
         self.threshold_modifier = 0.1
@@ -60,15 +66,15 @@ class DFSTextSplitter:
         self.chunk_overlap_min_threshold = self.chunk_overlap - int(
             self.threshold_modifier * self.chunk_overlap
         )
-        # self.info(f"New goal_length: {self.goal_length}")
+        # self.log.info(f"New goal_length: {self.goal_length}")
 
     def _set_heuristics(self, text, splits):
         """Sets some values that we use as a pre-filter to speed up the process."""
         self.average_range_min = 0
         for split in splits:
-            if self.tiktoken_len(split) > self.max_length:
+            if text_utils.tiktoken_len(split) > self.max_length:
                 return False
-        total_tokens = self.tiktoken_len(text)
+        total_tokens = text_utils.tiktoken_len(text)
 
         estimated_chunks = int(total_tokens / self.goal_length)
         if estimated_chunks == 1:
@@ -82,7 +88,7 @@ class DFSTextSplitter:
         self.average_range_min = int((estimated_splits_per_chunk / 2))
         return True
 
-    def _split_text(self, text, separator) -> list[list[str]]:
+    def _split_text(self, text: str, separator: str) -> Optional[list[str]]:
         """Splits text by various methods."""
 
         match separator:
@@ -118,7 +124,7 @@ class DFSTextSplitter:
         if len(chunks_as_splits) < 2:
             return None
 
-        # self.info(f"chunks_as_splits: {chunks_as_splits}")
+        # self.log.info(f"chunks_as_splits: {chunks_as_splits}")
         return chunks_as_splits
 
     def _recursive_chunk_tester(self, start, splits):
@@ -155,23 +161,23 @@ class DFSTextSplitter:
         Starts calculation at + self.average_range_min as a pre-filter.
         """
         if start in self.memo:
-            # self.info(f"Returning memoized result for start at index {start}")
+            # self.log.info(f"Returning memoized result for start at index {start}")
             return self.memo[start]
 
         valid_ends = []
 
-        current_length = self.tiktoken_len(
+        current_length = text_utils.tiktoken_len(
             "".join(splits[start : start + 1 + self.average_range_min])
         )
         for j in range(start + 1 + self.average_range_min, len(splits)):
             # Final tokenization will be of combined chunks - not individual chars!
-            current_length = self.tiktoken_len("".join(splits[start:j]))
+            current_length = text_utils.tiktoken_len("".join(splits[start:j]))
             if current_length >= self.goal_length_min_threshold - self.chunk_overlap_max_threshold:
                 if current_length <= self.max_length - self.chunk_overlap_max_threshold:
                     valid_ends.append(j)
                 else:
                     break
-        # self.info(f"Start: {start} has valid_ends: {valid_ends}")
+        # self.log.info(f"Start: {start} has valid_ends: {valid_ends}")
         self.memo[start] = valid_ends
 
         return valid_ends
@@ -232,14 +238,14 @@ class DFSTextSplitter:
                 return None
             text_chunk = "".join([backwards_overlap_text, text_chunk, forward_overlap_text])
 
-            text_chunk = TextProcessing.reduce_excess_whitespace(text_chunk)
-            token_count = self.tiktoken_len(text_chunk)
+            text_chunk = text_utils.reduce_excess_whitespace(text_chunk)
+            token_count = text_utils.tiktoken_len(text_chunk)
             if token_count > self.max_length:
-                # self.info(f"chunk token count too big!: {self.tiktoken_len(text_chunk)}")
+                # self.log.info(f"chunk token count too big!: {text_utils.tiktoken_len(text_chunk)}")
                 return None
-            # self.info(f"chunk token count: {self.tiktoken_len(text_chunk)}")
-            # self.info(f"backwards_overlap_text token count: {self.tiktoken_len(backwards_overlap_text)}")
-            # self.info(f"forward_overlap_text token count: {self.tiktoken_len(forward_overlap_text)}")
+            # self.log.info(f"chunk token count: {text_utils.tiktoken_len(text_chunk)}")
+            # self.log.info(f"backwards_overlap_text token count: {text_utils.tiktoken_len(backwards_overlap_text)}")
+            # self.log.info(f"forward_overlap_text token count: {text_utils.tiktoken_len(forward_overlap_text)}")
 
             chunks.append(text_chunk)
 
@@ -249,7 +255,7 @@ class DFSTextSplitter:
         """Creates forward chunks."""
         overlap_text = "".join(splits[end_split + 1 : next_end])
         for separator in self._separators:
-            # self.info(f"Trying overlap separator: {repr(separator)}")
+            # self.log.info(f"Trying overlap separator: {repr(separator)}")
             overlap_splits = self._split_text(overlap_text, separator)
             if overlap_splits is None:
                 continue
@@ -257,7 +263,7 @@ class DFSTextSplitter:
             saved_splits = []
             for split in overlap_splits:
                 saved_splits.append(split)
-                current_length = self.tiktoken_len("".join(saved_splits))
+                current_length = text_utils.tiktoken_len("".join(saved_splits))
                 if current_length > overlap_max:
                     break
                 if current_length >= overlap_min:
@@ -271,7 +277,7 @@ class DFSTextSplitter:
         """Creates backwards chunks."""
         overlap_text = "".join(splits[previous_end:start_split])
         for separator in self._separators:
-            # self.info(f"Trying overlap separator: {repr(separator)}")
+            # self.log.info(f"Trying overlap separator: {repr(separator)}")
             overlap_splits = self._split_text(overlap_text, separator)
             if overlap_splits is None:
                 continue
@@ -279,7 +285,7 @@ class DFSTextSplitter:
             saved_splits = []
             for j in range(len(overlap_splits) - 1, -1, -1):
                 saved_splits.insert(0, overlap_splits[j])
-                current_length = self.tiktoken_len("".join(saved_splits))
+                current_length = text_utils.tiktoken_len("".join(saved_splits))
                 if current_length > overlap_max:
                     break
                 if current_length >= overlap_min:
@@ -287,21 +293,21 @@ class DFSTextSplitter:
                     return overlap
         return None
 
-    def split_text(self, text) -> list[str]:
+    def split_text(self, text: str) -> Optional[list[str]]:
         """Interface for class."""
         self._set_thresholds(self.original_goal_length)
         # Skip if too small
-        if self.tiktoken_len(text) < self.max_length:
-            self.info(
-                f"Doc length: {self.tiktoken_len(text)} already within max_length: {self.max_length}"
+        if text_utils.tiktoken_len(text) < self.max_length:
+            self.log.info(
+                f"Doc length: {text_utils.tiktoken_len(text)} already within max_length: {self.max_length}"
             )
-            return text
+            return [text]
         for separator in self._separators:
-            self.info(f"Trying separator: {repr(separator)}")
+            self.log.info(f"Trying separator: {repr(separator)}")
             self._set_thresholds(self.original_goal_length)
             while (self.goal_length / self.original_goal_length) > self.min_length:
                 self.memo = {}
-                splits = []
+
                 chunk_end_splits = None
                 text_chunks = None
                 splits = self._split_text(text, separator)
@@ -314,126 +320,3 @@ class DFSTextSplitter:
                         return text_chunks
                 self._set_thresholds()
         return None
-
-
-class BalancedRecursiveCharacterTextSplitter:
-    """Implementation of splitting text that looks at characters.
-    Recursively tries to split by different characters to find one that works.
-    Originally from Langchain's RecursiveCharacterTextSplitter.
-    However this version retries if the chunk sizes does not meet the input requirements.
-    """
-
-    def __init__(
-        self,
-        goal_length,
-        max_length,
-        chunk_overlap,
-        info,
-    ) -> None:
-        self.info = info
-        self._separators = ["\n\n", "\n", "spacy_sentences", " ", ""]
-        self.spacy_sentences = spacy.load("en_core_web_sm")
-        self._keep_separator: bool = False
-        self.goal_length = goal_length
-        self.max_length = max_length or (self.goal_length * 1.25)
-        self.tiktoken_len = TextProcessing.tiktoken_len
-        # Chunk size logic
-        if chunk_overlap is not None:
-            # There must be at least some chunk overlap for this to function
-            if chunk_overlap < 100:
-                self._chunk_overlap = 100
-            else:
-                self._chunk_overlap = chunk_overlap
-        else:
-            self._chunk_overlap = self._chunk_overlap
-
-    def _split_text(self, text: str, separators: list[str], goal_length=None) -> list[list[str]]:
-        """Split incoming text and return chunks."""
-
-        # Have to define here initially so it can be redefined for each recursion
-        if goal_length is None:
-            goal_length = self.goal_length
-        # Get appropriate separator to use
-        separator = separators[-1]
-        new_separators = []
-        for i, _s in enumerate(separators):
-            if _s == "":
-                separator = _s
-                break
-            if _s == "spacy_sentences":
-                separator = "spacy_sentences"
-                new_separators = separators[i + 1 :]
-                break
-            elif re.search(_s, text):
-                separator = _s
-                new_separators = separators[i + 1 :]
-                break
-
-        # self.info(f"Trying separator: {repr(separator)} with goal_length: {goal_length}")
-
-        # Use the current separator to split the text
-        if separator == "spacy_sentences":
-            doc = self.spacy_sentences(text)
-            splits = [sent.text for sent in doc.sents]
-        else:
-            splits = TextProcessing.split_text_with_regex(text, separator, self._keep_separator)
-        final_combos = self.distribute_splits(splits, goal_length)
-
-        # If any split was larger than the max size
-        # final_combos will be returned empty from distribute_splits
-        if final_combos:
-            for combo in final_combos:
-                # If a combo of splits is too small,
-                # we adjust the goal_length and retry separator
-                combo_token_count = self.tiktoken_len("".join(combo))
-                if combo_token_count < self.goal_length * 0.75 and len(final_combos) > 1:
-                    new_goal_length = int(
-                        goal_length + (combo_token_count / (len(final_combos) - 1))
-                    )
-                    final_combos = self._split_text(text, separators, new_goal_length)
-                # If a combo of splits is too large, we retry with new separator
-                elif combo_token_count > self.max_length and new_separators:
-                    final_combos = self._split_text(text, new_separators, goal_length)
-        else:
-            # In the case distribute_splits returned None continue to next separator
-            final_combos = self._split_text(text, new_separators, goal_length)
-
-        # All combos satisfy requirements
-        return final_combos
-
-    def distribute_splits(self, splits: list, goal_length: int) -> list[list[str]]:
-        # Build initial combos
-        combos: list[list[str]] = []
-        current_combo = []
-        combo_token_count = 0
-        for split in splits:
-            split_token_count = self.tiktoken_len(split)
-            # If too big skip to next separator
-            if split_token_count > self.max_length:
-                combos = []
-                return combos
-            if goal_length > (combo_token_count + split_token_count):
-                current_combo.append(split)
-                combo_token_count = self.tiktoken_len("".join(current_combo))
-            # Combo larger than goal_length
-            else:
-                current_combo.append(split)
-                combos.append(current_combo)
-                # Create a new combo and add the current split so there is overlap
-                if split_token_count < self._chunk_overlap:
-                    current_combo = []
-                    current_combo.append(split)
-                    combo_token_count = self.tiktoken_len("".join(current_combo))
-                # If the overlap chunk is larger than overlap size
-                # continue to next separator
-                else:
-                    combos = []
-                    return combos
-        # Add the last combo if it has more than just the overlap chunk
-        if len(current_combo) > 1:
-            combos.append(current_combo)
-        return combos
-
-    def split_text(self, text: str) -> list[str]:
-        final_combos = self._split_text(text, self._separators, self.goal_length)
-        return ["".join(combo) for combo in final_combos]

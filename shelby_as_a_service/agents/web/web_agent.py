@@ -5,7 +5,7 @@ from typing import Any, Generator, Optional, Type
 from urllib.parse import urlparse, urlunparse
 
 import gradio as gr
-import services.text_processing.text as text
+import services.text_processing.text_utils as text_utils
 from agents.ingest.ingest_agent import IngestAgent
 from app.module_base import ModuleBase
 from pydantic import BaseModel
@@ -91,7 +91,7 @@ class WebAgent(ModuleBase):
                 output = ""
                 if documents:
                     for document in documents:
-                        if content := text.get_document_content(document):
+                        if content := text_utils.get_document_content(document):
                             output += content
                     return [output, output]
 

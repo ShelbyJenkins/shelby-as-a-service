@@ -1,7 +1,7 @@
 import os
 from typing import Dict
 
-import services.text_processing.text as TextProcess
+import services.text_processing.text_utils as text_utils
 import yaml
 
 

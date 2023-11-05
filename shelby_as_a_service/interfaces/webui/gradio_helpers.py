@@ -85,7 +85,6 @@ def list_provider_config_components(services_components):
 
 
 # This updates the config model with the values from the UI
-# Need a second class for updates to sqlite
 def update_config_classes(config_model, components, *values):
     ui_state = {k: v for k, v in zip(components.keys(), values)}
     current_values = config_model.model_dump()

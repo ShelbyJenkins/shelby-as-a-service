@@ -15,7 +15,7 @@ class ModuleBase(AppBase):
     config: BaseModel
     list_of_class_names: list[str]
     list_of_class_ui_names: list[str]
-    list_of_required_class_instances: list["ModuleBase"]
+    list_of_required_class_instances: list
     list_of_available_model_names: list[str]
     update_settings_file: bool = False
 
@@ -54,6 +54,9 @@ class ModuleBase(AppBase):
             self.list_of_class_names.append(new_instance.CLASS_NAME)
             self.list_of_class_ui_names.append(new_instance.CLASS_UI_NAME)
             self.list_of_required_class_instances.append(new_instance)
+        from services.context_index.context_index import ContextIndex
+
+        self.context_index: ContextIndex
 
     def create_model_instances(
         self,

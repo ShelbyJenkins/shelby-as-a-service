@@ -4,7 +4,7 @@ from typing import Any, Dict, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-import services.text_processing.text as TextProcess
+import services.text_processing.text_utils as text_utils
 from app.module_base import ModuleBase
 from pydantic import BaseModel
 
@@ -29,7 +29,7 @@ class LocalFileDatabase(ModuleBase):
         )
         os.makedirs(data_domain_name_file_path, exist_ok=True)
         for document in documents:
-            title = TextProcess.extract_and_clean_title(document, data_source.data_source_url)
+            title = text_utils.extract_and_clean_title(document, data_source.data_source_url)
             valid_filename = "".join(c if c.isalnum() else "_" for c in title)
             file_path = os.path.join(data_domain_name_file_path, f"{valid_filename}.md")
             page_content = document.page_content
@@ -41,13 +41,10 @@ class LocalFileDatabase(ModuleBase):
 
     def create_settings_ui(self):
         components = {}
-        # with gr.Accordion(label=self.CLASS_UI_NAME, open=True):
-        #     with gr.Column():
-        #         components["max_response_tokens"] = gr.Number(
-        #             value=self.config.max_response_tokens,
-        #             label="max_response_tokens",
-        #             interactive=True,
-        #         )
-        #     GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components
+
+    def create_provider_ui_components(self, visibility: bool = True):
+        ui_components = {}
+
+        return ui_components

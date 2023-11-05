@@ -22,10 +22,6 @@ class PineconeDatabase(ModuleBase):
         vectorstore_metric: str = "cosine"
         vectorstore_pod_type: str = "p1"
 
-        preprocessor_min_length: int = 150
-        #  text_splitter_goal_length: int = 500
-        text_splitter_goal_length: int = 750
-        text_splitter_overlap_percent: int = 15  # In percent
         retrieve_n_docs: int = 5
         indexed_metadata: list = [
             "data_domain_name",
@@ -210,44 +206,49 @@ class PineconeDatabase(ModuleBase):
             metadata_config=metadata_config,
         )
 
-    def create_settings_ui(self):
-        components = {}
-        with gr.Accordion(label=self.CLASS_UI_NAME, open=True):
-            with gr.Column():
-                components["index_env"] = gr.Textbox(
-                    value=self.config.index_env, label="index_env", interactive=True, min_width=0
-                )
-                components["vectorstore_dimension"] = gr.Number(
-                    value=self.config.vectorstore_dimension,
-                    label="vectorstore_dimension",
-                    interactive=True,
-                    min_width=0,
-                )
-                components["vectorstore_upsert_batch_size"] = gr.Number(
-                    value=self.config.vectorstore_upsert_batch_size,
-                    label="vectorstore_upsert_batch_size",
-                    interactive=True,
-                    min_width=0,
-                )
-                components["vectorstore_metric"] = gr.Textbox(
-                    value=self.config.vectorstore_metric,
-                    label="vectorstore_metric",
-                    interactive=True,
-                    min_width=0,
-                )
-                components["vectorstore_pod_type"] = gr.Textbox(
-                    value=self.config.vectorstore_pod_type,
-                    label="vectorstore_pod_type",
-                    interactive=True,
-                    min_width=0,
-                )
-                components["indexed_metadata"] = gr.Dropdown(
-                    value=self.config.indexed_metadata[0],
-                    choices=self.config.indexed_metadata,
-                    label="indexed_metadata",
-                    interactive=True,
-                    min_width=0,
-                )
-                GradioHelpers.create_settings_event_listener(self.config, components)
+    def create_provider_management_settings_ui(self):
+        ui_components = {}
 
-        return components
+        ui_components["index_env"] = gr.Textbox(
+            value=self.config.index_env, label="index_env", interactive=True, min_width=0
+        )
+        ui_components["vectorstore_dimension"] = gr.Number(
+            value=self.config.vectorstore_dimension,
+            label="vectorstore_dimension",
+            interactive=True,
+            min_width=0,
+        )
+        ui_components["vectorstore_metric"] = gr.Textbox(
+            value=self.config.vectorstore_metric,
+            label="vectorstore_metric",
+            interactive=True,
+            min_width=0,
+        )
+        ui_components["vectorstore_pod_type"] = gr.Textbox(
+            value=self.config.vectorstore_pod_type,
+            label="vectorstore_pod_type",
+            interactive=True,
+            min_width=0,
+        )
+        ui_components["indexed_metadata"] = gr.Dropdown(
+            value=self.config.indexed_metadata[0],
+            choices=self.config.indexed_metadata,
+            label="indexed_metadata",
+            interactive=True,
+            min_width=0,
+            multiselect=True,
+            allow_custom_value=True,
+        )
+        ui_components["vectorstore_upsert_batch_size"] = gr.Number(
+            value=self.config.vectorstore_upsert_batch_size,
+            label="vectorstore_upsert_batch_size",
+            interactive=True,
+            min_width=0,
+        )
+
+        return ui_components
+
+    def create_provider_ui_components(self, visibility: bool = True):
+        ui_components = {}
+
+        return ui_components

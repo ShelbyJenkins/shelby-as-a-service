@@ -1,7 +1,6 @@
 import logging
 from typing import Any, Optional, Type, Union
 
-from app.module_base import ModuleBase
 from services.database.database_service import DataBaseService
 from services.database.index_base import IndexBase
 from services.document_loading.document_loading_providers import (
@@ -9,6 +8,7 @@ from services.document_loading.document_loading_providers import (
     GenericWebScraper,
 )
 from services.document_loading.document_loading_service import DocLoadingService
+from services.text_processing.ingest_processing_service import IngestProcessingService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from .context_index_model import (
     ContextIndexModel,
     ContextTemplateModel,
     DocDBModel,
+    DocIngestProcessorModel,
     DocLoaderModel,
     DomainModel,
     SourceModel,
@@ -46,6 +47,7 @@ class ContextIndex(IndexBase):
             ContextIndex.context_index_model = context_index_model
             self.add_doc_dbs_to_index()
             self.add_default_context_templates_to_index()
+            # Need a function here to update any new services/providers to sources/domains
         else:
             ContextIndex.context_index_model = ContextIndexModel()
             ContextIndex.session.add(ContextIndex.context_index_model)
@@ -103,6 +105,44 @@ class ContextIndex(IndexBase):
             return parent_source
         else:
             raise Exception("Unexpected error: parent_domain or parent_source should be set.")
+
+    def get_or_create_doc_ingest_processor_instance(
+        self,
+        parent_domain: Optional[DomainModel] = None,
+        parent_source: Optional[SourceModel] = None,
+        id: Optional[int] = None,
+        name: Optional[str] = None,
+        config: dict[str, Any] = {},
+    ) -> DocIngestProcessorModel:
+        if parent_domain or parent_source:
+            parent_instance = self.parse_parent_instance(
+                parent_domain=parent_domain,
+                parent_source=parent_source,
+            )
+            list_of_model_instances = parent_instance.doc_ingest_processors
+            requested_instance = self.get_model_instance(
+                list_of_model_instances=list_of_model_instances,
+                id=id,
+                name=name,
+            )
+        else:
+            if not name:
+                raise Exception("Unexpected error: name should not be None at this point.")
+            provider_class_model = self.get_service_provider_class_model(
+                list_of_service_providers=IngestProcessingService.REQUIRED_CLASSES,
+                requested_provider_name=name,
+            )
+            requested_instance = DocIngestProcessorModel(
+                name=name,
+                config=provider_class_model.ClassConfigModel(**config).model_dump(),
+            )
+            ContextIndex.session.flush()
+        if not isinstance(requested_instance, DocIngestProcessorModel):
+            raise Exception(
+                "Unexpected error: requested_instance should be of type DocIngestProcessorModel."
+            )
+
+        return requested_instance
 
     def get_or_create_doc_loader_instance(
         self,
@@ -197,9 +237,8 @@ class ContextIndex(IndexBase):
         id: Optional[int] = None,
         name: Optional[str] = None,
     ) -> DomainModel:
-        list_of_model_instances = self.list_of_all_context_index_domain_names
         requested_instance = self.get_model_instance(
-            list_of_model_instances=list_of_model_instances,
+            list_of_model_instances=self.index.domains,
             id=id,
             name=name,
         )
@@ -219,9 +258,8 @@ class ContextIndex(IndexBase):
         if parent_domain is None:
             parent_domain = self.domain
 
-        list_of_model_instances = parent_domain.sources
         requested_instance = self.get_model_instance(
-            list_of_model_instances=list_of_model_instances,
+            list_of_model_instances=parent_domain.sources,
             id=id,
             name=name,
         )
@@ -240,10 +278,18 @@ class ContextIndex(IndexBase):
             list[ContextTemplateModel],
             list[DocDBModel],
             list[DocLoaderModel],
+            list[DocIngestProcessorModel],
         ],
         id: Optional[int] = None,
         name: Optional[str] = None,
-    ) -> Union[DomainModel, SourceModel, ContextTemplateModel, DocDBModel, DocLoaderModel]:
+    ) -> Union[
+        DomainModel,
+        SourceModel,
+        ContextTemplateModel,
+        DocDBModel,
+        DocLoaderModel,
+        DocIngestProcessorModel,
+    ]:
         if id:
             if (
                 requested_instance := next(
@@ -271,7 +317,9 @@ class ContextIndex(IndexBase):
     def set_current_domain_or_source_provider_instance(
         self,
         domain_or_source: Union[Type[DomainModel], Type[SourceModel]],
-        set_model_type: Union[Type[DocDBModel], Type[DocLoaderModel]],
+        set_model_type: Union[
+            Type[DocDBModel], Type[DocLoaderModel], Type[DocIngestProcessorModel]
+        ],
         set_id: Optional[int] = None,
         set_name: Optional[str] = None,
     ):
@@ -293,6 +341,11 @@ class ContextIndex(IndexBase):
                 parent_domain=parent_domain, parent_source=parent_source, id=set_id, name=set_name
             )
             parent_instance.enabled_doc_loader = set_instance
+        elif set_model_type is DocIngestProcessorModel:
+            set_instance = self.get_or_create_doc_ingest_processor_instance(
+                parent_domain=parent_domain, parent_source=parent_source, id=set_id, name=set_name
+            )
+            parent_instance.enabled_doc_ingest_processor = set_instance
         else:
             raise Exception(f"Unexpected error: {set_model_type.__name__} not found.")
 
@@ -329,6 +382,7 @@ class ContextIndex(IndexBase):
             )
             self.set_domain_or_source_config(
                 target_instance=new_instance,
+                enabled_doc_ingest_processor_name=context_template.enabled_doc_ingest_processor_name,
                 enabled_doc_loader_name=context_template.enabled_doc_loader_name,
                 enabled_doc_db_name=context_template.enabled_doc_db.name,
                 batch_update_enabled=context_template.batch_update_enabled,
@@ -349,6 +403,7 @@ class ContextIndex(IndexBase):
 
             self.set_domain_or_source_config(
                 target_instance=new_instance,
+                enabled_doc_ingest_processor_name=object_to_clone.enabled_doc_ingest_processor.name,
                 enabled_doc_loader_name=object_to_clone.enabled_doc_loader.name,
                 enabled_doc_db_name=object_to_clone.enabled_doc_db.name,
                 batch_update_enabled=object_to_clone.batch_update_enabled,
@@ -356,6 +411,9 @@ class ContextIndex(IndexBase):
 
         self.populate_service_providers(
             target_instance=new_instance, requested_model_type=DocLoaderModel
+        )
+        self.populate_service_providers(
+            target_instance=new_instance, requested_model_type=DocIngestProcessorModel
         )
 
         return new_instance
@@ -393,6 +451,7 @@ class ContextIndex(IndexBase):
 
             self.set_domain_or_source_config(
                 target_instance=new_instance,
+                enabled_doc_ingest_processor_name=context_template.enabled_doc_ingest_processor_name,
                 enabled_doc_loader_name=context_template.enabled_doc_loader_name,
                 enabled_doc_db_name=context_template.enabled_doc_db.name,
                 batch_update_enabled=context_template.batch_update_enabled,
@@ -406,6 +465,7 @@ class ContextIndex(IndexBase):
 
             self.set_domain_or_source_config(
                 target_instance=new_instance,
+                enabled_doc_ingest_processor_name=object_to_clone.enabled_doc_ingest_processor.name,
                 enabled_doc_loader_name=object_to_clone.enabled_doc_loader.name,
                 enabled_doc_db_name=object_to_clone.enabled_doc_db.name,
                 batch_update_enabled=object_to_clone.batch_update_enabled,
@@ -414,6 +474,9 @@ class ContextIndex(IndexBase):
         self.populate_service_providers(
             target_instance=new_instance, requested_model_type=DocLoaderModel
         )
+        self.populate_service_providers(
+            target_instance=new_instance, requested_model_type=DocIngestProcessorModel
+        )
 
         return new_instance
 
@@ -421,6 +484,7 @@ class ContextIndex(IndexBase):
         self,
         target_instance: Union[DomainModel, SourceModel],
         batch_update_enabled: bool,
+        enabled_doc_ingest_processor_name: Optional[str] = None,
         enabled_doc_loader_name: Optional[str] = None,
         enabled_doc_loader_config: dict = {},
         enabled_doc_db_name: Optional[str] = None,
@@ -446,6 +510,22 @@ class ContextIndex(IndexBase):
         ContextIndex.session.flush()
         target_instance.enabled_doc_loader = enabled_doc_loader
 
+        if enabled_doc_ingest_processor_name is None:
+            enabled_doc_ingest_processor_name = (
+                DocIngestProcessorModel.DEFAULT_DOC_INGEST_PROCESSOR_NAME
+            )
+        enabled_doc_ingest_processor = self.get_or_create_doc_ingest_processor_instance(
+            name=enabled_doc_ingest_processor_name,
+            config=enabled_doc_loader_config,
+        )
+        if not isinstance(enabled_doc_ingest_processor, DocIngestProcessorModel):
+            raise Exception(
+                "Unexpected error: enabled_doc_ingest_processor should be of type DocIngestProcessorModel."
+            )
+        target_instance.doc_ingest_processors.append(enabled_doc_ingest_processor)
+        ContextIndex.session.flush()
+        target_instance.enabled_doc_ingest_processor = enabled_doc_ingest_processor
+
         if enabled_doc_db_name is None:
             enabled_doc_db_name = DocDBModel.DEFAULT_DOC_DB_NAME
         target_instance.enabled_doc_db = self.get_or_create_doc_db_instance(
@@ -457,7 +537,7 @@ class ContextIndex(IndexBase):
         self,
         list_of_service_providers: list[Any],
         requested_provider_name: str,
-    ) -> ModuleBase:
+    ):
         if (
             provider_class_model := next(
                 (
@@ -477,7 +557,7 @@ class ContextIndex(IndexBase):
     def populate_service_providers(
         self,
         target_instance: Union[DomainModel, SourceModel],
-        requested_model_type: Type[DocLoaderModel],
+        requested_model_type: Union[Type[DocLoaderModel], Type[DocIngestProcessorModel]],
     ):
         if requested_model_type is DocLoaderModel:
             list_of_available_providers = DocLoadingService.REQUIRED_CLASSES
@@ -489,6 +569,19 @@ class ContextIndex(IndexBase):
                     continue
                 list_of_current_providers.append(
                     self.get_or_create_doc_loader_instance(  # type: ignore
+                        name=available_provider_class.CLASS_NAME,
+                    )
+                )
+        elif requested_model_type is DocIngestProcessorModel:
+            list_of_available_providers = IngestProcessingService.REQUIRED_CLASSES
+            list_of_current_providers = target_instance.doc_ingest_processors
+            for available_provider_class in list_of_available_providers:
+                if available_provider_class.CLASS_NAME in [
+                    current_provider.name for current_provider in list_of_current_providers
+                ]:
+                    continue
+                list_of_current_providers.append(
+                    self.get_or_create_doc_ingest_processor_instance(  # type: ignore
                         name=available_provider_class.CLASS_NAME,
                     )
                 )
@@ -536,6 +629,8 @@ class ContextIndex(IndexBase):
                     )
                 new_template = self.create_template(
                     new_template_name=available_template.TEMPLATE_NAME,
+                    enabled_doc_ingest_processor_name=available_template.doc_ingest_processor_provider_name,
+                    enabled_doc_ingest_processor_config=available_template.doc_ingest_processor_config.model_dump(),
                     enabled_doc_loader_name=available_template.doc_loader_provider_name,
                     enabled_doc_loader_config=available_template.doc_loader_config.model_dump(),
                     enabled_doc_db=enabled_doc_db,
@@ -559,6 +654,8 @@ class ContextIndex(IndexBase):
         )
         new_template = self.create_template(
             new_template_name=new_context_template_name,
+            enabled_doc_ingest_processor_name=parent_object.enabled_doc_ingest_processor.name,
+            enabled_doc_ingest_processor_config=parent_object.enabled_doc_ingest_processor.config,
             enabled_doc_loader_name=parent_object.enabled_doc_loader.name,
             enabled_doc_loader_config=parent_object.enabled_doc_loader.config,
             enabled_doc_db=parent_object.enabled_doc_db,
@@ -572,6 +669,8 @@ class ContextIndex(IndexBase):
     def create_template(
         self,
         new_template_name: str,
+        enabled_doc_ingest_processor_name: str,
+        enabled_doc_ingest_processor_config: dict,
         enabled_doc_loader_name: str,
         enabled_doc_loader_config: dict,
         enabled_doc_db: DocDBModel,
@@ -579,6 +678,8 @@ class ContextIndex(IndexBase):
     ):
         return ContextTemplateModel(
             name=new_template_name,
+            enabled_doc_ingest_processor_name=enabled_doc_ingest_processor_name,
+            enabled_doc_ingest_processor_config=enabled_doc_ingest_processor_config,
             enabled_doc_loader_name=enabled_doc_loader_name,
             enabled_doc_loader_config=enabled_doc_loader_config,
             enabled_doc_db=enabled_doc_db,

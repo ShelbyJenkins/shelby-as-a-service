@@ -2,7 +2,7 @@ import typing
 from decimal import Decimal
 from typing import Any, Type
 
-import services.text_processing.text as text
+import services.text_processing.text_utils as text_utils
 from app.module_base import ModuleBase
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
@@ -77,7 +77,7 @@ class OpenAIEmbedding(ModuleBase):
         return doc_embeddings
 
     def _calculate_cost(self, query, model):
-        token_count = text.tiktoken_len(query, model.MODEL_NAME)
+        token_count = text_utils.tiktoken_len(query, model.MODEL_NAME)
 
         # Convert numbers to Decimal
         COST_PER_K_decimal = Decimal(model.COST_PER_K)
