@@ -11,7 +11,7 @@ from services.database.local_file import LocalFileDatabase
 from services.database.pinecone import PineconeDatabase
 
 
-class DataBaseService(ModuleBase):
+class DatabaseService(ModuleBase):
     CLASS_NAME: str = "database_service"
     CLASS_UI_NAME: str = "Document Databases"
 

@@ -15,7 +15,7 @@ from services.context_index.context_index_model import (
     SourceModel,
 )
 from services.context_index.ingest import DocIngest
-from services.database.database_service import DataBaseService
+from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 from services.text_processing.ingest_processing_service import IngestProcessingService
 
@@ -39,7 +39,7 @@ class ContextIndexView(ModuleBase):
     doc_ingest: DocIngest
     doc_ingest_processor_service: IngestProcessingService
     doc_loader_service: DocLoadingService
-    database_service: DataBaseService
+    database_service: DatabaseService
     context_index: ContextIndex
 
     uic: dict[str, Any]
@@ -52,7 +52,7 @@ class ContextIndexView(ModuleBase):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
         self.doc_loader_service = DocLoadingService()
-        self.database_service = DataBaseService()
+        self.database_service = DatabaseService()
         self.doc_ingest_processor_service = IngestProcessingService()
         self.doc_ingest = DocIngest()
 
@@ -662,13 +662,13 @@ class ContextIndexView(ModuleBase):
                     parent_source=parent_source,
                     name=provider_name,
                 )
-            case DataBaseService.CLASS_NAME:
+            case DatabaseService.CLASS_NAME:
                 provider_model = self.context_index.get_or_create_doc_db_instance(
                     name=provider_name,
                 )
             case _:
                 raise ValueError(
-                    f"service_name must be {DocLoadingService.CLASS_NAME}, {IngestProcessingService.CLASS_NAME}, or {DataBaseService.CLASS_NAME}"
+                    f"service_name must be {DocLoadingService.CLASS_NAME}, {IngestProcessingService.CLASS_NAME}, or {DatabaseService.CLASS_NAME}"
                 )
 
         if hasattr(provider_model, "config"):
@@ -680,7 +680,7 @@ class ContextIndexView(ModuleBase):
             GradioHelpers.set_components_elem_id_and_classes(
                 provider_config_components=component_dict,
                 provider_name=name,
-                service_name=DataBaseService.CLASS_NAME,
+                service_name=DatabaseService.CLASS_NAME,
             )
         save_button.click(
             fn=lambda *x: self.save_provider_settings(

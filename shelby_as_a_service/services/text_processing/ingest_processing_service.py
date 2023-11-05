@@ -35,7 +35,7 @@ class IngestProcessingService(ModuleBase):
         self.provider_instance = self.get_requested_class_instance(
             text_proc_provider
             if text_proc_provider is not None
-            else self.config.text_proc_provider,
+            else self.config.text_processing_provider,
         )
 
         if self.provider_instance:

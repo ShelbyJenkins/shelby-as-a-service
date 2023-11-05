@@ -3,18 +3,18 @@ import types
 import typing
 from typing import Any, Dict, Generator, Optional, Type, Union
 
+import gradio as gr
 import requests
 from app.module_base import ModuleBase
-from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
-from services.llm.llm_openai import OpenAILLM
 
 
-class TinyJMAPClient(ModuleBase):
-    """The tiniest JMAP client you can imagine."""
+class EmailFastmail(ModuleBase):
+    """The tiniest JMAP client you can imagine.
+    From: https://github.com/fastmail/JMAP-Samples/blob/main/python3/tiny_jmap_library.py"""
 
-    CLASS_NAME: str = "email_service"
-    CLASS_UI_NAME: str = "email_service"
+    CLASS_NAME: str = "email_fastmail"
+    CLASS_UI_NAME: str = "Email: Fastmail"
     # For intialization
     REQUIRED_SECRETS: list[str] = [
         "JMAP_USERNAME",
@@ -22,32 +22,33 @@ class TinyJMAPClient(ModuleBase):
     ]
 
     class ClassConfigModel(BaseModel):
-        pass
+        hostname: str = "api.fastmail.com"
+        username: str
 
     class Config:
         extra = "ignore"
 
     config: ClassConfigModel
-    hostname: str = "api.fastmail.com"
-    username: str
+
     token: str
+    api_url: str
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        """Initialize using a hostname, username and bearer token"""
         super().__init__(config_file_dict=config_file_dict, **kwargs)
+        """Initialize using a hostname, username and bearer token"""
         self.session = None
-        self.api_url = None
         self.account_id = None
         self.identity_id = None
 
     def get_session(self):
-        self.username = AppBase.secrets["JMAP_USERNAME"]
-        self.token = AppBase.secrets["JMAP_TOKEN"]
+        self.username = self.secrets["JMAP_USERNAME"]
+        self.token = self.secrets["JMAP_TOKEN"]
+
         """Return the JMAP Session Resource as a Python dict"""
         if self.session:
             return self.session
         r = requests.get(
-            "https://" + self.hostname + "/.well-known/jmap",
+            "https://" + self.config.hostname + "/.well-known/jmap",
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.token}",
@@ -108,9 +109,18 @@ class TinyJMAPClient(ModuleBase):
         res.raise_for_status()
         return res.json()
 
-    def create_settings_ui(self):
-        components = {}
+    def create_provider_ui_components(self, visibility: bool = True):
+        ui_components = {}
 
-        pass
+        ui_components["hostname"] = gr.Textbox(
+            label="Hostname",
+            value=self.config.hostname,
+            visible=visibility,
+        )
+        ui_components["username"] = gr.Textbox(
+            label="Username",
+            value=self.config.username,
+            visible=visibility,
+        )
 
-        return components
+        return ui_components

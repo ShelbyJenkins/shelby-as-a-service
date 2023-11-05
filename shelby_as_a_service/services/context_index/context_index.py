@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Optional, Type, Union
 
-from services.database.database_service import DataBaseService
+from services.database.database_service import DatabaseService
 from services.database.index_base import IndexBase
 from services.document_loading.document_loading_providers import (
     GenericRecursiveWebScraper,
@@ -198,7 +198,7 @@ class ContextIndex(IndexBase):
             if not name:
                 raise Exception("Unexpected error: name should not be None at this point.")
             provider_class_model = self.get_service_provider_class_model(
-                list_of_service_providers=DataBaseService.REQUIRED_CLASSES,
+                list_of_service_providers=DatabaseService.REQUIRED_CLASSES,
                 requested_provider_name=name,
             )
 
@@ -591,7 +591,7 @@ class ContextIndex(IndexBase):
         ContextIndex.session.flush()
 
     def add_doc_dbs_to_index(self):
-        for db_class in DataBaseService.REQUIRED_CLASSES:
+        for db_class in DatabaseService.REQUIRED_CLASSES:
             doc_db_provider_name = db_class.CLASS_NAME
             existing_config = next(
                 (

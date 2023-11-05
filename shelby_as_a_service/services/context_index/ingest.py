@@ -14,7 +14,7 @@ from services.context_index.context_index_model import (
     DomainModel,
     SourceModel,
 )
-from services.database.database_service import DataBaseService
+from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 
 
@@ -30,7 +30,7 @@ class DocIngest(ModuleBase):
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
-    list_of_required_class_instances: list[Union[DocLoadingService, DataBaseService]]
+    list_of_required_class_instances: list[Union[DocLoadingService, DatabaseService]]
     doc_loader_service: DocLoadingService
     context_index: ContextIndex
 
