@@ -73,9 +73,9 @@ class ContextIndex(IndexBase):
 
     @property
     def domain(self) -> "DomainModel":
-        if getattr(ContextIndex.context_index_model, "current_domain", None) is None:
-            raise Exception(f"{ContextIndex.context_index_model} has no domain.")
-        return ContextIndex.context_index_model.current_domain
+        if getattr(self.index, "current_domain", None) is None:
+            raise Exception(f"{self.index} has no domain.")
+        return self.index.current_domain
 
     @property
     def source(self) -> "SourceModel":
@@ -268,45 +268,35 @@ class ContextIndex(IndexBase):
 
         return requested_instance
 
-    def set_domain_instance(
+    def set_current_domain_or_source_provider_instance(
         self,
+        domain_or_source: Union[Type[DomainModel], Type[SourceModel]],
         set_model_type: Union[Type[DocDBModel], Type[DocLoaderModel]],
         set_id: Optional[int] = None,
         set_name: Optional[str] = None,
     ):
+        if domain_or_source is DomainModel:
+            parent_domain = self.domain
+            parent_source = None
+            parent_instance = self.domain
+        elif domain_or_source is SourceModel:
+            parent_domain = None
+            parent_source = self.source
+            parent_instance = self.source
+        else:
+            raise Exception(f"Unexpected error: {domain_or_source.__name__} not found.")
         if set_model_type is DocDBModel:
             set_instance = self.get_or_create_doc_db_instance(id=set_id, name=set_name)
-            self.domain.enabled_doc_db = set_instance
+            parent_instance.enabled_doc_db = set_instance
         elif set_model_type is DocLoaderModel:
             set_instance = self.get_or_create_doc_loader_instance(
-                parent_domain=self.domain, id=set_id, name=set_name
+                parent_domain=parent_domain, parent_source=parent_source, id=set_id, name=set_name
             )
-            self.domain.enabled_doc_loader = set_instance
+            parent_instance.enabled_doc_loader = set_instance
         else:
             raise Exception(f"Unexpected error: {set_model_type.__name__} not found.")
 
         ContextIndex.session.flush()
-
-    def set_source_instance(
-        self,
-        set_model_type: Union[Type[DocDBModel], Type[DocLoaderModel]],
-        set_id: Optional[int] = None,
-        set_name: Optional[str] = None,
-        parent_domain: Optional[DomainModel] = None,
-    ):
-        if parent_domain is None:
-            parent_domain = self.domain
-
-        if set_model_type is DocDBModel:
-            set_instance = self.get_or_create_doc_db_instance(id=set_id, name=set_name)
-            parent_domain.current_source.enabled_doc_db = set_instance
-        elif set_model_type is DocLoaderModel:
-            set_instance = self.get_or_create_doc_loader_instance(
-                parent_source=parent_domain.current_source, id=set_id, name=set_name
-            )
-            parent_domain.current_source.enabled_doc_loader = set_instance
-        else:
-            raise Exception(f"Unexpected error: {set_model_type.__name__} not found.")
 
     def create_domain(
         self,
@@ -315,7 +305,7 @@ class ContextIndex(IndexBase):
         requested_template_name: Optional[str] = None,
         clone_name: Optional[str] = None,
         clone_id: Optional[int] = None,
-    ) -> tuple[str, int]:
+    ) -> DomainModel:
         if not new_name:
             new_name = DomainModel.DEFAULT_NAME
         new_name = self.check_and_handle_name_collision(
@@ -323,27 +313,27 @@ class ContextIndex(IndexBase):
         )
         if not new_description:
             new_description = DomainModel.DEFAULT_DESCRIPTION
-        new_model = DomainModel(name=new_name, description=new_description)
+        new_instance = DomainModel(name=new_name, description=new_description)
 
-        ContextIndex.context_index_model.domains.append(new_model)
+        ContextIndex.context_index_model.domains.append(new_instance)
         ContextIndex.session.flush()
 
         if not self.index.current_domain:
-            self.index.current_domain = new_model
+            self.index.current_domain = new_instance
             ContextIndex.session.flush()
         if not clone_name and not clone_id:
             if not requested_template_name:
-                requested_template_name = new_model.DEFAULT_TEMPLATE_NAME
+                requested_template_name = new_instance.DEFAULT_TEMPLATE_NAME
             context_template = self.get_template_instance(
                 name=requested_template_name,
             )
             self.set_domain_or_source_config(
-                target_instance=new_model,
+                target_instance=new_instance,
                 enabled_doc_loader_name=context_template.enabled_doc_loader_name,
                 enabled_doc_db_name=context_template.enabled_doc_db.name,
                 batch_update_enabled=context_template.batch_update_enabled,
             )
-            self.create_source(parent_domain=new_model)
+            self.create_source(parent_domain=new_instance)
         else:
             object_to_clone = self.get_domain_instance(
                 id=clone_id,
@@ -352,23 +342,23 @@ class ContextIndex(IndexBase):
 
             for source_model_to_clone in object_to_clone.sources:
                 self.create_source(
-                    parent_domain=new_model,
+                    parent_domain=new_instance,
                     clone_name=source_model_to_clone.name,
                     clone_id=source_model_to_clone.id,
                 )
 
             self.set_domain_or_source_config(
-                target_instance=new_model,
+                target_instance=new_instance,
                 enabled_doc_loader_name=object_to_clone.enabled_doc_loader.name,
                 enabled_doc_db_name=object_to_clone.enabled_doc_db.name,
                 batch_update_enabled=object_to_clone.batch_update_enabled,
             )
 
         self.populate_service_providers(
-            target_instance=new_model, requested_model_type=DocLoaderModel
+            target_instance=new_instance, requested_model_type=DocLoaderModel
         )
 
-        return new_model.name, new_model.id
+        return new_instance
 
     def create_source(
         self,
@@ -378,7 +368,7 @@ class ContextIndex(IndexBase):
         requested_template_name: Optional[str] = None,
         clone_name: Optional[str] = None,
         clone_id: Optional[int] = None,
-    ) -> tuple[str, int]:
+    ) -> SourceModel:
         if not new_name:
             new_name = SourceModel.DEFAULT_NAME
         new_name = self.check_and_handle_name_collision(
@@ -386,23 +376,23 @@ class ContextIndex(IndexBase):
         )
         if not new_description:
             new_description = SourceModel.DEFAULT_DESCRIPTION
-        new_model = SourceModel(name=new_name, description=new_description)
+        new_instance = SourceModel(name=new_name, description=new_description)
 
-        parent_domain.sources.append(new_model)
+        parent_domain.sources.append(new_instance)
         ContextIndex.session.flush()
 
         if not parent_domain.current_source:
-            parent_domain.current_source = new_model
+            parent_domain.current_source = new_instance
             ContextIndex.session.flush()
         if not clone_name and not clone_id:
             if not requested_template_name:
-                requested_template_name = new_model.DEFAULT_TEMPLATE_NAME
+                requested_template_name = new_instance.DEFAULT_TEMPLATE_NAME
             context_template = self.get_template_instance(
                 name=requested_template_name,
             )
 
             self.set_domain_or_source_config(
-                target_instance=new_model,
+                target_instance=new_instance,
                 enabled_doc_loader_name=context_template.enabled_doc_loader_name,
                 enabled_doc_db_name=context_template.enabled_doc_db.name,
                 batch_update_enabled=context_template.batch_update_enabled,
@@ -415,17 +405,17 @@ class ContextIndex(IndexBase):
             )
 
             self.set_domain_or_source_config(
-                target_instance=new_model,
+                target_instance=new_instance,
                 enabled_doc_loader_name=object_to_clone.enabled_doc_loader.name,
                 enabled_doc_db_name=object_to_clone.enabled_doc_db.name,
                 batch_update_enabled=object_to_clone.batch_update_enabled,
             )
 
         self.populate_service_providers(
-            target_instance=new_model, requested_model_type=DocLoaderModel
+            target_instance=new_instance, requested_model_type=DocLoaderModel
         )
 
-        return new_model.name, new_model.id
+        return new_instance
 
     def set_domain_or_source_config(
         self,

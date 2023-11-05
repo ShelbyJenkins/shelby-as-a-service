@@ -38,13 +38,14 @@ class GenericWebScraper(ModuleBase):
 
         return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
-    def create_provider_ui_components(self):
+    def create_provider_ui_components(self, visibility: bool = True):
         ui_components = {}
 
         ui_components["continue_on_failure"] = gr.Checkbox(
             value=self.config.continue_on_failure,
             label="Continue On Failure",
             interactive=True,
+            visible=visibility,
         )
 
         return ui_components
@@ -80,7 +81,7 @@ class GenericRecursiveWebScraper(ModuleBase):
 
         return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
 
-    def create_provider_ui_components(self):
+    def create_provider_ui_components(self, visibility: bool = True):
         ui_components = {}
 
         ui_components["exclude_dirs"] = gr.Textbox(
@@ -88,30 +89,35 @@ class GenericRecursiveWebScraper(ModuleBase):
             label="Exclude dirs.",
             info="A list of subdirectories to exclude.",
             interactive=True,
+            visible=visibility,
         )
         ui_components["max_depth"] = gr.Number(
             value=self.config.max_depth,
             label="Max Depth",
             info="The max depth of the recursive loading.",
             interactive=True,
+            visible=visibility,
         )
         ui_components["timeout"] = gr.Number(
             value=self.config.timeout,
             label="Timeout Time",
             info="The timeout for the requests, in the unit of seconds.",
             interactive=True,
+            visible=visibility,
         )
         ui_components["use_async"] = gr.Checkbox(
             value=self.config.use_async,
             label="Use Async",
             info="Whether to use asynchronous loading, if use_async is true, this function will not be lazy, but it will still work in the expected way, just not lazy.",
             interactive=True,
+            visible=visibility,
         )
         ui_components["prevent_outside"] = gr.Checkbox(
             value=self.config.prevent_outside,
             label="Prevent Outside",
             info="IDK",
             interactive=True,
+            visible=visibility,
         )
 
         return ui_components

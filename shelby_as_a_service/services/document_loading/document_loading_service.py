@@ -47,23 +47,24 @@ class DocLoadingService(ModuleBase):
 
     def create_service_ui_components(
         self,
-        parent_model: Union[DomainModel, SourceModel],
+        parent_instance: Union[DomainModel, SourceModel],
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}
 
-        for provider in parent_model.doc_loaders:
+        for provider in parent_instance.doc_loaders:
             name = provider.name
             config = provider.config
             provider_configs_dict[name] = config
 
-        enabled_doc_loader_name = parent_model.enabled_doc_loader.name
+        enabled_doc_loader_name = parent_instance.enabled_doc_loader.name
 
-        doc_loader_components_dict = GradioHelpers.abstract_service_ui_components(
+        provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
+            service_name=self.CLASS_NAME,
             enabled_provider_name=enabled_doc_loader_name,
             required_classes=self.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )
 
-        return doc_loader_components_dict
+        return provider_select_dd, service_providers_dict

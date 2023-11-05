@@ -82,10 +82,10 @@ class SourceModel(Base):
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
     enabled_doc_db = relationship("DocDBModel")
 
-    DEFAULT_NAME: str = "DEFAULT_NAME"
+    DEFAULT_NAME: str = "default_source_name"
     DEFAULT_TEMPLATE_NAME: str = "default_template_name"
     DEFAULT_DESCRIPTION: str = "A default source description"
-    name: Mapped[str] = mapped_column(String)
+    name: Mapped[str] = mapped_column(String, unique=True)
     description: Mapped[str] = mapped_column(String, default=DEFAULT_DESCRIPTION)
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -130,10 +130,10 @@ class DomainModel(Base):
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
     enabled_doc_db = relationship("DocDBModel")
 
-    DEFAULT_NAME: str = "DEFAULT_NAME"
+    DEFAULT_NAME: str = "default_domain_name"
     DEFAULT_TEMPLATE_NAME: str = "default_template_name"
     DEFAULT_DESCRIPTION: str = "A default domain description"
-    name: Mapped[str] = mapped_column(String)
+    name: Mapped[str] = mapped_column(String, unique=True)
     description: Mapped[str] = mapped_column(String, default=DEFAULT_DESCRIPTION)
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
