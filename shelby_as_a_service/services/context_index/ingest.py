@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 from typing import Any, Dict, Optional, Type, Union
 
@@ -6,8 +8,8 @@ import interfaces.webui.gradio_helpers as GradioHelpers
 
 # from modules.index.data_model import DataModels
 from app.module_base import ModuleBase
+from langchain.schema import Document
 from pydantic import BaseModel
-from services.context_index.context_index import ContextIndex
 from services.context_index.context_index_model import (
     ContextIndexModel,
     DocDBModel,
@@ -16,28 +18,53 @@ from services.context_index.context_index_model import (
 )
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
+from services.embedding.embedding_service import EmbeddingService
+from services.text_processing.ingest_processing_service import IngestProcessingService
 
 
 class DocIngest(ModuleBase):
     CLASS_NAME: str = "doc_ingest"
     CLASS_UI_NAME: str = "doc_ingest"
-    REQUIRED_CLASSES: list[Type] = [DocLoadingService]
+    REQUIRED_CLASSES: list[Type] = [
+        DocLoadingService,
+        IngestProcessingService,
+        DatabaseService,
+        EmbeddingService,
+    ]
 
-    class ClassConfigModel(BaseModel):
-        database_provider: str = "local_file_database"
-        doc_loading_provider: str = "generic_web_scraper"
+    doc_loading_provider_name: DocLoadingService.available_providers = "generic_web_scraper"
+    doc_ingest_processing_provider_name: str = "ceq_ingest_processor"
+    doc_embedding_provider_name: str = "sentence_transformers"
+    doc_db_provider_name: str = "local_file_database"
 
-    config: ClassConfigModel
-    list_of_class_names: list
-    list_of_class_ui_names: list
-    list_of_required_class_instances: list[Union[DocLoadingService, DatabaseService]]
-    doc_loader_service: DocLoadingService
-    context_index: ContextIndex
-
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
-
-    def ingest_docs(self):
+    @classmethod
+    def ingest_docs(
+        cls,
+        uri: str,
+        doc_loading_provider_name: Optional[DocLoadingService.available_providers] = None,
+        doc_loading_provider_config: dict = {},
+        doc_ingest_processing_provider_name: Optional[str] = None,
+        doc_ingest_processing_provider_config: dict = {},
+        doc_db_provider_name: Optional[str] = None,
+        doc_embedding_provider_name: Optional[str] = None,
+        **kwargs,
+    ):
+        doc_loading_provider_name = doc_loading_provider_name or cls.doc_loading_provider_name
+        docs = DocLoadingService.load_docs(
+            uri=uri,
+            provider_name=doc_loading_provider_name,
+            provider_config=doc_loading_provider_config,
+            **kwargs,
+        )
+        doc_ingest_processing_provider_name = (
+            doc_ingest_processing_provider_name or cls.doc_ingest_processing_provider_name
+        )
+        docs = IngestProcessingService.process_documents(
+            docs=docs,
+            provider_name=doc_ingest_processing_provider_name,
+            provider_config=doc_loading_provider_config,
+            **kwargs,
+        )
         # indexes = pinecone.list_indexes()
         # if self.index_name not in indexes:
         #     # create new index
@@ -61,6 +88,7 @@ class DocIngest(ModuleBase):
         #             continue
         #         self.enabled_data_sources.append(data_source)
         #         self.log.info(f"Will index: {data_source_name}")
+
         self.log.info(f"Initial index stats: {self.vectorstore.describe_index_stats()}\n")
 
         for data_source in self.enabled_data_sources:
@@ -185,33 +213,3 @@ class DocIngest(ModuleBase):
                         raise  # if exception in the last retry then raise it.
 
         self.log.info(f"Final index stats: {self.vectorstore.describe_index_stats()}")
-
-    def ingest_from_ui(self, components: Dict[str, Any], *values):
-        ui_state = {k: v for k, v in zip(components.keys(), values)}
-        data_domain = ui_state.get("data_domain_drp", None)
-        data_source = ui_state.get("data_source_drp", None)
-        url = ui_state.get("url_textbox", None)
-        preset = ui_state.get("source_preset", None)
-        # get data domain
-        # get data source, if it doesn't exist create it
-        # if use custom check box is not clicked
-        # get source preset
-
-        documents_list = []
-        for data_source in data_domain.data_sources:
-            documents_iterator = self.doc_loader_service.load(data_source)
-            if documents_iterator is not None:
-                try:
-                    documents_list = list(documents_iterator)
-                except TypeError:
-                    print(f"Error: Object {documents_iterator} is not iterable")
-            else:
-                print("Error: documents_iterator is None")
-            if documents_list:
-                self.database_service.write_documents_to_database(
-                    documents_list, data_domain, data_source
-                )
-                return documents_list
-
-    def create_loader_ui(self, current_class: Union[DomainModel, SourceModel]):
-        self.doc_loader_service.create_settings_ui(current_class=current_class)

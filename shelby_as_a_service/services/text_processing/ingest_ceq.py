@@ -2,11 +2,12 @@ import json
 import os
 import re
 import shutil
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Dict, Iterator, Optional, Type, Union
 from urllib.parse import urlparse
 
 import gradio as gr
 from app.module_base import ModuleBase
+from langchain.schema import Document
 from pydantic import BaseModel
 
 from . import text_utils
@@ -36,7 +37,7 @@ class IngestCEQ(ModuleBase):
             overlap_percent=self.config.text_splitter_overlap_percent,
         )
 
-    def process_documents(self, documents) -> Optional[list[str]]:
+    def process_documents(self, documents: Iterator[Document]) -> Optional[list[str]]:
         processed_document_chunks = []
         processed_text_chunks = []
 

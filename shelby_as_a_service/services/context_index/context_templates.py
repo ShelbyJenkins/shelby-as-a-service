@@ -5,10 +5,7 @@ from typing import Any, Dict, Optional, Type, Union
 from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.database import LocalFileDatabase, PineconeDatabase
-from services.document_loading.document_loading_providers import (
-    GenericRecursiveWebScraper,
-    GenericWebScraper,
-)
+from services.document_loading.web import GenericRecursiveWebScraper, GenericWebScraper
 from services.text_processing.ingest_ceq import IngestCEQ
 
 

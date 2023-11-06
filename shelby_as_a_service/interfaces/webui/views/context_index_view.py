@@ -36,10 +36,10 @@ class ContextIndexView(ModuleBase):
     config: ClassConfigModel
     list_of_class_ui_names: list
     list_of_required_class_instances: list
-    doc_ingest: DocIngest
-    doc_ingest_processor_service: IngestProcessingService
-    doc_loader_service: DocLoadingService
-    database_service: DatabaseService
+    doc_ingest: Type[DocIngest]
+    doc_ingest_processor_service: Type[IngestProcessingService]
+    doc_loader_service: Type[DocLoadingService]
+    database_service: Type[DatabaseService]
     context_index: ContextIndex
 
     uic: dict[str, Any]
@@ -51,10 +51,10 @@ class ContextIndexView(ModuleBase):
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
-        self.doc_loader_service = DocLoadingService()
-        self.database_service = DatabaseService()
-        self.doc_ingest_processor_service = IngestProcessingService()
-        self.doc_ingest = DocIngest()
+        self.doc_loader_service = DocLoadingService
+        self.database_service = DatabaseService
+        self.doc_ingest_processor_service = IngestProcessingService
+        self.doc_ingest = DocIngest
 
         self.uic = {}  # ui components
 

@@ -96,10 +96,8 @@ class OpenAILLM(ModuleBase):
 
         if max_tokens is None:
             max_tokens = llm_model.max_tokens
-        if max_tokens > llm_model.TOKENS_MAX:
-            max_tokens = llm_model.TOKENS_MAX - total_prompt_tokens
-        else:
-            max_tokens = max_tokens - total_prompt_tokens
+        while max_tokens + total_prompt_tokens > (llm_model.TOKENS_MAX - 15):
+            max_tokens -= 1
 
         if (llm_model.stream and stream is None) or (stream is True):
             yield from self._create_streaming_chat(
@@ -198,7 +196,7 @@ class OpenAILLM(ModuleBase):
                 )
             delta_content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
             if len(delta_content) != 0:
-                chunk_token_count = TextProcess.tiktoken_len(delta_content, llm_model.MODEL_NAME)
+                chunk_token_count = text_utils.tiktoken_len(delta_content, llm_model.MODEL_NAME)
                 total_completion_tokens += chunk_token_count
                 total_token_count += chunk_token_count
 
@@ -238,7 +236,7 @@ class OpenAILLM(ModuleBase):
             documents=documents,
         )
 
-        total_prompt_tokens = TextProcess.tiktoken_len_of_openai_prompt(prompt, llm_model)
+        total_prompt_tokens = text_utils.tiktoken_len_of_openai_prompt(prompt, llm_model)
 
         if prompt is None or llm_model is None or total_prompt_tokens is None:
             raise ValueError(

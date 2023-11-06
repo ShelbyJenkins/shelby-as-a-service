@@ -1,11 +1,12 @@
 import json
 import types
 import typing
-from typing import Any, Dict, Generator, Optional, Type, Union
+from typing import Any, Dict, Final, Generator, Iterator, Literal, Optional, Type, Union
 
 import gradio as gr
 import requests
 from app.module_base import ModuleBase
+from langchain.schema import Document
 from pydantic import BaseModel
 
 
@@ -13,8 +14,9 @@ class EmailFastmail(ModuleBase):
     """The tiniest JMAP client you can imagine.
     From: https://github.com/fastmail/JMAP-Samples/blob/main/python3/tiny_jmap_library.py"""
 
-    CLASS_NAME: str = "email_fastmail"
-    CLASS_UI_NAME: str = "Email: Fastmail"
+    CLASS_NAME: Final[str] = "email_fastmail"
+    class_name = Literal["email_fastmail"]
+    CLASS_UI_NAME: Final[str] = "Email: Fastmail"
     # For intialization
     REQUIRED_SECRETS: list[str] = [
         "JMAP_USERNAME",
@@ -23,7 +25,7 @@ class EmailFastmail(ModuleBase):
 
     class ClassConfigModel(BaseModel):
         hostname: str = "api.fastmail.com"
-        username: str
+        username: Optional[str] = None
 
     class Config:
         extra = "ignore"
@@ -39,6 +41,10 @@ class EmailFastmail(ModuleBase):
         self.session = None
         self.account_id = None
         self.identity_id = None
+
+    def _load(self, uri) -> Iterator[Document]:
+        documents = []
+        return (Document(page_content="Hello World!", metadata={"uri": uri}) for doc in documents)
 
     def get_session(self):
         self.username = self.secrets["JMAP_USERNAME"]

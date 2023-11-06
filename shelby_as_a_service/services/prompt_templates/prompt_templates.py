@@ -28,7 +28,7 @@ def create_document_string(documents=None):
         return None
 
     if isinstance(documents, str):
-        return TextProcess.clean_text_content(documents)
+        return text_utils.clean_text_content(documents)
 
     content_strs = []
 
@@ -39,8 +39,8 @@ def create_document_string(documents=None):
             doc_num = document_number
         else:
             doc_num = i
-        document_content = TextProcess.get_document_content(doc)
-        document_content = TextProcess.clean_text_content(document_content)
+        document_content = text_utils.get_document_content(doc)
+        document_content = text_utils.clean_text_content(document_content)
 
         content_strs.append(f"{document_content} doc_num: [{doc_num}]")
 

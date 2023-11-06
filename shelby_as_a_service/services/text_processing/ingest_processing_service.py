@@ -4,6 +4,7 @@ from typing import Any, Iterator, Type, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
+from langchain.schema import Document
 from pydantic import BaseModel, Field
 from services.context_index.context_index_model import DomainModel, SourceModel
 
@@ -16,35 +17,31 @@ class IngestProcessingService(ModuleBase):
     CLASS_UI_NAME: str = "Ingest Processing Service"
     REQUIRED_CLASSES = [OpenAPIMinifier, IngestCEQ]
 
-    class ClassConfigModel(BaseModel):
-        text_processing_provider: str = "ceq_ingest_processor"
+    @classmethod
+    def create_class_instance(
+        cls, requested_class: str
+    ) -> Union[Type[OpenAPIMinifier], Type[IngestCEQ]]:
+        for provider in cls.REQUIRED_CLASSES:
+            if provider.CLASS_NAME == requested_class or provider.CLASS_UI_NAME == requested_class:
+                return provider
+        raise ValueError(f"Requested class {requested_class} not found.")
 
-        class Config:
-            extra = "ignore"
-
-    config: ClassConfigModel
-    list_of_class_names: list
-    list_of_class_ui_names: list
-    list_of_required_class_instances: list[Union[OpenAPIMinifier, IngestCEQ]]
-    provider_instance: Union[OpenAPIMinifier, IngestCEQ]
-
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
-
-    def load(self, data_source, text_proc_provider=None):
-        self.provider_instance = self.get_requested_class_instance(
-            text_proc_provider
-            if text_proc_provider is not None
-            else self.config.text_processing_provider,
+    @classmethod
+    def process_documents(
+        cls,
+        docs: Iterator[Document],
+        provider_name,
+        provider_config: dict[str, Any] = {},
+        **kwargs,
+    ) -> Iterator[Document]:
+        provider = cls.create_class_instance(requested_class=provider_name)
+        return provider(config_file_dict=provider_config, **kwargs).process_documents(
+            documents=docs
         )
 
-        if self.provider_instance:
-            return self.provider_instance._load(data_source.data_source_url)
-        else:
-            print("rnr")
-
+    @classmethod
     def create_service_ui_components(
-        self,
+        cls,
         parent_instance: Union[DomainModel, SourceModel],
         groups_rendered: bool = True,
     ):
@@ -58,9 +55,9 @@ class IngestProcessingService(ModuleBase):
         text_processing_provider_name = parent_instance.enabled_doc_ingest_processor.name
 
         provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
-            service_name=self.CLASS_NAME,
+            service_name=cls.CLASS_NAME,
             enabled_provider_name=text_processing_provider_name,
-            required_classes=self.REQUIRED_CLASSES,
+            required_classes=cls.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )

@@ -19,7 +19,7 @@ class BalancedRecursiveCharacterTextSplitter:
         self._keep_separator: bool = False
         self.goal_length = goal_length
         self.max_length = max_length or (self.goal_length * 1.25)
-        self.tiktoken_len = TextProcessing.tiktoken_len
+        self.tiktoken_len = text_utils.tiktoken_len
         # Chunk size logic
         if chunk_overlap is not None:
             # There must be at least some chunk overlap for this to function
@@ -59,7 +59,7 @@ class BalancedRecursiveCharacterTextSplitter:
             doc = self.spacy_sentences(text)
             splits = [sent.text for sent in doc.sents]
         else:
-            splits = TextProcessing.split_text_with_regex(text, separator, self._keep_separator)
+            splits = text_utils.split_text_with_regex(text, separator, self._keep_separator)
         final_combos = self.distribute_splits(splits, goal_length)
 
         # If any split was larger than the max size

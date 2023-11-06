@@ -88,12 +88,13 @@ class PineconeDatabase(ModuleBase):
             returned_documents = _query_namespace(search_terms, top_k, namespace, filter)
         # If we don't have a namespace, just search all available namespaces
         else:
-            returned_documents = []
-            for data_domain in self.index.index_data_domains:
-                if namespace := getattr(data_domain, "data_domain_name", None):
-                    returned_documents.extend(
-                        _query_namespace(search_terms, top_k, namespace, filter)
-                    )
+            pass
+            # returned_documents = []
+            # for data_domain in self.index.index_data_domains:
+            #     if namespace := getattr(data_domain, "data_domain_name", None):
+            #         returned_documents.extend(
+            #             _query_namespace(search_terms, top_k, namespace, filter)
+            #         )
 
         return returned_documents
 
@@ -138,24 +139,11 @@ class PineconeDatabase(ModuleBase):
         #     }
         #     returned_documents.append(response)
 
-    def fetch_by_ids(self, ids, namespace=None) -> list[Any]:
-        response = self.pinecone_index.fetch(
+    def fetch_by_ids(self, ids, namespace=None, retrieve_n_docs=None) -> list[Any]:
+        return self.pinecone_index.fetch(
             namespace=namespace,
             ids=ids,
         )
-        returned_documents = []
-        for m in response.matches:
-            response = {
-                "content": m.metadata["content"],
-                "title": m.metadata["title"],
-                "url": m.metadata["url"],
-                "doc_type": m.metadata["doc_type"],
-                "score": m.score,
-                "id": m.id,
-            }
-            returned_documents.append(response)
-
-        return returned_documents
 
     def delete_pinecone_index(self):
         print(f"Deleting index {self.index_name}")
@@ -248,7 +236,7 @@ class PineconeDatabase(ModuleBase):
 
         return ui_components
 
-    def create_provider_ui_components(self, visibility: bool = True):
+    def create_provider_ui_components(self, visibility: bool = True) -> dict[str, Any]:
         ui_components = {}
 
         return ui_components

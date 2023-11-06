@@ -3,25 +3,18 @@ from typing import Any, Optional, Type, Union
 
 from services.database.database_service import DatabaseService
 from services.database.index_base import IndexBase
-from services.document_loading.document_loading_providers import (
-    GenericRecursiveWebScraper,
-    GenericWebScraper,
-)
-from services.document_loading.document_loading_service import DocLoadingService
-from services.text_processing.ingest_processing_service import IngestProcessingService
+from services.document_loading.document_loading_service import \
+    DocLoadingService
+from services.text_processing.ingest_processing_service import \
+    IngestProcessingService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .context_index_model import (
-    ContextIndexModel,
-    ContextTemplateModel,
-    DocDBModel,
-    DocIngestProcessorModel,
-    DocLoaderModel,
-    DomainModel,
-    SourceModel,
-)
+from .context_index_model import (ContextIndexModel, ContextTemplateModel,
+                                  DocDBModel, DocIngestProcessorModel,
+                                  DocLoaderModel, DomainModel, SourceModel)
 from .context_templates import ContextTemplates
+from .ingest import DocIngest
 
 
 class ContextIndex(IndexBase):
@@ -694,3 +687,9 @@ class ContextIndex(IndexBase):
             test_name = f"{new_name}_{i}"
             i += 1
         return test_name
+
+    # def ingest_docs(self,
+    #     target_instance: Union[DomainModel, SourceModel],
+        
+    #                 ):
+        

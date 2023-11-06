@@ -25,9 +25,15 @@ class DatabaseService(ModuleBase):
     list_of_class_names: list
     list_of_class_ui_names: list
     list_of_required_class_instances: list[Any]
+    pinecone_database: PineconeDatabase
+    database_provider: Union[LocalFileDatabase, PineconeDatabase]
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+        database_provider = kwargs.get("database_provider", None)
         super().__init__(config_file_dict=config_file_dict, **kwargs)
+        database_provider = self.get_requested_class_instance(
+            database_provider if database_provider is not None else self.config.database_provider,
+        )
 
     def query_index(
         self,
@@ -58,16 +64,19 @@ class DatabaseService(ModuleBase):
     def fetch_by_ids(
         self,
         ids=None,
-        retrieve_n_docs=None,
-        data_domain_name=None,
+        retrieve_n_docs=None,  # This doesn't need to be here
+        namespace=None,
         database_provider=None,
     ):
-        provider = self.get_requested_class_instance(database_provider)
-        if provider:
-            return provider.fetch_by_ids(
+        database_provider = self.get_requested_class_instance(
+            database_provider if database_provider is not None else self.config.database_provider,
+        )
+
+        if database_provider:
+            return database_provider.fetch_by_ids(
                 ids=ids,
                 retrieve_n_docs=retrieve_n_docs,
-                data_domain_name=data_domain_name,
+                namespace=namespace,
             )
         else:
             print("rnr")
@@ -80,17 +89,22 @@ class DatabaseService(ModuleBase):
         data_source=None,
         database_provider=None,
     ):
-        provider = self.get_requested_class_instance(database_provider)
-        if provider:
-            return provider.write_documents_to_database(documents, data_domain, data_source)
+        database_provider = self.get_requested_class_instance(
+            database_provider if database_provider is not None else self.config.database_provider,
+        )
+        if database_provider:
+            return database_provider.write_documents_to_database(
+                documents, data_domain, data_source
+            )
         else:
             print("rnr")
 
-    def create_service_management_settings_ui(self):
+    @classmethod
+    def create_service_management_settings_ui(cls):
         ui_components = {}
 
         with gr.Accordion(label="Pinecone"):
-            pinecone_model_instance = self.context_index.get_or_create_doc_db_instance(
+            pinecone_model_instance = cls.context_index.get_or_create_doc_db_instance(
                 name="pinecone_database"
             )
             pinecone_database = PineconeDatabase(config_file_dict=pinecone_model_instance.config)
@@ -100,14 +114,15 @@ class DatabaseService(ModuleBase):
 
         return ui_components
 
+    @classmethod
     def create_service_ui_components(
-        self,
+        cls,
         parent_instance: Union[DomainModel, SourceModel],
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}
 
-        for provider in self.context_index.index.doc_dbs:
+        for provider in cls.context_index.index.doc_dbs:
             name = provider.name
             config = provider.config
             provider_configs_dict[name] = config
@@ -115,9 +130,9 @@ class DatabaseService(ModuleBase):
         enabled_doc_db_name = parent_instance.enabled_doc_db.name
 
         provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
-            service_name=self.CLASS_NAME,
+            service_name=cls.CLASS_NAME,
             enabled_provider_name=enabled_doc_db_name,
-            required_classes=self.REQUIRED_CLASSES,
+            required_classes=cls.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )
