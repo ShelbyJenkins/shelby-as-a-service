@@ -133,11 +133,11 @@ class DocRetrieval(ModuleBase):
 
     def _retrieve_docs(self, search_terms, retrieve_n_docs, enabled_data_domains) -> list[Any]:
         returned_documents_list = []
-        for data_domain_name in enabled_data_domains:
+        for domain_name in enabled_data_domains:
             returned_documents = self.database_service.query_index(
                 search_terms=search_terms,
                 retrieve_n_docs=retrieve_n_docs,
-                data_domain_name=data_domain_name,
+                domain_name=domain_name,
             )
 
             returned_documents_list.extend(returned_documents)

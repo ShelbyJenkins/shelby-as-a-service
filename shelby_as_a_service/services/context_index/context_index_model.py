@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from services.database.index_base import Base
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
+from services.database.sqlite import Base
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, PickleType, String
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +34,17 @@ class DocLoaderModel(Base):
     config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
 
+class DocEmbeddingModel(Base):
+    __tablename__ = "doc_embedders"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
+    doc_db_model: Mapped["DocDBModel"] = relationship("DocDBModel", foreign_keys=[doc_db_id])
+
+    DEFAULT_DOC_EMBEDDER_NAME: str = "openai_embedding"
+    name: Mapped[str] = mapped_column(String, unique=True)
+    config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
+
+
 class DocDBModel(Base):
     __tablename__ = "doc_dbs"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -43,6 +54,18 @@ class DocDBModel(Base):
     context_index_model = relationship(
         "ContextIndexModel", back_populates="doc_dbs", foreign_keys=[context_id]
     )
+
+    doc_embedder_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("doc_embedders.id"), nullable=True
+    )
+    enabled_doc_embedder = relationship("DocLoaderModel", foreign_keys=[doc_embedder_id])
+    doc_embedders: Mapped[list[DocEmbeddingModel]] = relationship(
+        "DocEmbeddingModel",
+        back_populates="doc_db_model",
+        cascade="all, delete-orphan",
+        foreign_keys=[DocEmbeddingModel.doc_db_id],
+    )
+
     DEFAULT_DOC_DB_NAME: str = "pinecone_database"
     name: Mapped[str] = mapped_column(String, unique=True)
     config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
@@ -79,6 +102,8 @@ class ChunkModel(Base):
     )
 
     context_chunk: Mapped[str] = mapped_column(String, nullable=True)
+    chunk_embedding: Mapped[list[float]] = mapped_column(PickleType, nullable=True)
+    chunk_doc_db_id: Mapped[int] = mapped_column(Integer, nullable=True)
 
 
 class DocumentModel(Base):
@@ -162,6 +187,7 @@ class SourceModel(Base):
     description: Mapped[str] = mapped_column(String, default=DEFAULT_DESCRIPTION)
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     source_uri: Mapped[str] = mapped_column(String, nullable=True)
+    source_type: Mapped[str] = mapped_column(String, nullable=True)
 
     documents: Mapped[list[DocumentModel]] = relationship(
         "DocumentModel",

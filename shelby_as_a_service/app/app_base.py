@@ -90,7 +90,7 @@ class AppBase:
         cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app_config.app_name, "index")
         from services.context_index.context_index import ContextIndex
 
-        AppBase.context_index = ContextIndex()
+        AppBase.context_index: ContextIndex = ContextIndex()
 
         AppBase._load_sprite_instances(app_file_dict)
 

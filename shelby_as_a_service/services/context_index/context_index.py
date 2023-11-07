@@ -2,22 +2,26 @@ import logging
 from typing import Any, Optional, Type, Union
 
 from services.database.database_service import DatabaseService
-from services.database.index_base import IndexBase
-from services.document_loading.document_loading_service import \
-    DocLoadingService
-from services.text_processing.ingest_processing_service import \
-    IngestProcessingService
+from services.database.sqlite import SqliteDatabase
+from services.document_loading.document_loading_service import DocLoadingService
+from services.text_processing.ingest_processing_service import IngestProcessingService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .context_index_model import (ContextIndexModel, ContextTemplateModel,
-                                  DocDBModel, DocIngestProcessorModel,
-                                  DocLoaderModel, DomainModel, SourceModel)
+from .context_index_model import (
+    ContextIndexModel,
+    ContextTemplateModel,
+    DocDBModel,
+    DocIngestProcessorModel,
+    DocLoaderModel,
+    DomainModel,
+    SourceModel,
+)
 from .context_templates import ContextTemplates
 from .ingest import DocIngest
 
 
-class ContextIndex(IndexBase):
+class ContextIndex(SqliteDatabase):
     context_index_model: ContextIndexModel
     session: Session
     log: logging.Logger
@@ -690,6 +694,5 @@ class ContextIndex(IndexBase):
 
     # def ingest_docs(self,
     #     target_instance: Union[DomainModel, SourceModel],
-        
+
     #                 ):
-        

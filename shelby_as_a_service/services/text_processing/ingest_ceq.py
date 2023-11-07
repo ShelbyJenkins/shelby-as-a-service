@@ -39,7 +39,7 @@ class IngestCEQ(IngestProcessingService):
             overlap_percent=self.config.text_splitter_overlap_percent,
         )
 
-    def process_and_chunk_document(self, content: str) -> Optional[list[str]]:
+    def process_document(self, content: str) -> Optional[list[str]]:
         if text_utils.tiktoken_len(content) < self.config.preprocessor_min_length:
             self.log.info(
                 f"🔴 Skipping doc because content length: {text_utils.tiktoken_len(content)} is shorter than minimum: { self.config.preprocessor_min_length}"

@@ -32,18 +32,18 @@ class DocLoadingService(ABC, ModuleBase):
     #     return metadata
 
     @classmethod
-    def load_docs_from_source(
+    def load_docs_from_context_index_source(
         cls,
         source: SourceModel,
     ) -> Optional[list[Document]]:
-        return cls.load_docs_from_provider(
+        return cls.load_docs_with_provider(
             uri=source.source_uri,
             provider_name=source.enabled_doc_loader.name,
             provider_config=source.enabled_doc_loader.config,
         )
 
     @classmethod
-    def load_docs_from_provider(
+    def load_docs_with_provider(
         cls,
         uri: str,
         provider_name: AVAILABLE_PROVIDERS_NAMES,

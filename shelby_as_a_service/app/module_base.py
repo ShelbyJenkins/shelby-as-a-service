@@ -1,7 +1,7 @@
 import logging
 import os
 import typing
-from typing import Any
+from typing import Any, Optional
 
 from app.app_base import AppBase
 from pydantic import BaseModel
@@ -13,6 +13,7 @@ class ModuleBase(AppBase):
     log: logging.Logger
     ClassConfigModel: typing.Type[BaseModel]
     ModelConfig: typing.Type[BaseModel]
+    MODEL_DEFINITIONS: dict[str, Any]
     config: BaseModel
     list_of_class_names: list[str]
     list_of_class_ui_names: list[str]
@@ -94,25 +95,15 @@ class ModuleBase(AppBase):
                 return instance
         raise ValueError(f"Requested class {requested_class} not found.")
 
-    def get_model(self, requested_model_name: typing.Optional[str] = None):
+    def get_model_instance(self, requested_model_name: str) -> Any:
         model_instance = None
 
-        if requested_model_name:
-            for _, model in self.config.available_models.items():  # type: ignore
-                if model.MODEL_NAME == requested_model_name:  # type: ignore
-                    model_instance = model
-                    break
-            if not model_instance:
-                raise ValueError(f"Requested model {requested_model_name} not found.")
-        else:
-            for _, model in self.config.available_models.items():  # type: ignore
-                if model.MODEL_NAME == self.config.enabled_model_name:  # type: ignore
-                    model_instance = model
-                    break
-            if model_instance is None:
-                raise ValueError(f"Model from config {self.config.enabled_model_name} not found.")  # type: ignore
+        for model_name, model in self.MODEL_DEFINITIONS.items():
+            if model_name == requested_model_name:
+                model_instance = self.ModelConfig(**model)
+                return model_instance
 
-        return model_instance
+        raise ValueError(f"Requested model {requested_model_name} not found.")
 
     @staticmethod
     def get_requested_class(

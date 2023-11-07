@@ -22,16 +22,16 @@ class LocalFileDatabase(ModuleBase):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def write_documents_to_database(self, documents, data_domain, data_source):
-        data_domain_name_file_path = os.path.join(
+        domain_name_file_path = os.path.join(
             self.local_index_dir,
             "outputs",
-            data_domain.data_domain_name,
+            data_domain.domain_name,
         )
-        os.makedirs(data_domain_name_file_path, exist_ok=True)
+        os.makedirs(domain_name_file_path, exist_ok=True)
         for document in documents:
             title = text_utils.extract_and_clean_title(document, data_source.data_source_url)
             valid_filename = "".join(c if c.isalnum() else "_" for c in title)
-            file_path = os.path.join(data_domain_name_file_path, f"{valid_filename}.md")
+            file_path = os.path.join(domain_name_file_path, f"{valid_filename}.md")
             page_content = document.page_content
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(page_content)

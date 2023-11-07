@@ -112,7 +112,7 @@ class OpenAPIMinifier(IngestProcessingService):
         return minified_endpoints
 
     def create_full_spec(self, open_api_specs):
-        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/full_spec"
+        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.domain_name}/open_api_spec/full_spec"
         # Ensure output directory exists
         os.makedirs(folder_path, exist_ok=True)
         shutil.rmtree(folder_path)
@@ -120,7 +120,7 @@ class OpenAPIMinifier(IngestProcessingService):
         # Define output file path
         output_file_path = os.path.join(
             folder_path,
-            f"{self.data_source_config.data_domain_name}_open_api_spec.json",
+            f"{self.data_source_config.domain_name}_open_api_spec.json",
         )
 
         merged_open_api_spec = None
@@ -415,8 +415,8 @@ class OpenAPIMinifier(IngestProcessingService):
             endpoint["tag_summary"] = tag_summary
             endpoint["tag_number"] = tag_number
 
-            endpoint["data_domain_name"] = self.data_source_config.data_domain_name
-            endpoint["data_source_name"] = self.data_source_config.data_source_name
+            endpoint["domain_name"] = self.data_source_config.domain_name
+            endpoint["source_name"] = self.data_source_config.source_name
             endpoint["target_type"] = self.data_source_config.target_type
             endpoint["doc_type"] = self.data_source_config.doc_type
 
@@ -525,7 +525,7 @@ class OpenAPIMinifier(IngestProcessingService):
             # Load the YAML data and print the result
             yaml_content = yaml.safe_load(yaml_file)
         prompt_template = yaml_content.get("prompt_template")
-        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/keypoint"
+        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.domain_name}/open_api_spec/keypoint"
         # Ensure output directory exists
         os.makedirs(folder_path, exist_ok=True)
         # Define output file path
@@ -566,7 +566,7 @@ class OpenAPIMinifier(IngestProcessingService):
             output_file.write(output_string)
 
     def compare_chunks(self, data_source, document_chunks):
-        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
+        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.domain_name}/open_api_spec/endpoints"
         # Create the directory if it does not exist
         os.makedirs(folder_path, exist_ok=True)
         existing_files = os.listdir(folder_path)
@@ -606,7 +606,7 @@ class OpenAPIMinifier(IngestProcessingService):
         return checked_text_chunks, checked_document_chunks
 
     def write_chunks(self, data_source, document_chunks):
-        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.data_domain_name}/open_api_spec/endpoints"
+        folder_path = f"{self.index_agent.index_dir}/outputs/{self.data_source_config.domain_name}/open_api_spec/endpoints"
         # Clear the folder first
         shutil.rmtree(folder_path)
         os.makedirs(folder_path, exist_ok=True)

@@ -6,9 +6,10 @@ import services.text_processing.text_utils as text_utils
 from app.module_base import ModuleBase
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
+from services.embedding.embedding_service import EmbeddingService
 
 
-class OpenAIEmbedding(ModuleBase):
+class OpenAIEmbedding(EmbeddingService):
     class_name = Literal["openai_embedding"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI Embedding"
@@ -32,54 +33,52 @@ class OpenAIEmbedding(ModuleBase):
 
     class ClassConfigModel(BaseModel):
         enabled_model_name: str = "text-embedding-ada-002"
-        available_models: dict[str, "OpenAIEmbedding.ModelConfig"]
 
     config: ClassConfigModel
     embedding_models: list
-    current_model_class: ModelConfig
+    model_instance: "ModelConfig"
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
         # super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+        self.model_instance = self.get_model_instance(
+            requested_model_name=self.config.enabled_model_name
+        )
 
-    def get_embedding(self, content: str, model_name: Optional[str] = None) -> list[float]:
-        model = self.get_model(requested_model_name=model_name)
-        if model is None:
-            raise Exception("No model found")
-
-        embedding_retriever = OpenAIEmbeddings(
-            # Note that this is openai_api_key and not api_key
-            openai_api_key=self.secrets["openai_api_key"],
-            model=model.MODEL_NAME,
-            request_timeout=self.OPENAI_TIMEOUT_SECONDS,
-        )  # type: ignore
-
-        query_embedding = embedding_retriever.embed_query(content)
-        if query_embedding is None:
-            raise Exception("No embedding found")
-        self._calculate_cost(query_embedding, model)
-        self.log.info("Embeddings retrieved")
-
-        return query_embedding
-
-    def get_documents_embedding(self, documents, model_name=None) -> list[list[float]]:
-        model = self.get_model(requested_model_name=model_name)
-
-        if model is None:
-            return None
+    def get_embedding_of_text(self, text: str, model_name: Optional[str] = None) -> list[float]:
+        if model_name:
+            self.model_instance = self.get_model_instance(requested_model_name=model_name)
 
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             openai_api_key=self.secrets["openai_api_key"],
-            model=model.MODEL_NAME,
+            model=self.model_instance.MODEL_NAME,
             request_timeout=self.OPENAI_TIMEOUT_SECONDS,
         )  # type: ignore
 
-        doc_embeddings = embedding_retriever.embed_documents(documents)
+        text_embedding = embedding_retriever.embed_query(text)
+
+        # self._calculate_cost(text_embedding, self.model_instance)
+
+        return text_embedding
+
+    def get_embeddings_from_list_of_texts(
+        self, texts: list[str], model_name: Optional[str] = None
+    ) -> list[list[float]]:
+        if model_name:
+            self.model_instance = self.get_model_instance(requested_model_name=model_name)
+
+        embedding_retriever = OpenAIEmbeddings(
+            # Note that this is openai_api_key and not api_key
+            openai_api_key=self.secrets["openai_api_key"],
+            model=self.model_instance.MODEL_NAME,
+            request_timeout=self.OPENAI_TIMEOUT_SECONDS,
+        )  # type: ignore
+
+        text_embeddings = embedding_retriever.embed_documents(texts)
         # self._calculate_cost(query, model)
-        self.log.info("Embeddings retrieved")
 
-        return doc_embeddings
+        return text_embeddings
 
     def _calculate_cost(self, query, model):
         token_count = text_utils.tiktoken_len(query, model.MODEL_NAME)

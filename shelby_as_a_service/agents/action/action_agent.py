@@ -100,7 +100,10 @@ class ActionAgent(ModuleBase):
 
         # Create a list of formatted strings, each with the format "index. key: value"
         if isinstance(self.data_domains, dict):
-            content_strs = [f"{index + 1}. {key}: {value}" for index, (key, value) in enumerate(self.data_domains.items())]
+            content_strs = [
+                f"{index + 1}. {key}: {value}"
+                for index, (key, value) in enumerate(self.data_domains.items())
+            ]
 
         # Join the strings together with spaces between them
         topics_str = " ".join(content_strs)
@@ -133,13 +136,15 @@ class ActionAgent(ModuleBase):
         if domain_key == 0:
             return 0
         # Otherwise return string with the namespace of the domain in the vectorstore
-        data_domain_name = list(self.data_domains.keys())[domain_key - 1]  # We subtract 1 because list indices start at 0
+        domain_name = list(self.data_domains.keys())[
+            domain_key - 1
+        ]  # We subtract 1 because list indices start at 0
 
         self.ceq_agent.log.info(
-            f"{self.config.ceq_data_domain_constraints_llm_model} chose to fetch context docs from {data_domain_name} data domain."
+            f"{self.config.ceq_data_domain_constraints_llm_model} chose to fetch context docs from {domain_name} data domain."
         )
 
-        return data_domain_name
+        return domain_name
 
     def select_data_domain(self, query):
         response = None
@@ -150,19 +155,19 @@ class ActionAgent(ModuleBase):
         elif len(self.data_domains) == 1:
             # If only one topic, then we skip the ActionAgent topic decision.
             for key, _ in self.data_domains.items():
-                data_domain_name = key
+                domain_name = key
         else:
-            data_domain_name = self.action_agent.data_domain_decision(query)
+            domain_name = self.action_agent.data_domain_decision(query)
 
         # If no domain found message is sent to sprite
-        if data_domain_name == 0:
+        if domain_name == 0:
             response = self.ceq_data_domain_none_found_message
             response += "\n"
             for key, value in self.data_domains.items():
                 response += f"{key}: {value}\n"
             self.log.info(response)
 
-        return data_domain_name, response
+        return domain_name, response
 
     def keyword_generator(self, query):
         with open(
@@ -198,7 +203,9 @@ class ActionAgent(ModuleBase):
         returned_documents_list = []
         for returned_doc in documents:
             returned_documents_list.append(returned_doc["url"])
-        self.log.info(f"{len(documents)} documents returned from vectorstore: {returned_documents_list}")
+        self.log.info(
+            f"{len(documents)} documents returned from vectorstore: {returned_documents_list}"
+        )
         with open(
             os.path.join("shelby_as_service/prompt_templates/", "ceq_doc_check.yaml"),
             "r",
@@ -258,7 +265,9 @@ class ActionAgent(ModuleBase):
 
         for returned_doc in relevant_documents:
             returned_documents_list.append(returned_doc["url"])
-        self.log.info(f"{len(relevant_documents)} documents returned from doc_check: {returned_documents_list}")
+        self.log.info(
+            f"{len(relevant_documents)} documents returned from doc_check: {returned_documents_list}"
+        )
         if not relevant_documents:
             self.log.info("No supporting documents after doc_relevancy_check!")
             return None

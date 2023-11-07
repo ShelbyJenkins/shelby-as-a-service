@@ -2,16 +2,17 @@ from typing import Literal
 
 from services.database.local_file import LocalFileDatabase
 from services.database.pinecone import PineconeDatabase
+from services.database.sqlite import SqliteDatabase
 
 AVAILABLE_PROVIDERS_NAMES = Literal[
     PineconeDatabase.class_name,
-    LocalFileDatabase.class_name,
+    SqliteDatabase.class_name,
 ]
 AVAILABLE_PROVIDERS = [
     PineconeDatabase,
-    LocalFileDatabase,
+    SqliteDatabase,
 ]
 AVAILABLE_PROVIDERS_UI_NAMES = [
     PineconeDatabase.CLASS_UI_NAME,
-    LocalFileDatabase.CLASS_UI_NAME,
+    SqliteDatabase.CLASS_UI_NAME,
 ]

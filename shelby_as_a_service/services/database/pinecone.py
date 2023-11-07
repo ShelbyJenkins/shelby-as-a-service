@@ -1,18 +1,22 @@
 import os
 import typing
-from typing import Any, Dict, Type, Union
+from typing import Any, Dict, Literal, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 import pinecone
 from app.module_base import ModuleBase
 from pydantic import BaseModel
+from services.database.database_service import DatabaseBase
+from services.embedding.embedding_service import EmbeddingService
 
 
-class PineconeDatabase(ModuleBase):
-    CLASS_NAME: str = "pinecone_database"
+class PineconeDatabase(DatabaseBase):
+    class_name = Literal["pinecone_database"]
+    CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "Pinecone Database"
     REQUIRED_SECRETS: list[str] = ["pinecone_api_key"]
+    DOC_DB_REQUIRES_EMBEDDINGS: bool = True
 
     class ClassConfigModel(BaseModel):
         index_env: str = "us-central1-gcp"
@@ -21,22 +25,33 @@ class PineconeDatabase(ModuleBase):
         upsert_batch_size: int = 20
         vectorstore_metric: str = "cosine"
         vectorstore_pod_type: str = "p1"
-
+        enabled_doc_embedder_name: str = "openai_embedding"
+        enabled_doc_embedder_config: dict[str, Any] = {}
         retrieve_n_docs: int = 5
         indexed_metadata: list = [
-            "data_domain_name",
-            "data_source_name",
-            "doc_type",
-            "target_type",
-            "date_indexed",
+            "domain_name",
+            "source_name",
+            "source_type",
+            "date_of_creation",
         ]
 
     config: ClassConfigModel
-    existing_resource_vector_count: int
+    existing_entry_count: int
+    domain_name: str
+    source_name: Optional[str] = None
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+    def __init__(
+        self,
+        domain_name: str,
+        source_name: Optional[str] = None,
+        config_file_dict: dict[str, typing.Any] = {},
+        **kwargs,
+    ):
         # super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+        self.domain_name = domain_name
+        if source_name:
+            self.source_name = source_name
 
         if (api_key := self.secrets.get("pinecone_api_key")) is None:
             print("Pinecone API Key not found.")
@@ -46,85 +61,94 @@ class PineconeDatabase(ModuleBase):
                 environment=self.config.index_env,
             )
             self.pinecone = pinecone
+            indexes = pinecone.list_indexes()
+            if self.config.index_name not in indexes:
+                # create new index
+                self.create_index()
+                indexes = pinecone.list_indexes()
+                self.log.info(f"Created index: {indexes}")
             self.pinecone_index = pinecone.Index(self.config.index_name)
-            # indexes = pinecone.list_indexes()
-        # if cls.index_name not in indexes:
-        #     # create new index
-        #     cls.create_index()
-        #     indexes = pinecone.list_indexes()
-        #     cls.log.info(f"Created index: {indexes}")
 
-        #   cls.log.info(f"Initial index stats: {cls.vectorstore.describe_index_stats()}\n")
-        #         index_resource_stats = self.pinecone_index.describe_index_stats(
-        #     filter={"data_source_name": {"$eq": data_source.data_source_name}}
-        # )
+    @property
+    def doc_db_requires_embeddings(self) -> bool:
+        return self.DOC_DB_REQUIRES_EMBEDDINGS
 
-        # cls.log.info(
-        # )
-        # # cls.log.info(f'Post-upsert index stats: {index_resource_stats}\n')
+    @property
+    def doc_db_embeddings_config(self) -> tuple[str, dict[str, Any]]:
+        return self.config.enabled_doc_embedder_name, self.config.enabled_doc_embedder_config
 
-    def clear_existing_source(self, domain_name: str, source_name: str):
-        index_resource_stats = self.pinecone_index.describe_index_stats(
-            filter={"target_type": {"$eq": source_name}}
+    def get_index_domain_or_source_entry_count(self, source_name: Optional[str] = None) -> int:
+        self.log.info(f"Complete index stats: {self.pinecone_index.describe_index_stats()}\n")
+        if source_name:
+            index_resource_stats = self.pinecone_index.describe_index_stats(
+                filter={"source_name": {"$eq": source_name}}
+            )
+        else:
+            index_resource_stats = self.pinecone_index.describe_index_stats(
+                filter={"domain_name": {"$eq": self.domain_name}}
+            )
+        return (
+            index_resource_stats.get("namespaces", {})
+            .get(self.domain_name, {})
+            .get("vector_count", 0)
         )
-        existing_vector_count = (
-            index_resource_stats.get("namespaces", {}).get(domain_name, {}).get("vector_count", 0)
-        )
-        self.log.info(f"Existing vector count for {source_name}: {existing_vector_count}")
+
+    def clear_existing_source(self, source_name: str):
+        existing_entry_count = self.get_index_domain_or_source_entry_count(source_name=source_name)
+        self.log.info(f"Existing vector count for {source_name}: {existing_entry_count}")
         # If the "resource" already has vectors delete the existing vectors before upserting new vectors
         # We have to delete all because the difficulty in specifying specific documents in pinecone
-        if existing_vector_count == 0:
+        if existing_entry_count == 0:
+            self.log.info(f"No pre-existing vectors for {source_name}")
             return
         self.pinecone_index.delete(
-            namespace=domain_name,
+            namespace=self.domain_name,
             delete_all=False,
-            filter={"data_source_name": {"$eq": source_name}},
+            filter={"source_name": {"$eq": source_name}},
         )
-        index_resource_stats = self.pinecone_index.describe_index_stats(
-            filter={"source_name": {"$eq": source_name}}
-        )
-        cleared_resource_vector_count = (
-            index_resource_stats.get("namespaces", {}).get(domain_name, {}).get("vector_count", 0)
-        )
-        self.log.info(
-            f"Removing pre-existing vectors. New count: {cleared_resource_vector_count} (should be 0)"
-        )
+        cleared_entry_count = self.get_index_domain_or_source_entry_count(source_name=source_name)
+        if cleared_entry_count > 0:
+            raise ValueError(
+                f"Failed to clear vectors for {source_name}. New count: {cleared_entry_count}"
+            )
+        self.log.info(f"Removing pre-existing vectors. New count: {cleared_entry_count}")
 
-    def upsert(self, docs, **kwargs):
-        vectors_to_upsert = []
-        vector_counter = self.existing_resource_vector_count + 1
-        for i, story in enumerate(content):
-            prepared_vector = {
-                "id": f"id-{data_source.data_source_name}-{vector_counter}",
-                "values": dense_embeddings[i],
-                "metadata": document_chunk,
-            }
-            vector_counter += 1
-            vectors_to_upsert.append(prepared_vector)
+    def prepare_upsert(
+        self,
+        id: str,
+        values: Optional[list[float]],
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not values:
+            raise ValueError(f"Must provide values for {self.CLASS_NAME}")
+        return {
+            "id": id,
+            "values": values,
+            "metadata": metadata,
+        }
 
-        self.log.info(f"Upserting {len(vectors_to_upsert)} vectors")
+    def upsert(
+        self,
+        entries_to_upsert: list[dict[str, Any]],
+    ):
+        existing_entry_count = self.get_index_domain_or_source_entry_count(
+            source_name=self.source_name
+        )
         self.pinecone_index.upsert(
-            vectors=vectors_to_upsert,
-            namespace=self.deployment_name,
+            vectors=entries_to_upsert,
+            namespace=self.domain_name,
             batch_size=self.config.upsert_batch_size,
             show_progress=True,
         )
-        index_resource_stats = self.pinecone_index.describe_index_stats(
-            filter={"data_source_name": {"$eq": data_source.data_source_name}}
-        )
-        new_resource_vector_count = (
-            index_resource_stats.get("namespaces", {})
-            .get(self.deployment_name, {})
-            .get("vector_count", 0)
-        )
-        f"Previous vector count: {self.existing_resource_vector_count}\nNew vector count: {new_resource_vector_count}\n"
 
-        self.log.info(f"Final index stats: {self.pinecone_index.describe_index_stats()}")
+        self.log.info(f"Previous vector count: {existing_entry_count}")
+        self.log.info(
+            f"New vector count: {self.get_index_domain_or_source_entry_count(source_name=self.source_name)}"
+        )
 
-    def query_terms(
+    def query_by_terms(
         self,
         search_terms,
-        **kwargs,
     ) -> list[Any]:
         def _query_namespace(search_terms, top_k, namespace, filter=None):
             response = self.pinecone_index.query(
@@ -153,15 +177,15 @@ class PineconeDatabase(ModuleBase):
 
         filter = None  # Need to implement
 
-        if data_domain_name:
-            namespace = data_domain_name
+        if domain_name:
+            namespace = domain_name
             returned_documents = _query_namespace(search_terms, top_k, namespace, filter)
         # If we don't have a namespace, just search all available namespaces
         else:
             pass
             # returned_documents = []
             # for data_domain in self.index.index_data_domains:
-            #     if namespace := getattr(data_domain, "data_domain_name", None):
+            #     if namespace := getattr(data_domain, "domain_name", None):
             #         returned_documents.extend(
             #             _query_namespace(search_terms, top_k, namespace, filter)
             #         )
@@ -170,22 +194,22 @@ class PineconeDatabase(ModuleBase):
 
         #     soft_filter = {
         #         "doc_type": {"$eq": "soft"},
-        #         "data_domain_name": {"$in": data_domain_names},
+        #         "domain_name": {"$in": domain_names},
         #     }
 
         #     hard_filter = {
         #         "doc_type": {"$eq": "hard"},
-        #         "data_domain_name": {"$in": data_domain_names},
+        #         "domain_name": {"$in": domain_names},
         #     }
 
         # else:
         #     soft_filter = {
         #         "doc_type": {"$eq": "soft"},
-        #         "data_domain_name": {"$eq": data_domain_name},
+        #         "domain_name": {"$eq": domain_name},
         #     }
         #     hard_filter = {
         #         "doc_type": {"$eq": "hard"},
-        #         "data_domain_name": {"$eq": data_domain_name},
+        #         "domain_name": {"$eq": domain_name},
         #     }
         # hard_query_response = self.pinecone_index.query(
         #     top_k=retrieve_n_docs,
@@ -212,7 +236,6 @@ class PineconeDatabase(ModuleBase):
     def fetch_by_ids(
         self,
         ids: list[int],
-        **kwargs,
     ):
         namespace = kwargs.get("namespace", None)
         fetch_response = self.pinecone_index.fetch(
