@@ -1,6 +1,7 @@
 import logging
 import os
 import typing
+from typing import Any
 
 from app.app_base import AppBase
 from pydantic import BaseModel
@@ -18,6 +19,7 @@ class ModuleBase(AppBase):
     list_of_required_class_instances: list
     list_of_available_model_names: list[str]
     update_settings_file: bool = False
+    log = logging.getLogger("ModuleBase")
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs) -> None:
         self.log = logging.getLogger(self.__class__.__name__)
@@ -111,3 +113,15 @@ class ModuleBase(AppBase):
                 raise ValueError(f"Model from config {self.config.enabled_model_name} not found.")  # type: ignore
 
         return model_instance
+
+    @staticmethod
+    def get_requested_class(
+        requested_class: str, available_classes: list[typing.Type["ModuleBase"]]
+    ) -> Any:
+        for available_class in available_classes:
+            if (
+                available_class.CLASS_NAME == requested_class
+                or available_class.CLASS_UI_NAME == requested_class
+            ):
+                return available_class
+        raise ValueError(f"Requested class {requested_class} not found in {available_classes}")

@@ -1,3 +1,4 @@
+import hashlib
 import os
 import re
 import string
@@ -12,7 +13,7 @@ def tiktoken_len(document, encoding_model="text-embedding-ada-002"):
     return len(tokens)
 
 
-def tiktoken_len_of_document_list(documents):
+def tiktoken_len_of_document_list(documents) -> int:
     token_count = 0
     for document in documents:
         tokens = 0
@@ -52,7 +53,7 @@ def get_document_content(document):
     return None
 
 
-def clean_text_content(text):
+def clean_text_content(text: str) -> str:
     text = strip_unwanted_chars(text)
     text = reduce_excess_whitespace(text)
     return text
@@ -137,7 +138,7 @@ def split_text_with_regex(text: str, separator: str, keep_separator: bool) -> li
     return [s for s in splits if s != ""]
 
 
-def extract_and_clean_title(document, url=None):
+def extract_and_clean_title(document, uri=None):
     """
     Extracts and cleans the title from a document's metadata or a provided URL.
 
@@ -155,7 +156,7 @@ def extract_and_clean_title(document, url=None):
 
     # If title is absent in metadata, attempt to derive it from provided URL or 'loc' in metadata
     if not title:
-        use_url = url or metadata.get("loc", "")
+        use_url = uri or metadata.get("loc", "")
         parsed_url = urlparse(use_url)
         _, tail = os.path.split(parsed_url.path)
         root, _ = os.path.splitext(tail)
@@ -166,3 +167,8 @@ def extract_and_clean_title(document, url=None):
     title = reduce_excess_whitespace(title)
 
     return title
+
+
+@staticmethod
+def hash_content(content):
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()

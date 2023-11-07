@@ -3,7 +3,7 @@ import os
 import re
 import shutil
 import string
-from typing import Any, Dict, Type, Union
+from typing import Any, Dict, Literal, Type, Union, get_args
 from urllib.parse import urlparse
 
 import gradio as gr
@@ -11,11 +11,13 @@ import yaml
 from app.module_base import ModuleBase
 from pydantic import BaseModel
 
+from .ingest_processing_service import IngestProcessingService
 
-class OpenAPIMinifier(ModuleBase):
-    CLASS_NAME: str = "open_api_minifier"
+
+class OpenAPIMinifier(IngestProcessingService):
+    class_name = Literal["open_api_minifier"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Open API Minifier"
-
     # Saves tokens be abbreviating in a way understood by the LLM
     # Must be lowercase
     key_abbreviations = {
@@ -82,7 +84,8 @@ class OpenAPIMinifier(ModuleBase):
     config: ClassConfigModel
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        # super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
 
         # self.index_agent = data_source_config.index_agent
         # self.config = data_source_config.index_agent.config

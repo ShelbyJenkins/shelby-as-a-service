@@ -78,7 +78,7 @@ class ChunkModel(Base):
         "DocumentModel", foreign_keys=[document_id]
     )
 
-    processed_content: Mapped[str] = mapped_column(String, nullable=True)
+    context_chunk: Mapped[str] = mapped_column(String, nullable=True)
 
 
 class DocumentModel(Base):
@@ -94,13 +94,14 @@ class DocumentModel(Base):
         viewonly=True,
         uselist=False,  # Since each document is related to one domain through its source
     )
-    chunked_content: Mapped[list[ChunkModel]] = relationship(
+    context_chunks: Mapped[list[ChunkModel]] = relationship(
         "ChunkModel",
         back_populates="document_model",
         cascade="all, delete-orphan",
         foreign_keys=[ChunkModel.document_id],
     )
-    original_content: Mapped[str] = mapped_column(String, nullable=True)
+    cleaned_content: Mapped[str] = mapped_column(String, nullable=True)
+    hashed_cleaned_content: Mapped[str] = mapped_column(String, nullable=True)
     title: Mapped[str] = mapped_column(String, nullable=True)
     uri: Mapped[str] = mapped_column(String, nullable=True)
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)

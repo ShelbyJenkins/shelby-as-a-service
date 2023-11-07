@@ -18,27 +18,33 @@ from langchain.document_loaders import (
 from langchain.schema import Document
 from pydantic import BaseModel
 
+from .document_loading_service import DocLoadingService
 
-class GenericWebScraper(ModuleBase):
+
+class GenericWebScraper(DocLoadingService):
     class_name = Literal["generic_web_scraper"]
-    CLASS_NAME: Final[str] = "generic_web_scraper"
-    CLASS_UI_NAME: Final[str] = "Generic Web Scraper"
+    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_UI_NAME: str = "Generic Web Scraper"
 
     class ClassConfigModel(BaseModel):
         continue_on_failure: bool = True
+
+        class Config:
+            extra = "ignore"
 
     config: ClassConfigModel
     ui_components: dict[str, Any]
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+        # super().__init__(config_file_dict=config_file_dict, **kwargs)
 
-    def _load(self, url) -> Iterator[Document]:
+    def load_docs(self, url) -> Optional[list[Document]]:
         documents = WebBaseLoader(web_path=url).load()
         for document in documents:
             document.page_content = text_utils.clean_text_content(document.page_content)
 
-        return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
+        return [Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents]
 
     def create_provider_ui_components(self, visibility: bool = True):
         ui_components = {}
@@ -53,12 +59,10 @@ class GenericWebScraper(ModuleBase):
         return ui_components
 
 
-class GenericRecursiveWebScraper(ModuleBase):
+class GenericRecursiveWebScraper(DocLoadingService):
     class_name = Literal["generic_recursive_web_scraper"]
-    CLASS_NAME: Final[str] = "generic_recursive_web_scraper"
-    CLASS_UI_NAME: Final[str] = "Generic Resursive Web Scraper"
-
-    REQUIRED_SECRETS: list[str] = []
+    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_UI_NAME: str = "Generic Resursive Web Scraper"
 
     class ClassConfigModel(BaseModel):
         exclude_dirs: Optional[str] = None
@@ -70,7 +74,8 @@ class GenericRecursiveWebScraper(ModuleBase):
     config: ClassConfigModel
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        # super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:
@@ -80,10 +85,9 @@ class GenericRecursiveWebScraper(ModuleBase):
             return text_element.get_text()
         return ""
 
-    def _load(self, url) -> Iterator[Document]:
+    def load_docs(self, url) -> Optional[list[Document]]:
         documents = RecursiveUrlLoader(url=url, extractor=self.custom_extractor).load()
-
-        return (Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents)
+        return [Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents]
 
     def create_provider_ui_components(self, visibility: bool = True):
         ui_components = {}

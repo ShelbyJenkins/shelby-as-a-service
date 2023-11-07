@@ -18,7 +18,7 @@ class PineconeDatabase(ModuleBase):
         index_env: str = "us-central1-gcp"
         index_name: str = "shelby-as-a-service"
         vectorstore_dimension: int = 1536
-        vectorstore_upsert_batch_size: int = 20
+        upsert_batch_size: int = 20
         vectorstore_metric: str = "cosine"
         vectorstore_pod_type: str = "p1"
 
@@ -32,9 +32,12 @@ class PineconeDatabase(ModuleBase):
         ]
 
     config: ClassConfigModel
+    existing_resource_vector_count: int
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        # super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+
         if (api_key := self.secrets.get("pinecone_api_key")) is None:
             print("Pinecone API Key not found.")
         if api_key:
@@ -44,21 +47,88 @@ class PineconeDatabase(ModuleBase):
             )
             self.pinecone = pinecone
             self.pinecone_index = pinecone.Index(self.config.index_name)
+            # indexes = pinecone.list_indexes()
+        # if cls.index_name not in indexes:
+        #     # create new index
+        #     cls.create_index()
+        #     indexes = pinecone.list_indexes()
+        #     cls.log.info(f"Created index: {indexes}")
 
-    def query_index(
+        #   cls.log.info(f"Initial index stats: {cls.vectorstore.describe_index_stats()}\n")
+        #         index_resource_stats = self.pinecone_index.describe_index_stats(
+        #     filter={"data_source_name": {"$eq": data_source.data_source_name}}
+        # )
+
+        # cls.log.info(
+        # )
+        # # cls.log.info(f'Post-upsert index stats: {index_resource_stats}\n')
+
+    def clear_existing_source(self, domain_name: str, source_name: str):
+        index_resource_stats = self.pinecone_index.describe_index_stats(
+            filter={"target_type": {"$eq": source_name}}
+        )
+        existing_vector_count = (
+            index_resource_stats.get("namespaces", {}).get(domain_name, {}).get("vector_count", 0)
+        )
+        self.log.info(f"Existing vector count for {source_name}: {existing_vector_count}")
+        # If the "resource" already has vectors delete the existing vectors before upserting new vectors
+        # We have to delete all because the difficulty in specifying specific documents in pinecone
+        if existing_vector_count == 0:
+            return
+        self.pinecone_index.delete(
+            namespace=domain_name,
+            delete_all=False,
+            filter={"data_source_name": {"$eq": source_name}},
+        )
+        index_resource_stats = self.pinecone_index.describe_index_stats(
+            filter={"source_name": {"$eq": source_name}}
+        )
+        cleared_resource_vector_count = (
+            index_resource_stats.get("namespaces", {}).get(domain_name, {}).get("vector_count", 0)
+        )
+        self.log.info(
+            f"Removing pre-existing vectors. New count: {cleared_resource_vector_count} (should be 0)"
+        )
+
+    def upsert(self, docs, **kwargs):
+        vectors_to_upsert = []
+        vector_counter = self.existing_resource_vector_count + 1
+        for i, story in enumerate(content):
+            prepared_vector = {
+                "id": f"id-{data_source.data_source_name}-{vector_counter}",
+                "values": dense_embeddings[i],
+                "metadata": document_chunk,
+            }
+            vector_counter += 1
+            vectors_to_upsert.append(prepared_vector)
+
+        self.log.info(f"Upserting {len(vectors_to_upsert)} vectors")
+        self.pinecone_index.upsert(
+            vectors=vectors_to_upsert,
+            namespace=self.deployment_name,
+            batch_size=self.config.upsert_batch_size,
+            show_progress=True,
+        )
+        index_resource_stats = self.pinecone_index.describe_index_stats(
+            filter={"data_source_name": {"$eq": data_source.data_source_name}}
+        )
+        new_resource_vector_count = (
+            index_resource_stats.get("namespaces", {})
+            .get(self.deployment_name, {})
+            .get("vector_count", 0)
+        )
+        f"Previous vector count: {self.existing_resource_vector_count}\nNew vector count: {new_resource_vector_count}\n"
+
+        self.log.info(f"Final index stats: {self.pinecone_index.describe_index_stats()}")
+
+    def query_terms(
         self,
         search_terms,
-        retrieve_n_docs=None,
-        data_domain_name=None,
+        **kwargs,
     ) -> list[Any]:
-        if retrieve_n_docs is None:
-            top_k = self.config.retrieve_n_docs
-        else:
-            top_k = retrieve_n_docs
-
         def _query_namespace(search_terms, top_k, namespace, filter=None):
             response = self.pinecone_index.query(
-                top_k=top_k,
+                top_k=self.config.retrieve_n_docs,
                 include_values=False,
                 namespace=namespace,
                 include_metadata=True,
@@ -139,20 +209,26 @@ class PineconeDatabase(ModuleBase):
         #     }
         #     returned_documents.append(response)
 
-    def fetch_by_ids(self, ids, namespace=None, retrieve_n_docs=None) -> list[Any]:
-        return self.pinecone_index.fetch(
+    def fetch_by_ids(
+        self,
+        ids: list[int],
+        **kwargs,
+    ):
+        namespace = kwargs.get("namespace", None)
+        fetch_response = self.pinecone_index.fetch(
             namespace=namespace,
             ids=ids,
         )
+        return fetch_response
 
-    def delete_pinecone_index(self):
+    def delete_index(self):
         print(f"Deleting index {self.index_name}")
         stats = self.pinecone_index.describe_index_stats()
         print(stats)
         pinecone.delete_index(self.index_name)
         print(self.pinecone_index.describe_index_stats())
 
-    def clear_pinecone_index(self):
+    def clear_index(self):
         print("Deleting all vectors in index.")
         stats = self.pinecone_index.describe_index_stats()
         print(stats)
@@ -160,19 +236,12 @@ class PineconeDatabase(ModuleBase):
             self.pinecone_index.delete(deleteAll="true", namespace=key)
         print(self.pinecone_index.describe_index_stats())
 
-    def clear_pinecone_deployment(self):
+    def clear_namespace(self):
         print(f"Clearing namespace aka deployment: {self.app_name}")
         self.pinecone_index.delete(deleteAll="true", namespace=self.app_name)
         print(self.pinecone_index.describe_index_stats())
 
-    def clear_pinecone_data_source(self, data_source):
-        data_source.pinecone_index.delete(
-            namespace=self.app_name,
-            delete_all=False,
-            filter={"data_source_name": {"$eq": data_source.data_source_name}},
-        )
-
-    def create_pinecone_index(self):
+    def create_index(self):
         metadata_config = {"indexed": self.config.index_indexed_metadata}
         # Prepare log message
         log_message = (
@@ -227,9 +296,9 @@ class PineconeDatabase(ModuleBase):
             multiselect=True,
             allow_custom_value=True,
         )
-        ui_components["vectorstore_upsert_batch_size"] = gr.Number(
-            value=self.config.vectorstore_upsert_batch_size,
-            label="vectorstore_upsert_batch_size",
+        ui_components["upsert_batch_size"] = gr.Number(
+            value=self.config.upsert_batch_size,
+            label="upsert_batch_size",
             interactive=True,
             min_width=0,
         )

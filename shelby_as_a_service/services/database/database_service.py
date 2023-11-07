@@ -1,103 +1,139 @@
-import os
 import typing
-from typing import Any, Type, Union
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from pydantic import BaseModel
-from services.context_index.context_index_model import ContextIndexModel, DomainModel, SourceModel
-from services.database.local_file import LocalFileDatabase
+from services.context_index.context_index_model import (
+    ChunkModel,
+    DocumentModel,
+    DomainModel,
+    SourceModel,
+)
 from services.database.pinecone import PineconeDatabase
 
+from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
-class DatabaseService(ModuleBase):
+
+class DatabaseService(ABC, ModuleBase):
     CLASS_NAME: str = "database_service"
     CLASS_UI_NAME: str = "Document Databases"
+    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
+    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
+    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
-    REQUIRED_CLASSES: list[Type] = [LocalFileDatabase, PineconeDatabase]
-
-    class ClassConfigModel(BaseModel):
-        database_provider: str = "pinecone_database"
-        retrieve_n_docs: int = 6
-
-    config: ClassConfigModel
-    list_of_class_names: list
-    list_of_class_ui_names: list
-    list_of_required_class_instances: list[Any]
-    pinecone_database: PineconeDatabase
-    database_provider: Union[LocalFileDatabase, PineconeDatabase]
-
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        database_provider = kwargs.get("database_provider", None)
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
-        database_provider = self.get_requested_class_instance(
-            database_provider if database_provider is not None else self.config.database_provider,
+    @classmethod
+    def upsert_from_source(cls, docs: list[DocumentModel], source: SourceModel):
+        cls.upsert_from_provider(
+            docs=docs,
+            provider_name=source.enabled_doc_db.name,
+            provider_config=source.enabled_doc_db.config,
         )
 
-    def query_index(
-        self,
+    @classmethod
+    def query_from_provider(
+        cls,
+        search_terms: list[str] | str,
+        provider_name: AVAILABLE_PROVIDERS_NAMES,
+        provider_config: dict[str, Any] = {},
+        **kwargs,
+    ):
+        provider: Type[DatabaseService] = cls.get_requested_class(
+            requested_class=provider_name, available_classes=cls.REQUIRED_CLASSES
+        )
+        if isinstance(search_terms, str):
+            search_terms = [search_terms]
+        retrieved_docs = []
+        for term in search_terms:
+            docs = provider(config_file_dict=provider_config, **kwargs).query_terms(
+                search_terms=term,
+                **kwargs,
+            )
+            if docs:
+                retrieved_docs.append(docs)
+            else:
+                cls.log.info(f"No documents found for {term}")
+        return retrieved_docs
+
+    @classmethod
+    def fetch_by_ids_from_provider(
+        cls,
+        ids: list[int] | int,
+        provider_name: AVAILABLE_PROVIDERS_NAMES,
+        provider_config: dict[str, Any] = {},
+        **kwargs,
+    ):
+        provider: Type[DatabaseService] = cls.get_requested_class(
+            requested_class=provider_name, available_classes=cls.REQUIRED_CLASSES
+        )
+        if isinstance(ids, int):
+            ids = [ids]
+
+        docs = provider(config_file_dict=provider_config, **kwargs).fetch_by_ids(
+            ids=ids,
+            **kwargs,
+        )
+        if not docs:
+            cls.log.info(f"No documents found for {id}")
+        return docs
+
+    @classmethod
+    def upsert_from_provider(
+        cls,
+        docs,
+        provider_name: AVAILABLE_PROVIDERS_NAMES,
+        provider_config: dict[str, Any] = {},
+        **kwargs,
+    ):
+        provider: Type[DatabaseService] = cls.get_requested_class(
+            requested_class=provider_name, available_classes=cls.REQUIRED_CLASSES
+        )
+
+        provider(config_file_dict=provider_config, **kwargs).upsert(docs=docs, **kwargs)
+
+    @classmethod
+    def clear_existing_source_from_source(
+        cls,
+        source: SourceModel,
+        **kwargs,
+    ):
+        provider: Type[DatabaseService] = cls.get_requested_class(
+            requested_class=source.enabled_doc_db.name, available_classes=cls.REQUIRED_CLASSES
+        )
+        provider(config_file_dict=source.enabled_doc_db.config, **kwargs).clear_existing_source(
+            domain_name=source.domain_model.name, source_name=source.name
+        )
+
+    @abstractmethod
+    def query_terms(
+        cls,
         search_terms,
-        retrieve_n_docs,
-        data_domain_name,
-        database_provider=None,
+        **kwargs,
     ) -> list[dict]:
-        if database_provider is None:
-            database_provider = self.config.database_provider
+        raise NotImplementedError
 
-        provider = self.get_requested_class_instance(
-            database_provider if database_provider is not None else self.config.database_provider,
-        )
-
-        if provider:
-            return provider.query_index(
-                search_terms=search_terms,
-                retrieve_n_docs=self.config.retrieve_n_docs
-                if retrieve_n_docs is None
-                else retrieve_n_docs,
-                data_domain_name=data_domain_name,
-            )
-        else:
-            print("rnr")
-            return []
-
+    @abstractmethod
     def fetch_by_ids(
-        self,
-        ids=None,
-        retrieve_n_docs=None,  # This doesn't need to be here
-        namespace=None,
-        database_provider=None,
+        cls,
+        ids: list[int] | int,
+        **kwargs,
     ):
-        database_provider = self.get_requested_class_instance(
-            database_provider if database_provider is not None else self.config.database_provider,
-        )
+        raise NotImplementedError
 
-        if database_provider:
-            return database_provider.fetch_by_ids(
-                ids=ids,
-                retrieve_n_docs=retrieve_n_docs,
-                namespace=namespace,
-            )
-        else:
-            print("rnr")
-            return []
-
-    def write_documents_to_database(
-        self,
-        documents,
-        data_domain=None,
-        data_source=None,
-        database_provider=None,
+    @abstractmethod
+    def upsert(
+        cls,
+        docs,
+        **kwargs,
     ):
-        database_provider = self.get_requested_class_instance(
-            database_provider if database_provider is not None else self.config.database_provider,
-        )
-        if database_provider:
-            return database_provider.write_documents_to_database(
-                documents, data_domain, data_source
-            )
-        else:
-            print("rnr")
+        raise NotImplementedError
+
+    @abstractmethod
+    def clear_existing_source(self, domain_name: str, source_name: str):
+        raise NotImplementedError
 
     @classmethod
     def create_service_management_settings_ui(cls):

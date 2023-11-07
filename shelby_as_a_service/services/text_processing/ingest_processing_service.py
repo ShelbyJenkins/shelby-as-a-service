@@ -1,43 +1,143 @@
 import typing
-from typing import Any, Iterator, Type, Union
+from abc import ABC, abstractmethod
+from typing import Any, Iterator, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from langchain.schema import Document
 from pydantic import BaseModel, Field
-from services.context_index.context_index_model import DomainModel, SourceModel
+from services.context_index.context_index_model import (
+    ChunkModel,
+    DocumentModel,
+    DomainModel,
+    SourceModel,
+)
+from services.text_processing.text_utils import (
+    clean_text_content,
+    extract_and_clean_title,
+    hash_content,
+    tiktoken_len,
+)
 
-from .ingest_ceq import IngestCEQ
-from .ingest_open_api import OpenAPIMinifier
+from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class IngestProcessingService(ModuleBase):
-    CLASS_NAME: str = "ingest_processing_service"
-    CLASS_UI_NAME: str = "Ingest Processing Service"
-    REQUIRED_CLASSES = [OpenAPIMinifier, IngestCEQ]
+class IngestProcessingService(ModuleBase, ABC):
+    CLASS_NAME: str = "doc_loader_service"
+    CLASS_UI_NAME: str = "Document Loading Service"
+    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
+    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
+    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
     @classmethod
-    def create_class_instance(
-        cls, requested_class: str
-    ) -> Union[Type[OpenAPIMinifier], Type[IngestCEQ]]:
-        for provider in cls.REQUIRED_CLASSES:
-            if provider.CLASS_NAME == requested_class or provider.CLASS_UI_NAME == requested_class:
-                return provider
-        raise ValueError(f"Requested class {requested_class} not found.")
-
-    @classmethod
-    def process_documents(
+    def preprocess_documents_from_source(
         cls,
-        docs: Iterator[Document],
-        provider_name,
+        source: SourceModel,
+        docs: list[Document],
+    ) -> list[DocumentModel]:
+        processed_docs = []
+        for doc in docs:
+            cleaned_content = clean_text_content(doc.page_content)
+            processed_docs.append(
+                DocumentModel(
+                    cleaned_content=cleaned_content,
+                    hashed_cleaned_content=hash_content(cleaned_content),
+                    title=extract_and_clean_title(doc, uri=doc.metadata.get("source", None)),
+                    uri=doc.metadata.get("source", None),
+                    source_id=source.id,
+                )
+            )
+        return processed_docs
+
+    @classmethod
+    def compare_new_and_existing_docs(cls, source: SourceModel, docs: list[DocumentModel]) -> bool:
+        has_changes = False
+        # This will hold the titles of new or different chunks
+        new_or_changed_docs = []
+        for doc in docs:
+            if any(doc.uri == document.uri for document in source.documents):
+                has_changes = True
+                new_or_changed_docs.append(doc.title)
+                continue
+            doc_hash = hash_content(doc.cleaned_content)
+            if any(
+                hash_content(document.hashed_cleaned_content) == doc_hash
+                for document in source.documents
+            ):
+                has_changes = True
+                new_or_changed_docs.append(doc.title)
+                continue
+
+        if new_or_changed_docs:
+            cls.log.info(f"Found {len(new_or_changed_docs)} new or changed documents")
+        return has_changes
+
+    @classmethod
+    def process_and_chunk_documents_from_source(
+        cls,
+        source: SourceModel,
+        docs: list[DocumentModel],
+    ):
+        successfully_chunked_counter: int = 0
+        docs_token_counts: list[int] = []
+        for doc in docs:
+            cls.log.info(f"Processing and chunking {doc.title}")
+            document_chunks = cls.process_and_chunk_document_from_provider(
+                content=doc.cleaned_content,
+                provider_name=source.enabled_doc_ingest_processor.name,
+                provider_config=source.enabled_doc_ingest_processor.config,
+            )
+            if document_chunks is None:
+                continue
+            for chunk in document_chunks:
+                cls.log.info(f"{doc.title} has {len(document_chunks)} chunks")
+                doc.context_chunks.append(
+                    ChunkModel(
+                        chunked_content=chunk,
+                    )
+                )
+                successfully_chunked_counter += 1
+                doc_token_count = [tiktoken_len(chunk) for chunk in document_chunks]
+                cls.log.info(
+                    f"🟢 Doc split into {len(document_chunks)} of averge length {int(sum(doc_token_count) / len(document_chunks))}"
+                )
+                docs_token_counts.extend(doc_token_count)
+
+        cls.log.info(f"Min: {min(docs_token_counts)}")
+        cls.log.info(f"Avg: {int(sum(docs_token_counts) / len(docs_token_counts))}")
+        cls.log.info(f"Max: {max(docs_token_counts)}")
+        cls.log.info(f"Total tokens: {int(sum(docs_token_counts))}")
+        cls.log.info(f"Total documents processed: {len(docs)}")
+        cls.log.info(f"Total document chunks: {successfully_chunked_counter}")
+
+    @classmethod
+    def process_and_chunk_document_from_provider(
+        cls,
+        content: str,
+        provider_name: AVAILABLE_PROVIDERS_NAMES,
         provider_config: dict[str, Any] = {},
         **kwargs,
-    ) -> Iterator[Document]:
-        provider = cls.create_class_instance(requested_class=provider_name)
-        return provider(config_file_dict=provider_config, **kwargs).process_documents(
-            documents=docs
+    ) -> Optional[list[str]]:
+        provider: Type[IngestProcessingService] = cls.get_requested_class(
+            requested_class=provider_name, available_classes=cls.REQUIRED_CLASSES
         )
+
+        document_chunks = provider(
+            config_file_dict=provider_config, **kwargs
+        ).process_and_chunk_document(content=content)
+        if not document_chunks:
+            cls.log.info(f"{content[:10]} produced no chunks")
+            return None
+
+        cls.log.info(f"{content[:10]} produced {len(document_chunks)} chunks")
+
+        return document_chunks
+
+    @abstractmethod
+    def process_and_chunk_document(self, content: str) -> Optional[list[str]]:
+        raise NotImplementedError
 
     @classmethod
     def create_service_ui_components(

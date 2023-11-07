@@ -1,6 +1,19 @@
-from . import text_utils
-from .ingest_processing_service import IngestProcessingService
+from typing import Literal
 
-# from .process_ingest import
-# from .process_retrieval import process_retrieval
-# from .minify_open_api import minify_open_api
+from services.text_processing.ingest_ceq import IngestCEQ
+from services.text_processing.ingest_open_api import OpenAPIMinifier
+
+from . import text_utils
+
+AVAILABLE_PROVIDERS_NAMES = Literal[
+    IngestCEQ.class_name,
+    OpenAPIMinifier.class_name,
+]
+AVAILABLE_PROVIDERS = [
+    IngestCEQ,
+    OpenAPIMinifier,
+]
+AVAILABLE_PROVIDERS_UI_NAMES = [
+    IngestCEQ.CLASS_UI_NAME,
+    OpenAPIMinifier.CLASS_UI_NAME,
+]

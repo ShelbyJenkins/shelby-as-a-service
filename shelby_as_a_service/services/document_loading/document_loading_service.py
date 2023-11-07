@@ -1,6 +1,6 @@
-from __future__ import annotations
-
+import abc
 import typing
+from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Final, Iterator, Literal, Optional, Type, Union
 
@@ -8,41 +8,63 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from langchain.schema import Document
-from pydantic import BaseModel, Field
-from services.context_index.context_index_model import DomainModel, SourceModel
-from services.document_loading.email_fastmail import EmailFastmail
-from services.document_loading.web import GenericRecursiveWebScraper, GenericWebScraper
+from services.context_index.context_index_model import DocumentModel, DomainModel, SourceModel
+
+from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class DocLoadingService(ModuleBase):
+class DocLoadingService(ABC, ModuleBase):
     CLASS_NAME: str = "doc_loader_service"
     CLASS_UI_NAME: str = "Document Loading Service"
-    REQUIRED_CLASSES: list[Type] = [GenericWebScraper, GenericRecursiveWebScraper, EmailFastmail]
-    available_providers = Literal[
-        GenericWebScraper.class_name,
-        GenericRecursiveWebScraper.class_name,
-        EmailFastmail.class_name,
-    ]
+    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
+    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
+    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
+
+    #    metadata = {"source": url}
+    #     soup = BeautifulSoup(raw_html, "html.parser")
+    #     if title := soup.find("title"):
+    #         metadata["title"] = title.get_text()
+    #     if description := soup.find("meta", attrs={"name": "description"}):
+    #         metadata["description"] = description.get("content", None)
+    #     if html := soup.find("html"):
+    #         metadata["language"] = html.get("lang", None)
+    #     return metadata
 
     @classmethod
-    def create_class_instance(
-        cls, requested_class: str
-    ) -> Union[Type[GenericWebScraper], Type[GenericRecursiveWebScraper], Type[EmailFastmail]]:
-        for provider in cls.REQUIRED_CLASSES:
-            if provider.CLASS_NAME == requested_class or provider.CLASS_UI_NAME == requested_class:
-                return provider
-        raise ValueError(f"Requested class {requested_class} not found.")
+    def load_docs_from_source(
+        cls,
+        source: SourceModel,
+    ) -> Optional[list[Document]]:
+        return cls.load_docs_from_provider(
+            uri=source.source_uri,
+            provider_name=source.enabled_doc_loader.name,
+            provider_config=source.enabled_doc_loader.config,
+        )
 
     @classmethod
-    def load_docs(
+    def load_docs_from_provider(
         cls,
         uri: str,
-        provider_name: available_providers,
+        provider_name: AVAILABLE_PROVIDERS_NAMES,
         provider_config: dict[str, Any] = {},
         **kwargs,
-    ) -> Iterator[Document]:
-        provider = cls.create_class_instance(requested_class=provider_name)
-        return provider(config_file_dict=provider_config, **kwargs)._load(uri)
+    ) -> Optional[list[Document]]:
+        provider: Type[DocLoadingService] = cls.get_requested_class(
+            requested_class=provider_name, available_classes=cls.REQUIRED_CLASSES
+        )
+
+        docs = provider(config_file_dict=provider_config, **kwargs).load_docs(uri)
+        if docs:
+            cls.log.info(f"Total documents loaded from DocLoadingService: {len(docs)}")
+            return docs
+
+        cls.log.info(f"No data loaded for {uri}")
+        return None
+
+    @abstractmethod
+    def load_docs(self, uri: str) -> Optional[list[Document]]:
+        raise NotImplementedError
 
     @classmethod
     def create_service_ui_components(

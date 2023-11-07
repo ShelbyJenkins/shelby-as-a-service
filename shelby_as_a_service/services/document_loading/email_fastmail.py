@@ -9,14 +9,16 @@ from app.module_base import ModuleBase
 from langchain.schema import Document
 from pydantic import BaseModel
 
+from .document_loading_service import DocLoadingService
 
-class EmailFastmail(ModuleBase):
+
+class EmailFastmail(DocLoadingService):
     """The tiniest JMAP client you can imagine.
     From: https://github.com/fastmail/JMAP-Samples/blob/main/python3/tiny_jmap_library.py"""
 
-    CLASS_NAME: Final[str] = "email_fastmail"
     class_name = Literal["email_fastmail"]
-    CLASS_UI_NAME: Final[str] = "Email: Fastmail"
+    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_UI_NAME: str = "Email: Fastmail"
     # For intialization
     REQUIRED_SECRETS: list[str] = [
         "JMAP_USERNAME",
@@ -27,8 +29,8 @@ class EmailFastmail(ModuleBase):
         hostname: str = "api.fastmail.com"
         username: Optional[str] = None
 
-    class Config:
-        extra = "ignore"
+        class Config:
+            extra = "ignore"
 
     config: ClassConfigModel
 
@@ -36,13 +38,14 @@ class EmailFastmail(ModuleBase):
     api_url: str
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        # super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
         """Initialize using a hostname, username and bearer token"""
         self.session = None
         self.account_id = None
         self.identity_id = None
 
-    def _load(self, uri) -> Iterator[Document]:
+    def load_docs(self, uri) -> Iterator[Document]:
         documents = []
         return (Document(page_content="Hello World!", metadata={"uri": uri}) for doc in documents)
 

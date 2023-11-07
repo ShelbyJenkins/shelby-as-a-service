@@ -1,6 +1,6 @@
 import typing
 from decimal import Decimal
-from typing import Any, Type
+from typing import Any, Literal, Optional, Type
 
 import services.text_processing.text_utils as text_utils
 from app.module_base import ModuleBase
@@ -9,9 +9,11 @@ from pydantic import BaseModel
 
 
 class OpenAIEmbedding(ModuleBase):
-    CLASS_NAME: str = "openai_embedding"
+    class_name = Literal["openai_embedding"]
+    CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI Embedding"
     REQUIRED_SECRETS: list[str] = ["openai_api_key"]
+
     MODELS_TYPE: str = "embedding_models"
     OPENAI_TIMEOUT_SECONDS: float = 180
 
@@ -37,12 +39,13 @@ class OpenAIEmbedding(ModuleBase):
     current_model_class: ModelConfig
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        # super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
 
-    def get_query_embedding(self, query, model_name=None) -> list[float]:
+    def get_embedding(self, content: str, model_name: Optional[str] = None) -> list[float]:
         model = self.get_model(requested_model_name=model_name)
         if model is None:
-            return None
+            raise Exception("No model found")
 
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
@@ -51,8 +54,10 @@ class OpenAIEmbedding(ModuleBase):
             request_timeout=self.OPENAI_TIMEOUT_SECONDS,
         )  # type: ignore
 
-        query_embedding = embedding_retriever.embed_query(query)
-        self._calculate_cost(query, model)
+        query_embedding = embedding_retriever.embed_query(content)
+        if query_embedding is None:
+            raise Exception("No embedding found")
+        self._calculate_cost(query_embedding, model)
         self.log.info("Embeddings retrieved")
 
         return query_embedding
