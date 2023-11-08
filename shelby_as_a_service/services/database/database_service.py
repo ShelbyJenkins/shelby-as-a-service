@@ -24,19 +24,11 @@ class DatabaseBase(ABC, ModuleBase):
         raise NotImplementedError
 
     @abstractmethod
-    def query_by_terms(
-        self,
-        search_terms,
-        **kwargs,
-    ) -> list[dict]:
+    def query_by_terms(self, search_terms: list[str] | str) -> list[dict]:
         raise NotImplementedError
 
     @abstractmethod
-    def fetch_by_ids(
-        self,
-        ids: list[int] | int,
-        **kwargs,
-    ):
+    def fetch_by_ids(self, ids: list[int] | int) -> list[dict]:
         raise NotImplementedError
 
     def prepare_upsert_for_vectorstore(
@@ -196,7 +188,7 @@ class DatabaseService(DatabaseBase):
     def get_index_domain_or_source_entry_count(self, source_name: Optional[str] = None) -> int:
         return self.doc_db_instance.get_index_domain_or_source_entry_count(source_name=source_name)
 
-    def query_by_terms(self, search_terms: list[str] | str):
+    def query_by_terms(self, search_terms: list[str] | str) -> list[dict]:
         if isinstance(search_terms, str):
             search_terms = [search_terms]
         retrieved_docs = []
@@ -205,12 +197,12 @@ class DatabaseService(DatabaseBase):
                 search_terms=term,
             )
             if docs:
-                retrieved_docs.append(docs)
+                retrieved_docs.extend(docs)
             else:
                 self.log.info(f"No documents found for {term}")
         return retrieved_docs
 
-    def fetch_by_ids(self, ids: list[int] | int):
+    def fetch_by_ids(self, ids: list[int] | int) -> list[dict]:
         if isinstance(ids, int):
             ids = [ids]
 

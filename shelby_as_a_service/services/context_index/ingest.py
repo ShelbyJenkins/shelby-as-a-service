@@ -51,7 +51,9 @@ class DocIngest(ModuleBase):
             for i in range(retry_count):
                 try:
                     if (
-                        documents := DocLoadingService.load_docs_from_context_index_source(
+                        documents := DocLoadingService(
+                            source=source
+                        ).load_docs_from_context_index_source(
                             source=source,
                         )
                     ) is None:

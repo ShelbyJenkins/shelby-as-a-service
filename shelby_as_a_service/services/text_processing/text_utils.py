@@ -5,19 +5,20 @@ import string
 from urllib.parse import urlparse
 
 import tiktoken
+from langchain.schema import Document
 
 
-def tiktoken_len(document, encoding_model="text-embedding-ada-002"):
+def tiktoken_len(text: str, encoding_model="text-embedding-ada-002") -> int:
     tokenizer = tiktoken.encoding_for_model(encoding_model)
-    tokens = tokenizer.encode(document, disallowed_special=())
+    tokens = tokenizer.encode(text, disallowed_special=())
     return len(tokens)
 
 
-def tiktoken_len_of_document_list(documents) -> int:
+def tiktoken_len_of_document_list(texts: list[str]) -> int:
     token_count = 0
-    for document in documents:
+    for text in texts:
         tokens = 0
-        tokens += tiktoken_len(document["content"])
+        tokens += tiktoken_len(text)
         token_count += tokens
     return token_count
 
@@ -32,25 +33,6 @@ def tiktoken_len_of_openai_prompt(prompt, llm_model) -> int:
                 num_tokens += llm_model.TOKENS_PER_NAME
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
     return num_tokens
-
-
-def get_document_content(document):
-    # Check attributes
-    for attr in ["page_content", "content"]:
-        if (document_content := getattr(document, attr, None)) is not None:
-            return document_content
-
-    # Check dictionary keys
-    if isinstance(document, dict):
-        for key in ["page_content", "content"]:
-            if (document_content := document.get(key)) is not None:
-                return document_content
-
-    # Check if document is a string
-    if isinstance(document, str):
-        return document
-
-    return None
 
 
 def clean_text_content(text: str) -> str:
@@ -138,7 +120,29 @@ def split_text_with_regex(text: str, separator: str, keep_separator: bool) -> li
     return [s for s in splits if s != ""]
 
 
-def extract_and_clean_title(document, uri=None):
+def extract_document_content(doc: dict | str | Document) -> str:
+    # Check if document is a string
+    if isinstance(doc, str):
+        return doc
+    # Check dictionary keys
+    elif isinstance(doc, dict):
+        for key in ["page_content", "content"]:
+            if (document_content := doc.get(key)) is not None:
+                return document_content
+
+    elif isinstance(doc, Document):
+        for attr in ["page_content", "content"]:
+            if (document_content := getattr(doc, attr, None)) is not None:
+                return document_content
+    else:
+        raise ValueError(
+            f"Document must be a string, dictionary, or Document. Received {type(doc).__name__}"
+        )
+
+    raise ValueError(f"No content found in document {doc}")
+
+
+def extract_and_clean_title(doc, uri=None) -> str:
     """
     Extracts and cleans the title from a document's metadata or a provided URL.
 
@@ -151,7 +155,7 @@ def extract_and_clean_title(document, uri=None):
     """
 
     # Use metadata from doc or initialize as empty dictionary
-    metadata = document.metadata if hasattr(document, "metadata") else document.get("metadata", {})
+    metadata = doc.metadata if hasattr(doc, "metadata") else doc.get("metadata", {})
     title = metadata.title if hasattr(metadata, "title") else metadata.get("title", {})
 
     # If title is absent in metadata, attempt to derive it from provided URL or 'loc' in metadata
@@ -169,6 +173,25 @@ def extract_and_clean_title(document, uri=None):
     return title
 
 
+def extract_uri(doc: dict | Document) -> str:
+    # Check dictionary keys
+    if isinstance(doc, dict):
+        for key in ["source", "url", "loc", "uri"]:
+            if (uri := doc.get(key)) is not None:
+                return uri
+
+    elif isinstance(doc, Document):
+        for attr in ["source", "url", "loc", "uri"]:
+            if (uri := getattr(doc, attr, None)) is not None:
+                return uri
+    else:
+        raise ValueError(
+            f"Document must be a dictionary, or Document. Received {type(doc).__name__}"
+        )
+
+    raise ValueError(f"No uri found in document {doc}")
+
+
 @staticmethod
-def hash_content(content):
+def hash_content(content) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()

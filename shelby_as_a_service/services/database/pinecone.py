@@ -149,7 +149,7 @@ class PineconeDatabase(DatabaseBase):
     def query_by_terms(
         self,
         search_terms,
-    ) -> list[Any]:
+    ) -> list[dict]:
         def _query_namespace(search_terms, top_k, namespace, filter=None):
             response = self.pinecone_index.query(
                 top_k=self.config.retrieve_n_docs,

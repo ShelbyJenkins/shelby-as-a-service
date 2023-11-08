@@ -91,7 +91,7 @@ class WebAgent(ModuleBase):
                 output = ""
                 if documents:
                     for document in documents:
-                        if content := text_utils.get_document_content(document):
+                        if content := text_utils.extract_document_content(document):
                             output += content
                     return [output, output]
 

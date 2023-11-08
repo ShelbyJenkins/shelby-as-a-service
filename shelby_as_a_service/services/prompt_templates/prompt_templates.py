@@ -39,7 +39,7 @@ def create_document_string(documents=None):
             doc_num = document_number
         else:
             doc_num = i
-        document_content = text_utils.get_document_content(doc)
+        document_content = text_utils.extract_document_content(doc)
         document_content = text_utils.clean_text_content(document_content)
 
         content_strs.append(f"{document_content} doc_num: [{doc_num}]")
