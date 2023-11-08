@@ -1,4 +1,4 @@
-# class OpenAPILoader(ServiceBase):
+# class OpenAPILoader(DocLoadingBase):
 #     def __init__(self, data_source_config: DataSourceConfig):
 #         self.index_agent = data_source_config.index_agent
 #         self.config = data_source_config

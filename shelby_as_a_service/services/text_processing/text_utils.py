@@ -192,6 +192,5 @@ def extract_uri(doc: dict | Document) -> str:
     raise ValueError(f"No uri found in document {doc}")
 
 
-@staticmethod
 def hash_content(content) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()

@@ -6,6 +6,7 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from langchain.schema import Document
+from services.context_index.context_documents import IngestDoc
 from services.context_index.context_index_model import (
     ChunkModel,
     DocumentModel,
@@ -28,69 +29,57 @@ class EmbeddingBase(ABC, ModuleBase):
         raise NotImplementedError
 
 
-class EmbeddingService(EmbeddingBase):
+class EmbeddingService(ModuleBase):
     CLASS_NAME: str = "embedding_service"
     CLASS_UI_NAME: str = "Embedding Service"
     REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
     LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
     LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
-    provider_instance: "EmbeddingService"
 
     def __init__(
         self,
-        source: Optional[SourceModel],
-        provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
-        provider_config: Optional[dict[str, Any]] = {},
-        **kwargs,
+        source: Optional[SourceModel] = None,
+        doc_embedder_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_embedder_provider_config: dict = {},
     ):
         if source:
-            provider_name = source.enabled_doc_db.name
-            provider_config = source.enabled_doc_db.config
+            self.source = source
+            self.enabled_doc_embedder = self.source.enabled_doc_db.enabled_doc_embedder
+            self.doc_embedder_provider_name = self.enabled_doc_embedder.name
+            self.doc_embedder_provider_config = self.enabled_doc_embedder.config
+        elif doc_embedder_provider_name:
+            self.doc_embedder_provider_name = doc_embedder_provider_name
+            self.doc_embedder_provider_config = doc_embedder_provider_config
 
-        if not provider_name or not provider_config:
-            raise ValueError("Must provide either source or provider_name and provider_config")
-        provider: Type[EmbeddingService] = self.get_requested_class(
-            requested_class=provider_name, available_classes=self.REQUIRED_CLASSES
+        else:
+            raise ValueError(
+                "Must provide either source or doc_embedder_provider_name and doc_embedder_provider_config"
+            )
+
+        self.doc_embedder_instance: EmbeddingBase = self.get_requested_class_instance(
+            requested_class_name=self.doc_embedder_provider_name,
+            requested_class_config=self.doc_embedder_provider_config,
         )
-        self.provider_instance = provider(config_file_dict=provider_config, **kwargs)
 
-    def get_embedding_of_text_by_provider(
+    def get_embedding_of_text(
         self,
         text: str,
         model_name: Optional[str] = None,
-        provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
-        provider_config: Optional[dict[str, Any]] = {},
-        **kwargs,
     ) -> list[float]:
-        if provider_name:
-            provider: Type[EmbeddingService] = self.get_requested_class(
-                requested_class=provider_name, available_classes=self.REQUIRED_CLASSES
-            )
-            self.provider_instance = provider(config_file_dict=provider_config, **kwargs)
-
-        text_embedding = self.provider_instance.get_embedding_of_text(
+        text_embedding = self.doc_embedder_instance.get_embedding_of_text(
             text=text, model_name=model_name
         )
         if text_embedding is None:
             raise ValueError("No embedding returned")
         return text_embedding
 
-    def get_embeddings_from_list_of_texts_by_provider(
+    def get_embeddings_from_list_of_texts(
         self,
         texts: list[str],
         model_name: Optional[str] = None,
-        provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
-        provider_config: Optional[dict[str, Any]] = {},
-        **kwargs,
     ) -> list[list[float]]:
-        if provider_name:
-            provider: Type[EmbeddingService] = self.get_requested_class(
-                requested_class=provider_name, available_classes=self.REQUIRED_CLASSES
-            )
-            self.provider_instance = provider(config_file_dict=provider_config, **kwargs)
-
-        text_embeddings = self.provider_instance.get_embeddings_from_list_of_texts(
+        text_embeddings = self.doc_embedder_instance.get_embeddings_from_list_of_texts(
             texts=texts, model_name=model_name
         )
         if text_embeddings is None:
@@ -98,24 +87,20 @@ class EmbeddingService(EmbeddingBase):
         self.log.info(f"Got {len(text_embeddings)} embeddings")
         return text_embeddings
 
-    def get_document_embeddings_from_document_models(
-        self, document_models: list[DocumentModel]
-    ) -> list[DocumentModel]:
-        document_models_context_chunks = []
-        document_models_text_embeddings = []
-        for document_model in document_models:
-            for chunk in document_model.context_chunks:
-                document_models_context_chunks.append(chunk.context_chunk)
+    def get_document_embeddings_for_chunks_to_upsert(self, chunks_to_upsert: list[ChunkModel]):
+        upsert_chunks_text = []
+        upsert_docs_text_embeddings = []
+        for chunk in chunks_to_upsert:
+            upsert_chunks_text.append(chunk.context_chunk)
 
-        document_models_text_embeddings = self.get_embeddings_from_list_of_texts(
-            texts=document_models_context_chunks
+        upsert_docs_text_embeddings = self.get_embeddings_from_list_of_texts(
+            texts=upsert_chunks_text
         )
-        if len(document_models_text_embeddings) != len(document_models_context_chunks):
+        if len(upsert_docs_text_embeddings) != len(upsert_chunks_text):
             raise ValueError("Number of embeddings does not match number of context chunks")
-        for i, document_model in enumerate(document_models):
-            for chunk in document_model.context_chunks:
-                chunk.chunk_embedding = document_models_context_chunks[i]
-        return document_models
+
+        for i, chunk in enumerate(chunks_to_upsert):
+            chunk.chunk_embedding = upsert_docs_text_embeddings[i]
 
     def create_settings_ui(self):
         components = {}
@@ -130,8 +115,8 @@ class EmbeddingService(EmbeddingBase):
             min_width=0,
         )
 
-        for provider_instance in self.list_of_required_class_instances:
-            provider_instance.create_settings_ui()
+        for doc_embedder_instance in self.list_of_required_class_instances:
+            doc_embedder_instance.create_settings_ui()
 
         GradioHelpers.create_settings_event_listener(self.config, components)
 

@@ -24,10 +24,10 @@ def abstract_service_ui_components(
     for provider_class in required_classes:
         provider_name = provider_class.CLASS_NAME
         provider_config = provider_configs_dict.get(provider_name, {})
-        provider_instance = provider_class(config_file_dict=provider_config)
+        config_model = provider_class.ClassConfigModel(**provider_config)
         visibility = set_current_ui_provider_visible(provider_name, enabled_provider_name)
-        provider_config_components = provider_instance.create_provider_ui_components(
-            visibility=visibility
+        provider_config_components = provider_class.create_provider_ui_components(
+            config_model=config_model, visibility=visibility
         )
         if not groups_rendered:
             set_components_elem_id_and_classes(

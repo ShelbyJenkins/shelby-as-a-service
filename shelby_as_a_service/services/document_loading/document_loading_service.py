@@ -15,26 +15,25 @@ from services.context_index.context_index_model import DocumentModel, DomainMode
 
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
-#   @abstractmethod
-#     def load_docs(self, uri: str) -> Optional[list[Document]]:
-#         raise NotImplementedError
+
+class DocLoadingBase(ABC, ModuleBase):
+    @abstractmethod
+    def load_docs(self, uri: str) -> Optional[list[Document]]:
+        raise NotImplementedError
 
 
-class DocLoadingService(ABC, ModuleBase):
+class DocLoadingService(ModuleBase):
     CLASS_NAME: str = "doc_loader_service"
     CLASS_UI_NAME: str = "Document Loading Service"
     REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
     LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
     LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
-    doc_loader_instance: "DocLoadingService"
-    source: Optional[SourceModel] = None
-    domain: Optional[DomainModel] = None
 
     def __init__(
         self,
         source: Optional[SourceModel] = None,
-        doc_loader_provider_name: Optional[str] = None,
+        doc_loader_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
         doc_loader_provider_config: dict[str, Any] = {},
     ):
         if source:
@@ -48,7 +47,7 @@ class DocLoadingService(ABC, ModuleBase):
             self.doc_db_provider_config = doc_loader_provider_config
         else:
             raise ValueError("Must provide either SourceModel or doc_loader_provider_name")
-        self.doc_loader_instance: DocLoadingService = self.get_requested_class_instance(
+        self.doc_loader_instance: DocLoadingBase = self.get_requested_class_instance(
             requested_class_name=self.doc_loader_provider_name,
             requested_class_config=self.doc_loader_provider_config,
         )
@@ -56,37 +55,30 @@ class DocLoadingService(ABC, ModuleBase):
     def load_docs_from_context_index_source(
         self,
         source: SourceModel,
-    ) -> list[IngestDoc]:
-        return self.load_docs(
+    ) -> Optional[list[IngestDoc]]:
+        docs = self.load_docs(
             uri=source.source_uri,
         )
+        if not docs:
+            self.log.info(f"No documents found for {source.name} @ {source.source_uri}")
+            return None
+        ingest_docs = []
+        for doc in docs:
+            ingest_docs.append(
+                IngestDoc.create_ingest_doc_from_langchain_document(doc=doc, source=source)
+            )
+        return ingest_docs
 
     def load_docs(
         self,
         uri: str,
-    ) -> list[Document] | Document:
+    ) -> Optional[list[Document]]:
         docs = self.doc_loader_instance.load_docs(uri)
-        if docs:
-            self.log.info(f"Total documents loaded from DocLoadingService: {len(docs)}")
-            return docs
-
-        raise ValueError(f"No data loaded for {uri}")
-
-    # metadata = {
-    #     "domain_name": domain_name,
-    #     "source_name": source_name,
-    #     "context_chunk": context_chunk,
-    #     "document_id": document_id,
-    #     "title": title,
-    #     "uri": uri,
-    #     "source_type": source_type,
-    #     "date_of_creation": date_of_creation,
-    # }
-
-    def create_ingest_docs(self, docs: list[Document] | Document) -> list[IngestDoc]:
-        ingest_docs = []
-        for doc in docs:
-            ingest_docs.append()
+        if not docs:
+            self.log.info(f"No documents loaded from DocLoadingService: {self.doc_loader_instance}")
+            return None
+        self.log.info(f"Total documents loaded from DocLoadingService: {len(docs)}")
+        return docs
 
     @classmethod
     def create_service_ui_components(

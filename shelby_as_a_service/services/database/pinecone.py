@@ -42,67 +42,58 @@ class PineconeDatabase(DatabaseBase):
 
     def __init__(
         self,
-        domain_name: str,
-        source_name: Optional[str] = None,
         config_file_dict: dict[str, typing.Any] = {},
         **kwargs,
     ):
         # super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
-        self.domain_name = domain_name
-        if source_name:
-            self.source_name = source_name
 
         if (api_key := self.secrets.get("pinecone_api_key")) is None:
-            print("Pinecone API Key not found.")
-        if api_key:
-            pinecone.init(
-                api_key=api_key,
-                environment=self.config.index_env,
-            )
-            self.pinecone = pinecone
+            raise ValueError("Pinecone API Key not found.")
+        pinecone.init(
+            api_key=api_key,
+            environment=self.config.index_env,
+        )
+        self.pinecone = pinecone
+        indexes = pinecone.list_indexes()
+        if self.config.index_name not in indexes:
+            # create new index
+            self.create_index()
             indexes = pinecone.list_indexes()
-            if self.config.index_name not in indexes:
-                # create new index
-                self.create_index()
-                indexes = pinecone.list_indexes()
-                self.log.info(f"Created index: {indexes}")
-            self.pinecone_index = pinecone.Index(self.config.index_name)
-
-    @property
-    def doc_db_requires_embeddings(self) -> bool:
-        return self.DOC_DB_REQUIRES_EMBEDDINGS
+            self.log.info(f"Created index: {indexes}")
+        self.pinecone_index = pinecone.Index(self.config.index_name)
 
     @property
     def doc_db_embeddings_config(self) -> tuple[str, dict[str, Any]]:
         return self.config.enabled_doc_embedder_name, self.config.enabled_doc_embedder_config
 
-    def get_index_domain_or_source_entry_count(self, source_name: Optional[str] = None) -> int:
+    def get_index_domain_or_source_entry_count(
+        self, source_name: Optional[str] = None, domain_name: Optional[str] = None
+    ) -> int:
         self.log.info(f"Complete index stats: {self.pinecone_index.describe_index_stats()}\n")
         if source_name:
             index_resource_stats = self.pinecone_index.describe_index_stats(
                 filter={"source_name": {"$eq": source_name}}
             )
-        else:
+        elif domain_name:
             index_resource_stats = self.pinecone_index.describe_index_stats(
-                filter={"domain_name": {"$eq": self.domain_name}}
+                filter={"domain_name": {"$eq": domain_name}}
             )
+        else:
+            raise ValueError("Must provide either source_name or domain_name")
         return (
-            index_resource_stats.get("namespaces", {})
-            .get(self.domain_name, {})
-            .get("vector_count", 0)
+            index_resource_stats.get("namespaces", {}).get(domain_name, {}).get("vector_count", 0)
         )
 
-    def clear_existing_source(self, source_name: str):
+    def clear_existing_source(self, source_name: str, domain_name: str):
         existing_entry_count = self.get_index_domain_or_source_entry_count(source_name=source_name)
         self.log.info(f"Existing vector count for {source_name}: {existing_entry_count}")
-        # If the "resource" already has vectors delete the existing vectors before upserting new vectors
-        # We have to delete all because the difficulty in specifying specific documents in pinecone
+
         if existing_entry_count == 0:
             self.log.info(f"No pre-existing vectors for {source_name}")
             return
         self.pinecone_index.delete(
-            namespace=self.domain_name,
+            namespace=domain_name,
             delete_all=False,
             filter={"source_name": {"$eq": source_name}},
         )
@@ -111,7 +102,14 @@ class PineconeDatabase(DatabaseBase):
             raise ValueError(
                 f"Failed to clear vectors for {source_name}. New count: {cleared_entry_count}"
             )
-        self.log.info(f"Removing pre-existing vectors. New count: {cleared_entry_count}")
+        self.log.info(f"Removed pre-existing vectors. New count: {cleared_entry_count}")
+
+    def clear_existing_entries_by_id(self, ids: list[str], domain_name: str):
+        self.pinecone_index.delete(
+            namespace=domain_name,
+            delete_all=False,
+            ids=ids,
+        )
 
     def prepare_upsert_for_vectorstore(
         self,
@@ -130,25 +128,19 @@ class PineconeDatabase(DatabaseBase):
     def upsert(
         self,
         entries_to_upsert: list[dict[str, Any]],
+        domain_name: str,
     ):
-        existing_entry_count = self.get_index_domain_or_source_entry_count(
-            source_name=self.source_name
-        )
         self.pinecone_index.upsert(
             vectors=entries_to_upsert,
-            namespace=self.domain_name,
+            namespace=domain_name,
             batch_size=self.config.upsert_batch_size,
             show_progress=True,
-        )
-
-        self.log.info(f"Previous vector count: {existing_entry_count}")
-        self.log.info(
-            f"New vector count: {self.get_index_domain_or_source_entry_count(source_name=self.source_name)}"
         )
 
     def query_by_terms(
         self,
         search_terms,
+        domain_name,
     ) -> list[dict]:
         def _query_namespace(search_terms, top_k, namespace, filter=None):
             response = self.pinecone_index.query(
@@ -328,7 +320,8 @@ class PineconeDatabase(DatabaseBase):
 
         return ui_components
 
-    def create_provider_ui_components(self, visibility: bool = True) -> dict[str, Any]:
+    @classmethod
+    def create_provider_ui_components(cls, config_model: ClassConfigModel, visibility: bool = True):
         ui_components = {}
 
         return ui_components

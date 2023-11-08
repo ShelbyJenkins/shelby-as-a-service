@@ -103,7 +103,20 @@ class ChunkModel(Base):
 
     context_chunk: Mapped[str] = mapped_column(String, nullable=True)
     chunk_embedding: Mapped[list[float]] = mapped_column(PickleType, nullable=True)
-    chunk_doc_db_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    chunk_doc_db_id: Mapped[str] = mapped_column(String, nullable=True)
+
+    def prepare_upsert_metadata(self) -> dict:
+        metadata = {
+            "domain_name": self.document_model.domain_model.name,
+            "source_name": self.document_model.source_model.name,
+            "context_chunk": self.context_chunk,
+            "document_id": self.document_model.id,
+            "title": self.document_model.title,
+            "uri": self.document_model.uri,
+            "source_type": self.document_model.source_type,
+            "date_of_creation": self.document_model.date_of_creation,
+        }
+        return metadata
 
 
 class DocumentModel(Base):
@@ -130,7 +143,7 @@ class DocumentModel(Base):
     title: Mapped[str] = mapped_column(String, nullable=True)
     uri: Mapped[str] = mapped_column(String, nullable=True)
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    input_file_type: Mapped[str] = mapped_column(String, nullable=True)
+    source_type: Mapped[str] = mapped_column(String, nullable=True)
     date_published: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     date_of_creation: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
@@ -195,6 +208,7 @@ class SourceModel(Base):
         cascade="all, delete-orphan",
         foreign_keys=[DocumentModel.source_id],
     )
+    date_of_last_successful_update: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
 class DomainModel(Base):

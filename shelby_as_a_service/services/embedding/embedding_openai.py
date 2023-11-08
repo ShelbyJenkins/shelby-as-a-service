@@ -6,10 +6,10 @@ import services.text_processing.text_utils as text_utils
 from app.module_base import ModuleBase
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
-from services.embedding.embedding_service import EmbeddingService
+from services.embedding.embedding_service import EmbeddingBase
 
 
-class OpenAIEmbedding(EmbeddingService):
+class OpenAIEmbedding(EmbeddingBase):
     class_name = Literal["openai_embedding"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI Embedding"

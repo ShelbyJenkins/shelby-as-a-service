@@ -44,7 +44,8 @@ class LocalFileDatabase(ModuleBase):
 
         return components
 
-    def create_provider_ui_components(self, visibility: bool = True):
+    @classmethod
+    def create_provider_ui_components(cls, config_model: ClassConfigModel, visibility: bool = True):
         ui_components = {}
 
         return ui_components

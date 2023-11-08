@@ -7,6 +7,7 @@ import interfaces.webui.gradio_helpers as GradioHelpers
 from app.module_base import ModuleBase
 from langchain.schema import Document
 from pydantic import BaseModel, Field
+from services.context_index.context_documents import IngestDoc
 from services.context_index.context_index_model import (
     ChunkModel,
     DocumentModel,
@@ -23,7 +24,20 @@ from services.text_processing.text_utils import (
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class IngestProcessingService(ModuleBase, ABC):
+class IngestProcessingBase(ABC, ModuleBase):
+    @abstractmethod
+    def preprocess_document(self, doc: IngestDoc) -> IngestDoc:
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_chunks(
+        self,
+        text: str | dict,
+    ) -> Optional[list[str]]:
+        raise NotImplementedError
+
+
+class IngestProcessingService(ModuleBase):
     CLASS_NAME: str = "doc_loader_service"
     CLASS_UI_NAME: str = "Document Loading Service"
     REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
@@ -31,135 +45,149 @@ class IngestProcessingService(ModuleBase, ABC):
     LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
-    @classmethod
-    def process_document_with_provider(
-        cls,
-        content: str,
-        provider_name: AVAILABLE_PROVIDERS_NAMES,
-        provider_config: dict[str, Any] = {},
-        **kwargs,
+    successfully_chunked_counter: int = 0
+    docs_token_counts: list[int] = []
+
+    def __init__(
+        self,
+        source: Optional[SourceModel] = None,
+        doc_ingest_processor_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_ingest_processor_provider_config: dict[str, Any] = {},
+    ):
+        if source:
+            self.source = source
+            self.enabled_doc_ingest_processor = source.enabled_doc_ingest_processor
+            self.domain = source.domain_model
+            self.doc_ingest_processor_provider_name = self.enabled_doc_ingest_processor.name
+            self.doc_ingest_processor_provider_config = self.enabled_doc_ingest_processor.config
+        elif doc_ingest_processor_provider_name:
+            self.doc_db_provider_name = doc_ingest_processor_provider_name
+            self.doc_db_provider_config = doc_ingest_processor_provider_config
+        else:
+            raise ValueError(
+                "Must provide either SourceModel or doc_ingest_processor_provider_name"
+            )
+        self.doc_ingest_processor_instance: IngestProcessingBase = (
+            self.get_requested_class_instance(
+                requested_class_name=self.doc_ingest_processor_provider_name,
+                requested_class_config=self.doc_ingest_processor_provider_config,
+            )
+        )
+
+    def create_chunks(
+        self,
+        text: str | dict,
     ) -> Optional[list[str]]:
-        provider: Type[IngestProcessingService] = cls.get_requested_class(
-            requested_class=provider_name, available_classes=cls.REQUIRED_CLASSES
-        )
-
-        document_chunks = provider(config_file_dict=provider_config, **kwargs).process_document(
-            content=content
-        )
-        if not document_chunks:
-            cls.log.info(f"{content[:10]} produced no chunks")
+        doc_chunks = self.doc_ingest_processor_instance.create_chunks(text=text)
+        if not doc_chunks:
+            self.log.info(f"{text[:10]} produced no chunks")
             return None
 
-        cls.log.info(f"{content[:10]} produced {len(document_chunks)} chunks")
+        self.log.info(f"{text[:10]} produced {len(doc_chunks)} chunks")
 
-        return document_chunks
+        return doc_chunks
 
-    @classmethod
     def process_documents_from_context_index_source(
-        cls,
-        source: SourceModel,
-        documents: list[Document],
-    ) -> Optional[list[DocumentModel]]:
-        document_models = IngestProcessingService.preprocess_documents_from_context_index_source(
-            source=source,
-            documents=documents,
-        )
-        # Checks against local docs if there are changes or new docs
-        if (
-            IngestProcessingService.compare_new_and_existing_docs_from_context_index_source(
-                source=source,
-                document_models=document_models,
-            )
-            == False
-        ):
-            cls.log.info(f"Skipping data_source: no new data found for {source.name}")
-            for doc in document_models:
-                cls.context_index.session.expunge(doc)
-            return None
+        self,
+        ingest_docs: list[IngestDoc],
+    ) -> tuple[list[IngestDoc], list[str]]:
+        preprocessed_docs = []
+        for doc in ingest_docs:
+            preprocessed_docs.append(self.doc_ingest_processor_instance.preprocess_document(doc))
 
-        successfully_chunked_counter: int = 0
-        docs_token_counts: list[int] = []
+        self.get_existing_docs_from_context_index_source(preprocessed_docs)
+        if not (docs_requiring_update := self.check_for_docs_requiring_update(preprocessed_docs)):
+            self.log.info(f"No new data found for {self.source.name}")
+            return [], []
 
-        for doc in document_models:
-            cls.log.info(f"Processing and chunking {doc.title}")
-            document_chunks = cls.process_document_with_provider(
-                content=doc.cleaned_content,
-                provider_name=source.enabled_doc_ingest_processor.name,
-                provider_config=source.enabled_doc_ingest_processor.config,
-            )
-            if document_chunks is None:
+        doc_db_ids_requiring_deletion: list[str] = []
+        upsert_docs: list[IngestDoc] = []
+        for doc in docs_requiring_update:
+            self.log.info(f"Processing and chunking {doc.title}")
+            if doc.cleaned_content is None:
+                raise ValueError("doc.cleaned_content must not be None")
+            text_chunks = self.create_chunks(text=doc.cleaned_content)
+            if not text_chunks:
+                self.log.info(f"🔴 Skipping doc because text_chunks is None")
                 continue
-            for chunk in document_chunks:
-                cls.log.info(f"{doc.title} has {len(document_chunks)} chunks")
-                doc.context_chunks.append(
-                    ChunkModel(
-                        chunked_content=chunk,
-                    )
-                )
-                successfully_chunked_counter += 1
-                doc_token_count = [tiktoken_len(chunk) for chunk in document_chunks]
-                cls.log.info(
-                    f"🟢 Doc split into {len(document_chunks)} of averge length {int(sum(doc_token_count) / len(document_chunks))}"
-                )
-                docs_token_counts.extend(doc_token_count)
+            doc_db_ids_requiring_deletion.extend(self.clear_and_get_existing_doc_db_chunks(doc))
+            upsert_docs.append(self.create_document_and_chunk_models(text_chunks, doc))
 
-        cls.context_index.session.commit()
-        cls.log.info(f"Min: {min(docs_token_counts)}")
-        cls.log.info(f"Avg: {int(sum(docs_token_counts) / len(docs_token_counts))}")
-        cls.log.info(f"Max: {max(docs_token_counts)}")
-        cls.log.info(f"Total tokens: {int(sum(docs_token_counts))}")
-        cls.log.info(f"Total documents processed: {len(document_models)}")
-        cls.log.info(f"Total document chunks: {successfully_chunked_counter}")
-        return document_models
+        self.context_index.session.commit()
+        self.log.info(f"Min: {min(self.docs_token_counts)}")
+        self.log.info(f"Avg: {int(sum(self.docs_token_counts) / len(self.docs_token_counts))}")
+        self.log.info(f"Max: {max(self.docs_token_counts)}")
+        self.log.info(f"Total tokens: {int(sum(self.docs_token_counts))}")
+        self.log.info(f"Total documents processed: {len(upsert_docs)}")
+        self.log.info(f"Total document chunks: {self.successfully_chunked_counter}")
+        return upsert_docs, doc_db_ids_requiring_deletion
 
-    @classmethod
-    def preprocess_documents_from_context_index_source(
-        cls,
-        source: SourceModel,
-        documents: list[Document],
-    ) -> list[DocumentModel]:
-        processed_docs = []
-        for doc in documents:
-            cleaned_content = clean_text_content(doc.page_content)
-            processed_docs.append(
-                DocumentModel(
-                    cleaned_content=cleaned_content,
-                    hashed_cleaned_content=hash_content(cleaned_content),
-                    title=extract_and_clean_title(doc, uri=doc.metadata.get("source", None)),
-                    uri=doc.metadata.get("source", None),
-                    source_id=source.id,
+    def clear_and_get_existing_doc_db_chunks(self, ingest_doc: IngestDoc) -> list[str]:
+        doc_db_ids = []
+        if not ingest_doc.existing_document_model:
+            return []
+        for chunk in ingest_doc.existing_document_model.context_chunks:
+            doc_db_ids.append(chunk.id)
+            self.context_index.session.delete(chunk)
+        return doc_db_ids
+
+    def create_document_and_chunk_models(
+        self, text_chunks: list[str], ingest_doc: IngestDoc
+    ) -> IngestDoc:
+        if not ingest_doc.existing_document_model:
+            ingest_doc.existing_document_model = DocumentModel(
+                source_id=self.source.id,
+                cleaned_content=ingest_doc.cleaned_content,
+                hashed_cleaned_content=ingest_doc.hashed_cleaned_content,
+                title=ingest_doc.title,
+                uri=ingest_doc.uri,
+                batch_update_enabled=self.source.batch_update_enabled,
+                source_type=ingest_doc.source_type,
+                date_published=ingest_doc.date_published,
+            )
+        for chunk in text_chunks:
+            self.log.info(f"{ingest_doc.title} has {len(text_chunks)} chunks")
+            ingest_doc.existing_document_model.context_chunks.append(
+                ChunkModel(
+                    chunked_content=chunk,
                 )
             )
-        return processed_docs
+            self.successfully_chunked_counter += 1
+            doc_token_count = [tiktoken_len(chunk) for chunk in text_chunks]
+            self.log.info(
+                f"🟢 Doc split into {len(text_chunks)} of averge length {int(sum(doc_token_count) / len(text_chunks))}"
+            )
+            self.docs_token_counts.extend(doc_token_count)
 
-    @classmethod
-    def compare_new_and_existing_docs_from_context_index_source(
-        cls, source: SourceModel, document_models: list[DocumentModel]
-    ) -> bool:
-        has_changes = False
-        # This will hold the titles of new or different chunks
-        new_or_changed_docs = []
-        for doc in document_models:
-            if any(doc.uri == document.uri for document in source.documents):
-                has_changes = True
-                new_or_changed_docs.append(doc.title)
+        return ingest_doc
+
+    def check_for_docs_requiring_update(
+        self, preprocessed_docs: list[IngestDoc]
+    ) -> list[IngestDoc]:
+        docs_requiring_update = []
+        for doc in preprocessed_docs:
+            if not doc.existing_document_model:
+                docs_requiring_update.append(doc)
                 continue
-            doc_hash = hash_content(doc.cleaned_content)
-            if any(
-                hash_content(document.hashed_cleaned_content) == doc_hash
-                for document in source.documents
-            ):
-                has_changes = True
-                new_or_changed_docs.append(doc.title)
-                continue
+            if doc.hashed_cleaned_content != doc.existing_document_model.hashed_cleaned_content:
+                docs_requiring_update.append(doc)
 
-        if new_or_changed_docs:
-            cls.log.info(f"Found {len(new_or_changed_docs)} new or changed documents")
-        return has_changes
+        self.log.info(f"Found {len(docs_requiring_update)} docs_requiring_update")
+        return docs_requiring_update
 
-    @abstractmethod
-    def process_document(self, content: str) -> Optional[list[str]]:
-        raise NotImplementedError
+    def get_existing_docs_from_context_index_source(
+        self,
+        ingest_docs: list[IngestDoc],
+    ):
+        existing_document_models = []
+        for doc in ingest_docs:
+            for document_model in self.source.documents:
+                if doc.uri == document_model.uri:
+                    doc.existing_document_id = document_model.id
+                    doc.existing_document_model = document_model
+                    existing_document_models.append(document_model)
+                    break
+            self.log.info(f"Found {len(existing_document_models)} existing_document_models")
 
     @classmethod
     def create_service_ui_components(

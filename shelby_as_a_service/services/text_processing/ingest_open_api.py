@@ -8,13 +8,12 @@ from urllib.parse import urlparse
 
 import gradio as gr
 import yaml
-from app.module_base import ModuleBase
 from pydantic import BaseModel
 
-from .ingest_processing_service import IngestProcessingService
+from .ingest_processing_service import IngestProcessingBase
 
 
-class OpenAPIMinifier(IngestProcessingService):
+class OpenAPIMinifier(IngestProcessingBase):
     class_name = Literal["open_api_minifier"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Open API Minifier"
@@ -627,23 +626,24 @@ class OpenAPIMinifier(IngestProcessingService):
             with open(file_path, "w") as f:
                 json.dump(document_chunk, f, indent=4)
 
-    def create_provider_ui_components(self, visibility: bool = True):
+    @classmethod
+    def create_provider_ui_components(cls, config_model: ClassConfigModel, visibility: bool = True):
         ui_components = {}
         ui_components["key_abbreviations_enabled"] = gr.Checkbox(
-            value=self.config.key_abbreviations_enabled,
+            value=config_model.key_abbreviations_enabled,
             label="Enable key abbreviations",
             visible=visibility,
         )
         ui_components["methods_to_handle"] = gr.CheckboxGroup(
-            value=list(self.config.methods_to_handle),
+            value=list(config_model.methods_to_handle),
             label="Methods to handle",
-            choices=list(self.available_methods_to_handle),
+            choices=list(cls.available_methods_to_handle),
             visible=visibility,
         )
         ui_components["keys_to_keep"] = gr.Dropdown(
-            value=list(self.config.keys_to_keep),
+            value=list(config_model.keys_to_keep),
             label="Keys to keep",
-            choices=list(self.available_keys_to_keep),
+            choices=list(cls.available_keys_to_keep),
             multiselect=True,
             visible=visibility,
         )

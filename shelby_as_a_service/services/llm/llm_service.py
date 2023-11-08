@@ -1,5 +1,6 @@
 import types
 import typing
+from abc import ABC, abstractmethod
 from typing import Annotated, Any, Dict, Generator, Optional, Type, Union
 
 import gradio as gr
@@ -8,29 +9,48 @@ from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.llm.llm_openai import OpenAILLM
 
+from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
+
+
+class LLMBase(ABC, ModuleBase):
+    pass
+
 
 class LLMService(ModuleBase):
     CLASS_NAME: str = "llm_service"
     CLASS_UI_NAME: str = "LLM Settings"
-    REQUIRED_CLASSES: list[Type] = [OpenAILLM]
+    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
+    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
+    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
     class ClassConfigModel(BaseModel):
-        llm_provider: str = "openai_llm"
+        llm_provider_name: str = "openai_llm"
         model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
 
         class Config:
             extra = "ignore"
 
     config: ClassConfigModel
-    list_of_class_names: list
-    list_of_class_ui_names: list
-    list_of_required_class_instances: list[Any]
-    current_llm_provider: Any
-    provider_instance: OpenAILLM
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+    def __init__(
+        self,
+        llm_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
+        config_file_dict: dict[str, typing.Any] = {},
+        **kwargs,
+    ):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.current_llm_provider = self.get_requested_class_instance(self.config.llm_provider)
+
+        if llm_provider_name is None:
+            self.llm_provider_name = self.config.llm_provider_name
+        else:
+            self.llm_provider_name = llm_provider_name
+
+        self.current_llm_provider = self.get_requested_class_instance(self.llm_provider_name)
+        self.doc_db_instance: LLMBase = self.get_requested_class_instance(
+            requested_class_name=self.llm_provider_name,
+            requested_class_config=config_file_dict,
+        )
 
     def create_chat(
         self,
@@ -104,11 +124,12 @@ class LLMService(ModuleBase):
         else:
             return 0, 0
 
+    @classmethod
     def create_settings_ui(self):
         components = {}
 
         components["model_token_utilization"] = gr.Slider(
-            value=self.config.model_token_utilization,
+            value=cls.config.model_token_utilization,
             label="Percent of Model Context Size to Use",
             minimum=0.0,
             maximum=1.0,
@@ -117,15 +138,15 @@ class LLMService(ModuleBase):
         )
 
         components["llm_provider"] = gr.Dropdown(
-            value=self.current_llm_provider.CLASS_UI_NAME,
-            choices=self.list_of_class_ui_names,
+            value=cls.current_llm_provider.CLASS_UI_NAME,
+            choices=cls.list_of_class_ui_names,
             label="LLM Provider",
             container=True,
         )
 
-        for provider_instance in self.list_of_required_class_instances:
+        for provider_instance in cls.list_of_required_class_instances:
             provider_instance.create_settings_ui()
 
-        GradioHelpers.create_settings_event_listener(self.config, components)
+        GradioHelpers.create_settings_event_listener(cls.config, components)
 
         return components

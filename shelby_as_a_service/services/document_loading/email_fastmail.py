@@ -118,17 +118,18 @@ class EmailFastmail(DocLoadingService):
         res.raise_for_status()
         return res.json()
 
-    def create_provider_ui_components(self, visibility: bool = True):
+    @classmethod
+    def create_provider_ui_components(cls, config_model: ClassConfigModel, visibility: bool = True):
         ui_components = {}
 
         ui_components["hostname"] = gr.Textbox(
             label="Hostname",
-            value=self.config.hostname,
+            value=config_model.hostname,
             visible=visibility,
         )
         ui_components["username"] = gr.Textbox(
             label="Username",
-            value=self.config.username,
+            value=config_model.username,
             visible=visibility,
         )
 

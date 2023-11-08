@@ -1,6 +1,6 @@
 import typing
 from decimal import Decimal
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
@@ -13,7 +13,8 @@ from typing_extensions import Annotated
 
 
 class OpenAILLM(ModuleBase):
-    CLASS_NAME: str = "openai_llm"
+    class_name = Literal["openai_llm"]
+    CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI LLM"
     REQUIRED_SECRETS: list[str] = ["openai_api_key"]
     MODELS_TYPE: str = "llm_models"

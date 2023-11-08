@@ -18,10 +18,10 @@ from langchain.document_loaders import (
 from langchain.schema import Document
 from pydantic import BaseModel
 
-from .document_loading_service import DocLoadingService
+from .document_loading_service import DocLoadingBase
 
 
-class GenericWebScraper(DocLoadingService):
+class GenericWebScraper(DocLoadingBase):
     class_name = Literal["generic_web_scraper"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generic Web Scraper"
@@ -39,18 +39,15 @@ class GenericWebScraper(DocLoadingService):
         self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
         # super().__init__(config_file_dict=config_file_dict, **kwargs)
 
-    def load_docs(self, url) -> Optional[list[Document]]:
-        documents = WebBaseLoader(web_path=url).load()
-        for document in documents:
-            document.page_content = text_utils.clean_text_content(document.page_content)
+    def load_docs(self, uri) -> list[Document]:
+        return WebBaseLoader(web_path=uri).load()
 
-        return [Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents]
-
-    def create_provider_ui_components(self, visibility: bool = True):
+    @classmethod
+    def create_provider_ui_components(cls, config_model: ClassConfigModel, visibility: bool = True):
         ui_components = {}
 
         ui_components["continue_on_failure"] = gr.Checkbox(
-            value=self.config.continue_on_failure,
+            value=config_model.continue_on_failure,
             label="Continue On Failure",
             interactive=True,
             visible=visibility,
@@ -59,7 +56,7 @@ class GenericWebScraper(DocLoadingService):
         return ui_components
 
 
-class GenericRecursiveWebScraper(DocLoadingService):
+class GenericRecursiveWebScraper(DocLoadingBase):
     class_name = Literal["generic_recursive_web_scraper"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generic Resursive Web Scraper"
@@ -85,43 +82,43 @@ class GenericRecursiveWebScraper(DocLoadingService):
             return text_element.get_text()
         return ""
 
-    def load_docs(self, url) -> Optional[list[Document]]:
-        documents = RecursiveUrlLoader(url=url, extractor=self.custom_extractor).load()
-        return [Document(page_content=doc.page_content, metadata=doc.metadata) for doc in documents]
+    def load_docs(self, uri) -> list[Document]:
+        return RecursiveUrlLoader(url=uri, extractor=self.custom_extractor).load()
 
-    def create_provider_ui_components(self, visibility: bool = True):
+    @classmethod
+    def create_provider_ui_components(cls, config_model: ClassConfigModel, visibility: bool = True):
         ui_components = {}
 
         ui_components["exclude_dirs"] = gr.Textbox(
-            value=self.config.exclude_dirs,
+            value=config_model.exclude_dirs,
             label="Exclude dirs.",
             info="A list of subdirectories to exclude.",
             interactive=True,
             visible=visibility,
         )
         ui_components["max_depth"] = gr.Number(
-            value=self.config.max_depth,
+            value=config_model.max_depth,
             label="Max Depth",
             info="The max depth of the recursive loading.",
             interactive=True,
             visible=visibility,
         )
         ui_components["timeout"] = gr.Number(
-            value=self.config.timeout,
+            value=config_model.timeout,
             label="Timeout Time",
             info="The timeout for the requests, in the unit of seconds.",
             interactive=True,
             visible=visibility,
         )
         ui_components["use_async"] = gr.Checkbox(
-            value=self.config.use_async,
+            value=config_model.use_async,
             label="Use Async",
             info="Whether to use asynchronous loading, if use_async is true, this function will not be lazy, but it will still work in the expected way, just not lazy.",
             interactive=True,
             visible=visibility,
         )
         ui_components["prevent_outside"] = gr.Checkbox(
-            value=self.config.prevent_outside,
+            value=config_model.prevent_outside,
             label="Prevent Outside",
             info="IDK",
             interactive=True,
