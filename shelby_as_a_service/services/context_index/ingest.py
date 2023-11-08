@@ -63,7 +63,7 @@ class DocIngest(ModuleBase):
                             documents=documents,
                         )
                     ) is None:
-                        return None
+                        break
 
                     doc_db_instance = DatabaseService(source=source)
                     doc_db_instance.upsert_documents_from_context_index_source(

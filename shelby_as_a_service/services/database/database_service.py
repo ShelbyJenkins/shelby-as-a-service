@@ -39,8 +39,7 @@ class DatabaseBase(ABC, ModuleBase):
     ):
         raise NotImplementedError
 
-    @abstractmethod
-    def prepare_upsert(
+    def prepare_upsert_for_vectorstore(
         self,
         id: str,
         values: Optional[list[float]],
@@ -64,11 +63,6 @@ class DatabaseBase(ABC, ModuleBase):
     def doc_db_requires_embeddings(self) -> bool:
         raise NotImplementedError
 
-    @property
-    @abstractmethod
-    def doc_db_embeddings_config(self) -> tuple[str, dict[str, Any]]:
-        raise NotImplementedError
-
 
 class DatabaseService(DatabaseBase):
     CLASS_NAME: str = "database_service"
@@ -81,82 +75,86 @@ class DatabaseService(DatabaseBase):
     doc_db_instance: "DatabaseService"
     doc_embedder_instance: EmbeddingService
     source: SourceModel
+    domain: DomainModel
 
     def __init__(
         self,
-        source: Optional[SourceModel],
-        doc_db_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES],
-        doc_embedder_provider_name: Optional[EmbeddingService.AVAILABLE_PROVIDERS_NAMES],
-        doc_db_provider_config: Optional[dict[str, Any]] = {},
-        doc_embedder_provider_config: Optional[dict[str, Any]] = {},
+        source: Optional[SourceModel] = None,
+        domain: Optional[DomainModel] = None,
+        doc_db_provider_name: Optional[str] = None,
+        doc_db_provider_config: dict[str, Any] = {},
         domain_name: Optional[str] = None,
-        **kwargs,
     ):
-        if source:
-            self.source = source
-            doc_db_provider_name = source.enabled_doc_db.name
-            doc_db_provider_config = source.enabled_doc_db.config
-            domain_name = source.domain_model.name
-
-        if not doc_db_provider_name or not doc_db_provider_config:
-            raise ValueError(
-                "Must provide either source or doc_db_provider_name and doc_db_provider_config"
-            )
-        if not domain_name:
-            raise ValueError("Must provide either source or domain_name")
-        doc_db_provider: Type[DatabaseService] = self.get_requested_class(
-            requested_class=doc_db_provider_name, available_classes=self.REQUIRED_CLASSES
-        )
-        self.doc_db_instance = doc_db_provider(
-            domain_name=domain_name, config_file_dict=doc_db_provider_config, **kwargs
-        )
-
-        if self.doc_db_instance.doc_db_requires_embeddings:
+        if source or domain:
             if source:
-                doc_embedder_provider_name = source.enabled_doc_db.enabled_doc_embedder.name
-                doc_embedder_provider_config = source.enabled_doc_db.enabled_doc_embedder.config
-            if not doc_embedder_provider_name or not doc_embedder_provider_config:
-                raise ValueError(
-                    "Must provide either source or doc_embedder_provider_name and doc_embedder_provider_config"
-                )
+                self.source = source
+                self.enabled_doc_db = source.enabled_doc_db
+                self.domain = source.domain_model
 
-            doc_embedder_provider: Type[EmbeddingService] = self.get_requested_class(
-                requested_class=doc_embedder_provider_name,
-                available_classes=EmbeddingService.REQUIRED_CLASSES,
+            elif domain:
+                self.enabled_doc_db = domain.enabled_doc_db
+                self.domain = domain
+            self.doc_db_provider_name = self.enabled_doc_db.name
+            self.doc_db_provider_config = self.enabled_doc_db.config
+            self.domain_name = self.domain.name
+        elif doc_db_provider_name:
+            self.doc_db_provider_name = doc_db_provider_name
+            self.doc_db_provider_config = doc_db_provider_config
+            self.domain_name = domain_name
+        else:
+            raise ValueError(
+                "Must provide either SourceModel or DomainModel or doc_db_provider_name"
             )
-            self.doc_embedder_instance = doc_embedder_provider(
-                config_file_dict=doc_embedder_provider_config, **kwargs
+        if not self.domain_name:
+            Warning("No domain name provided")
+
+        self.doc_db_instance: DatabaseService = self.get_requested_class_instance(
+            requested_class_name=self.doc_db_provider_name,
+            requested_class_config=self.doc_db_provider_config,
+        )
+        if self.doc_db_instance.doc_db_requires_embeddings:
+            self.doc_embedder_provider_name = self.enabled_doc_db.enabled_doc_embedder.name
+            self.doc_embedder_provider_config = self.enabled_doc_db.enabled_doc_embedder.config
+            self.doc_embedder_instance: EmbeddingService = self.get_requested_class_instance(
+                requested_class_name=self.doc_embedder_provider_name,
+                requested_class_config=self.doc_embedder_provider_config,
             )
 
     @property
     def doc_db_requires_embeddings(self) -> bool:
         return self.doc_db_instance.doc_db_requires_embeddings
 
-    @property
-    def doc_db_embeddings_config(self):
-        return self.doc_db_instance.doc_db_embeddings_config
+    def upsert_documents_from_context_index_source(self, document_models: list[DocumentModel]):
+        self.clear_existing_source(source_name=self.source.name)
 
-    def get_index_domain_or_source_entry_count(self, source_name: Optional[str] = None) -> int:
-        return self.doc_db_instance.get_index_domain_or_source_entry_count(source_name=source_name)
+        if self.doc_db_requires_embeddings:
+            document_models = (
+                self.doc_embedder_instance.get_document_embeddings_from_document_models(
+                    document_models=document_models
+                )
+            )
 
-    def prepare_upsert(
-        self,
-        id: str,
-        values: Optional[list[float]],
-        metadata: dict[str, Any],
-    ) -> dict[str, Any]:
-        return self.doc_db_instance.prepare_upsert(id=id, values=values, metadata=metadata)
+        entries_to_upsert: list[dict[str, Any]] = []
+        for doc in document_models:
+            for i, chunk in enumerate(doc.context_chunks):
+                entries_to_upsert.append(
+                    self.prepare_upsert_metadata(
+                        id=f"id-{self.source.name}-{i}",
+                        domain_name=self.source.domain_model.name,
+                        source_name=self.source.name,
+                        context_chunk=chunk.context_chunk,
+                        document_id=doc.id,
+                        title=doc.title,
+                        uri=doc.uri,
+                        source_type=self.source.source_type,
+                        date_of_creation=doc.date_of_creation,
+                        embedding=chunk.chunk_embedding,
+                    )
+                )
 
-    def upsert(
-        self,
-        entries_to_upsert: list[dict[str, Any]],
-    ):
-        self.log.info(
-            f"Upserting {len(entries_to_upsert)} entries to {self.doc_db_instance.CLASS_NAME}"
-        )
-        self.doc_db_instance.upsert(entries_to_upsert=entries_to_upsert)
+        self.upsert(entries_to_upsert=entries_to_upsert)
 
-    def prepare_upsert_with_provider(
+    def prepare_upsert_metadata(
         self,
         id: str,
         domain_name: str,
@@ -179,37 +177,24 @@ class DatabaseService(DatabaseBase):
             "source_type": source_type,
             "date_of_creation": date_of_creation,
         }
-        return self.prepare_upsert(id=id, values=embedding, metadata=metadata)
-
-    def upsert_documents_from_context_index_source(self, document_models: list[DocumentModel]):
-        self.clear_existing_source(source_name=self.source.name)
-
-        if self.doc_db_requires_embeddings:
-            document_models = (
-                self.doc_embedder_instance.get_document_embeddings_from_document_models(
-                    document_models=document_models
-                )
+        if embedding:
+            return self.doc_db_instance.prepare_upsert_for_vectorstore(
+                id=id, values=embedding, metadata=metadata
             )
+        else:
+            raise NotImplementedError
 
-        entries_to_upsert: list[dict[str, Any]] = []
-        for doc in document_models:
-            for i, chunk in enumerate(doc.context_chunks):
-                entries_to_upsert.append(
-                    self.prepare_upsert_with_provider(
-                        id=f"id-{self.source.name}-{i}",
-                        domain_name=self.source.domain_model.name,
-                        source_name=self.source.name,
-                        context_chunk=chunk.context_chunk,
-                        document_id=doc.id,
-                        title=doc.title,
-                        uri=doc.uri,
-                        source_type=self.source.source_type,
-                        date_of_creation=doc.date_of_creation,
-                        embedding=chunk.chunk_embedding,
-                    )
-                )
+    def upsert(
+        self,
+        entries_to_upsert: list[dict[str, Any]],
+    ):
+        self.log.info(
+            f"Upserting {len(entries_to_upsert)} entries to {self.doc_db_instance.CLASS_NAME}"
+        )
+        self.doc_db_instance.upsert(entries_to_upsert=entries_to_upsert)
 
-        self.upsert(entries_to_upsert=entries_to_upsert)
+    def get_index_domain_or_source_entry_count(self, source_name: Optional[str] = None) -> int:
+        return self.doc_db_instance.get_index_domain_or_source_entry_count(source_name=source_name)
 
     def query_by_terms(self, search_terms: list[str] | str):
         if isinstance(search_terms, str):
@@ -253,14 +238,15 @@ class DatabaseService(DatabaseBase):
 
         return ui_components
 
+    @classmethod
     def create_service_ui_components(
-        self,
+        cls,
         parent_instance: Union[DomainModel, SourceModel],
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}
 
-        for provider in self.context_index.index.doc_dbs:
+        for provider in cls.context_index.index.doc_dbs:
             name = provider.name
             config = provider.config
             provider_configs_dict[name] = config
@@ -268,9 +254,9 @@ class DatabaseService(DatabaseBase):
         enabled_doc_db_name = parent_instance.enabled_doc_db.name
 
         provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
-            service_name=self.CLASS_NAME,
+            service_name=cls.CLASS_NAME,
             enabled_provider_name=enabled_doc_db_name,
-            required_classes=self.REQUIRED_CLASSES,
+            required_classes=cls.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )

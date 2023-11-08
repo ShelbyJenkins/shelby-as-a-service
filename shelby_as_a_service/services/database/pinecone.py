@@ -113,7 +113,7 @@ class PineconeDatabase(DatabaseBase):
             )
         self.log.info(f"Removing pre-existing vectors. New count: {cleared_entry_count}")
 
-    def prepare_upsert(
+    def prepare_upsert_for_vectorstore(
         self,
         id: str,
         values: Optional[list[float]],

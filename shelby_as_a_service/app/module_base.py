@@ -1,7 +1,7 @@
 import logging
 import os
 import typing
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
 from app.app_base import AppBase
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ class ModuleBase(AppBase):
     list_of_available_model_names: list[str]
     update_settings_file: bool = False
     log = logging.getLogger("ModuleBase")
+    REQUIRED_CLASSES: list[Type["ModuleBase"]] = []
 
     def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs) -> None:
         self.log = logging.getLogger(self.__class__.__name__)
@@ -89,12 +90,6 @@ class ModuleBase(AppBase):
                 else:
                     print(f"Secret: {required_secret} is None!")
 
-    def get_requested_class_instance(self, requested_class: str):
-        for instance in self.list_of_required_class_instances:
-            if instance.CLASS_NAME == requested_class or instance.CLASS_UI_NAME == requested_class:
-                return instance
-        raise ValueError(f"Requested class {requested_class} not found.")
-
     def get_model_instance(self, requested_model_name: str) -> Any:
         model_instance = None
 
@@ -116,3 +111,18 @@ class ModuleBase(AppBase):
             ):
                 return available_class
         raise ValueError(f"Requested class {requested_class} not found in {available_classes}")
+
+    def get_requested_class_instance(
+        self,
+        requested_class_name: str,
+        requested_class_config: dict[str, Any] = {},
+    ) -> Any:
+        for available_class in self.REQUIRED_CLASSES:
+            if (
+                available_class.CLASS_NAME == requested_class_name
+                or available_class.CLASS_UI_NAME == requested_class_name
+            ):
+                return available_class(config_file_dict=requested_class_config)
+        raise ValueError(
+            f"Requested class {requested_class_name} not found in {self.REQUIRED_CLASSES}"
+        )
