@@ -4,72 +4,39 @@ from typing import Any, Final, Iterator, Literal, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
-from langchain.schema import Document
-from services.context_index.context_documents import IngestDoc
 from services.context_index.context_index_model import (
     ChunkModel,
+    DocDBModel,
+    DocEmbeddingModel,
     DocumentModel,
     DomainModel,
     SourceModel,
 )
+from services.service_base import ServiceBase
 
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class EmbeddingBase(ABC, ModuleBase):
-    @abstractmethod
-    def get_embedding_of_text(self, text: str, model_name: Optional[str] = None) -> list[float]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_embeddings_from_list_of_texts(
-        self, texts: list[str], model_name: Optional[str] = None
-    ) -> list[list[float]]:
-        raise NotImplementedError
-
-
-class EmbeddingService(ModuleBase):
+class EmbeddingService(ABC, ServiceBase):
     CLASS_NAME: str = "embedding_service"
+    CONTEXT_INDEX_PROVIDER_KEY: str = "enabled_doc_embedder"
     CLASS_UI_NAME: str = "Embedding Service"
-    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
-    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
-    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
-    def __init__(
-        self,
-        source: Optional[SourceModel] = None,
-        doc_embedder_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
-        doc_embedder_provider_config: dict = {},
-    ):
-        if source:
-            self.source = source
-            self.enabled_doc_embedder = self.source.enabled_doc_db.enabled_doc_embedder
-            self.doc_embedder_provider_name = self.enabled_doc_embedder.name
-            self.doc_embedder_provider_config = self.enabled_doc_embedder.config
-        elif doc_embedder_provider_name:
-            self.doc_embedder_provider_name = doc_embedder_provider_name
-            self.doc_embedder_provider_config = doc_embedder_provider_config
-
-        else:
-            raise ValueError(
-                "Must provide either source or doc_embedder_provider_name and doc_embedder_provider_config"
-            )
-
-        self.doc_embedder_instance: EmbeddingBase = self.get_requested_class_instance(
-            requested_class_name=self.doc_embedder_provider_name,
-            requested_class_config=self.doc_embedder_provider_config,
-        )
+    @classmethod
+    def load_service_from_context_index(
+        cls, domain_or_source: DomainModel | SourceModel
+    ) -> "EmbeddingService":
+        return cls.get_instance_from_context_index(domain_or_source=domain_or_source)
 
     def get_embedding_of_text(
         self,
         text: str,
         model_name: Optional[str] = None,
     ) -> list[float]:
-        text_embedding = self.doc_embedder_instance.get_embedding_of_text(
-            text=text, model_name=model_name
-        )
+        text_embedding = self.get_embedding_of_text_with_provider(text=text, model_name=model_name)
         if text_embedding is None:
             raise ValueError("No embedding returned")
         return text_embedding
@@ -79,7 +46,7 @@ class EmbeddingService(ModuleBase):
         texts: list[str],
         model_name: Optional[str] = None,
     ) -> list[list[float]]:
-        text_embeddings = self.doc_embedder_instance.get_embeddings_from_list_of_texts(
+        text_embeddings = self.get_embeddings_from_list_of_texts_with_provider(
             texts=texts, model_name=model_name
         )
         if text_embeddings is None:
@@ -102,6 +69,18 @@ class EmbeddingService(ModuleBase):
         for i, chunk in enumerate(chunks_to_upsert):
             chunk.chunk_embedding = upsert_docs_text_embeddings[i]
 
+    @abstractmethod
+    def get_embedding_of_text_with_provider(
+        self, text: str, model_name: Optional[str] = None
+    ) -> list[float]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_embeddings_from_list_of_texts_with_provider(
+        self, texts: list[str], model_name: Optional[str] = None
+    ) -> list[list[float]]:
+        raise NotImplementedError
+
     def create_settings_ui(self):
         components = {}
 
@@ -121,3 +100,6 @@ class EmbeddingService(ModuleBase):
         GradioHelpers.create_settings_event_listener(self.config, components)
 
         return components
+
+
+EmbeddingService(doc_embedder_provider_name="openai_embedding")

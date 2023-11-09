@@ -1,12 +1,8 @@
 import typing
 from abc import ABC, abstractmethod
-from typing import Any, Iterator, Optional, Type, Union
+from typing import Any, Optional, Type
 
-import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
-from langchain.schema import Document
-from pydantic import BaseModel, Field
 from services.context_index.context_documents import IngestDoc
 from services.context_index.context_index_model import (
     ChunkModel,
@@ -14,71 +10,34 @@ from services.context_index.context_index_model import (
     DomainModel,
     SourceModel,
 )
-from services.text_processing.text_utils import (
-    clean_text_content,
-    extract_and_clean_title,
-    hash_content,
-    tiktoken_len,
-)
+from services.service_base import ServiceBase
+from services.text_processing.text_utils import tiktoken_len
 
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class IngestProcessingBase(ABC, ModuleBase):
-    @abstractmethod
-    def preprocess_document(self, doc: IngestDoc) -> IngestDoc:
-        raise NotImplementedError
-
-    @abstractmethod
-    def create_chunks(
-        self,
-        text: str | dict,
-    ) -> Optional[list[str]]:
-        raise NotImplementedError
-
-
-class IngestProcessingService(ModuleBase):
-    CLASS_NAME: str = "doc_loader_service"
-    CLASS_UI_NAME: str = "Document Loading Service"
-    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
-    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
-    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+class IngestProcessingService(ABC, ServiceBase):
+    CLASS_NAME: str = "doc_ingest_processor_service"
+    CONTEXT_INDEX_PROVIDER_KEY: str = "enabled_doc_ingest_processor"
+    CLASS_UI_NAME: str = "Document Ingest Processor Service"
+    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
     successfully_chunked_counter: int = 0
     docs_token_counts: list[int] = []
 
-    def __init__(
-        self,
-        source: Optional[SourceModel] = None,
-        doc_ingest_processor_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
-        doc_ingest_processor_provider_config: dict[str, Any] = {},
-    ):
-        if source:
-            self.source = source
-            self.enabled_doc_ingest_processor = source.enabled_doc_ingest_processor
-            self.domain = source.domain_model
-            self.doc_ingest_processor_provider_name = self.enabled_doc_ingest_processor.name
-            self.doc_ingest_processor_provider_config = self.enabled_doc_ingest_processor.config
-        elif doc_ingest_processor_provider_name:
-            self.doc_db_provider_name = doc_ingest_processor_provider_name
-            self.doc_db_provider_config = doc_ingest_processor_provider_config
-        else:
-            raise ValueError(
-                "Must provide either SourceModel or doc_ingest_processor_provider_name"
-            )
-        self.doc_ingest_processor_instance: IngestProcessingBase = (
-            self.get_requested_class_instance(
-                requested_class_name=self.doc_ingest_processor_provider_name,
-                requested_class_config=self.doc_ingest_processor_provider_config,
-            )
-        )
+    @classmethod
+    def load_service_from_context_index(
+        cls, domain_or_source: DomainModel | SourceModel
+    ) -> "IngestProcessingService":
+        return cls.get_instance_from_context_index(domain_or_source=domain_or_source)
 
     def create_chunks(
         self,
         text: str | dict,
     ) -> Optional[list[str]]:
-        doc_chunks = self.doc_ingest_processor_instance.create_chunks(text=text)
+        doc_chunks = self.create_chunks_with_provider(text=text)
         if not doc_chunks:
             self.log.info(f"{text[:10]} produced no chunks")
             return None
@@ -91,9 +50,10 @@ class IngestProcessingService(ModuleBase):
         self,
         ingest_docs: list[IngestDoc],
     ) -> tuple[list[IngestDoc], list[str]]:
+        self.check_for_source
         preprocessed_docs = []
         for doc in ingest_docs:
-            preprocessed_docs.append(self.doc_ingest_processor_instance.preprocess_document(doc))
+            preprocessed_docs.append(self.preprocess_document(doc))
 
         self.get_existing_docs_from_context_index_source(preprocessed_docs)
         if not (docs_requiring_update := self.check_for_docs_requiring_update(preprocessed_docs)):
@@ -189,10 +149,21 @@ class IngestProcessingService(ModuleBase):
                     break
             self.log.info(f"Found {len(existing_document_models)} existing_document_models")
 
+    @abstractmethod
+    def preprocess_document(self, doc: IngestDoc) -> IngestDoc:
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_chunks_with_provider(
+        self,
+        text: str | dict,
+    ) -> Optional[list[str]]:
+        raise NotImplementedError
+
     @classmethod
     def create_service_ui_components(
         cls,
-        parent_instance: Union[DomainModel, SourceModel],
+        parent_instance: DomainModel | SourceModel,
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}

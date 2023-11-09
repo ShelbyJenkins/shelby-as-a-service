@@ -1,17 +1,14 @@
 import os
 import typing
-from typing import Any, Dict, Literal, Optional, Type, Union
+from typing import Any, Literal, Optional
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
 import pinecone
-from app.module_base import ModuleBase
 from pydantic import BaseModel
-from services.database.database_service import DatabaseBase
-from services.embedding.embedding_service import EmbeddingService
+from services.database.database_service import DatabaseService
 
 
-class PineconeDatabase(DatabaseBase):
+class PineconeDatabase(DatabaseService):
     class_name = Literal["pinecone_database"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "Pinecone Database"
@@ -42,11 +39,10 @@ class PineconeDatabase(DatabaseBase):
 
     def __init__(
         self,
-        config_file_dict: dict[str, typing.Any] = {},
+        config: dict[str, typing.Any] = {},
         **kwargs,
     ):
-        # super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+        super().__init__(config=config, **kwargs)
 
         if (api_key := self.secrets.get("pinecone_api_key")) is None:
             raise ValueError("Pinecone API Key not found.")
@@ -62,10 +58,6 @@ class PineconeDatabase(DatabaseBase):
             indexes = pinecone.list_indexes()
             self.log.info(f"Created index: {indexes}")
         self.pinecone_index = pinecone.Index(self.config.index_name)
-
-    @property
-    def doc_db_embeddings_config(self) -> tuple[str, dict[str, Any]]:
-        return self.config.enabled_doc_embedder_name, self.config.enabled_doc_embedder_config
 
     def get_index_domain_or_source_entry_count(
         self, source_name: Optional[str] = None, domain_name: Optional[str] = None
@@ -85,27 +77,15 @@ class PineconeDatabase(DatabaseBase):
             index_resource_stats.get("namespaces", {}).get(domain_name, {}).get("vector_count", 0)
         )
 
-    def clear_existing_source(self, source_name: str, domain_name: str):
-        existing_entry_count = self.get_index_domain_or_source_entry_count(source_name=source_name)
-        self.log.info(f"Existing vector count for {source_name}: {existing_entry_count}")
-
-        if existing_entry_count == 0:
-            self.log.info(f"No pre-existing vectors for {source_name}")
-            return
-        self.pinecone_index.delete(
+    def clear_existing_source(self, source_name: str, domain_name: str) -> Any:
+        return self.pinecone_index.delete(
             namespace=domain_name,
             delete_all=False,
             filter={"source_name": {"$eq": source_name}},
         )
-        cleared_entry_count = self.get_index_domain_or_source_entry_count(source_name=source_name)
-        if cleared_entry_count > 0:
-            raise ValueError(
-                f"Failed to clear vectors for {source_name}. New count: {cleared_entry_count}"
-            )
-        self.log.info(f"Removed pre-existing vectors. New count: {cleared_entry_count}")
 
-    def clear_existing_entries_by_id(self, ids: list[str], domain_name: str):
-        self.pinecone_index.delete(
+    def clear_existing_entries_by_id(self, ids: list[str], domain_name: str) -> Any:
+        return self.pinecone_index.delete(
             namespace=domain_name,
             delete_all=False,
             ids=ids,
@@ -129,8 +109,8 @@ class PineconeDatabase(DatabaseBase):
         self,
         entries_to_upsert: list[dict[str, Any]],
         domain_name: str,
-    ):
-        self.pinecone_index.upsert(
+    ) -> Any:
+        return self.pinecone_index.upsert(
             vectors=entries_to_upsert,
             namespace=domain_name,
             batch_size=self.config.upsert_batch_size,

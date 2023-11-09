@@ -169,10 +169,6 @@ class SourceModel(Base):
         foreign_keys=[DocLoaderModel.source_id],
     )
 
-    @property
-    def list_of_doc_loader_names(self) -> list:
-        return [doc_loader.name for doc_loader in self.doc_loaders]
-
     doc_ingest_processor_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("doc_ingest_processors.id"), nullable=True
     )
@@ -185,10 +181,6 @@ class SourceModel(Base):
         cascade="all, delete-orphan",
         foreign_keys=[DocIngestProcessorModel.source_id],
     )
-
-    @property
-    def list_of_doc_ingest_processor_names(self) -> list:
-        return [doc_processor.name for doc_processor in self.doc_ingest_processors]
 
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
     enabled_doc_db = relationship("DocDBModel")
@@ -248,10 +240,6 @@ class DomainModel(Base):
         foreign_keys=[DocIngestProcessorModel.domain_id],
     )
 
-    @property
-    def list_of_doc_ingest_processor_names(self) -> list:
-        return [doc_processor.name for doc_processor in self.doc_ingest_processors]
-
     doc_loader_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_loaders.id"), nullable=True)
     enabled_doc_loader = relationship("DocLoaderModel", foreign_keys=[doc_loader_id])
     doc_loaders: Mapped[list[DocLoaderModel]] = relationship(
@@ -260,10 +248,6 @@ class DomainModel(Base):
         cascade="all, delete-orphan",
         foreign_keys=[DocLoaderModel.domain_id],
     )
-
-    @property
-    def list_of_doc_loader_names(self) -> list:
-        return [doc_loader.name for doc_loader in self.doc_loaders]
 
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
     enabled_doc_db = relationship("DocDBModel")

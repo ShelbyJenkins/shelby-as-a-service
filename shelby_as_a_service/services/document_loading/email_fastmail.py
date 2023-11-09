@@ -1,11 +1,10 @@
 import json
 import types
 import typing
-from typing import Any, Dict, Final, Generator, Iterator, Literal, Optional, Type, Union
+from typing import Any, Iterator, Literal, Optional, get_args
 
 import gradio as gr
 import requests
-from app.module_base import ModuleBase
 from langchain.schema import Document
 from pydantic import BaseModel
 
@@ -17,7 +16,7 @@ class EmailFastmail(DocLoadingService):
     From: https://github.com/fastmail/JMAP-Samples/blob/main/python3/tiny_jmap_library.py"""
 
     class_name = Literal["email_fastmail"]
-    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Email: Fastmail"
     # For intialization
     REQUIRED_SECRETS: list[str] = [
@@ -37,15 +36,14 @@ class EmailFastmail(DocLoadingService):
     token: str
     api_url: str
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        # super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
         """Initialize using a hostname, username and bearer token"""
         self.session = None
         self.account_id = None
         self.identity_id = None
 
-    def load_docs(self, uri) -> Iterator[Document]:
+    def load_docs_with_provider(self, uri) -> Iterator[Document]:
         documents = []
         return (Document(page_content="Hello World!", metadata={"uri": uri}) for doc in documents)
 

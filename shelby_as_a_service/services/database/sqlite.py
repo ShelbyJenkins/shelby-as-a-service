@@ -1,6 +1,6 @@
 import os
 import typing
-from typing import Any, Dict, Literal, Type, Union
+from typing import Any, Literal, get_args
 
 from app.app_base import AppBase
 from sqlalchemy import create_engine
@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
 
 class SqliteDatabase(AppBase):
     class_name = Literal["index"]
-    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Local Index - SQLite"
     _session_factory: typing.Callable[[], Session]
     session: Session

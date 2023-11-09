@@ -7,14 +7,14 @@ from services.context_index.context_documents import IngestDoc
 
 from . import text_utils
 from .dfs_text_splitter import DFSTextSplitter
-from .ingest_processing_service import IngestProcessingBase
+from .ingest_processing_service import IngestProcessingService
 
 
-class IngestCEQ(IngestProcessingBase):
+class IngestCEQ(IngestProcessingService):
     class_name = Literal["ceq_ingest_processor"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Context Enhanced Query Ingest Processor"
-    available_text_splitters: list[str] = ["dfs_text_splitter"]
+    AVAILABLE_TEXT_SPLITTERS: list[str] = ["dfs_text_splitter"]
 
     class ClassConfigModel(BaseModel):
         enabled_text_splitter: str = "dfs_text_splitter"
@@ -23,12 +23,12 @@ class IngestCEQ(IngestProcessingBase):
         text_splitter_overlap_percent: int = 15  # In percent
 
     config: ClassConfigModel
+
     domain_name: str
     source_name: str
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        # super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
         self.text_splitter = DFSTextSplitter(
             goal_length=self.config.text_splitter_goal_length,
@@ -44,7 +44,7 @@ class IngestCEQ(IngestProcessingBase):
 
         return doc
 
-    def create_chunks(self, text: str) -> Optional[list[str]]:
+    def create_chunks_with_provider(self, text: str) -> Optional[list[str]]:
         if text_utils.tiktoken_len(text) < self.config.preprocessor_min_length:
             self.log.info(
                 f"🔴 Skipping doc because text length: {text_utils.tiktoken_len(text)} is shorter than minimum: { self.config.preprocessor_min_length}"
@@ -64,7 +64,7 @@ class IngestCEQ(IngestProcessingBase):
         ui_components["enabled_text_splitter"] = gr.Dropdown(
             value=config_model.enabled_text_splitter,
             label="Enabled text splitter",
-            choices=list(cls.available_text_splitters),
+            choices=list(cls.AVAILABLE_TEXT_SPLITTERS),
             visible=visibility,
         )
         ui_components["preprocessor_min_length"] = gr.Number(

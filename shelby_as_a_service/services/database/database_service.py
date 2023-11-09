@@ -1,43 +1,159 @@
-import typing
 from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import Any, Optional, Type, Union
 
-import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
-from pydantic import BaseModel
 from services.context_index.context_documents import IngestDoc
-from services.context_index.context_index_model import (
-    ChunkModel,
-    DocumentModel,
-    DomainModel,
-    SourceModel,
-)
+from services.context_index.context_index_model import ChunkModel, DomainModel, SourceModel
 from services.embedding.embedding_service import EmbeddingService
+from services.service_base import ServiceBase
 
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class DatabaseBase(ABC, ModuleBase):
+class DatabaseService(ABC, ServiceBase):
+    CLASS_NAME: str = "database_service"
+    CONTEXT_INDEX_PROVIDER_KEY: str = "enabled_doc_db"
+    CLASS_UI_NAME: str = "Document Databases"
+    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
     DOC_DB_REQUIRES_EMBEDDINGS: bool
+    domain_name: str
+
+    @classmethod
+    def load_service_from_context_index(
+        cls, domain_or_source: DomainModel | SourceModel
+    ) -> "DatabaseService":
+        instance: DatabaseService = cls.get_instance_from_context_index(
+            domain_or_source=domain_or_source
+        )
+        setattr(instance, "domain_name", instance.domain.name)
+        return instance
+
+    def upsert_documents_from_context_index_source(self, upsert_docs: list[IngestDoc]):
+        self.check_for_source
+        current_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
+            source_name=self.source.name
+        )
+        current_entry_count += 1
+        chunks_to_upsert: list[ChunkModel] = []
+        for doc in upsert_docs:
+            if not doc.existing_document_model:
+                raise ValueError(f"No existing_document_model for doc {doc.title}")
+            if not doc.existing_document_model.context_chunks:
+                raise ValueError(f"No context_chunks for doc {doc.title}")
+            for i, chunk in enumerate(doc.existing_document_model.context_chunks):
+                chunk_doc_db_id = f"id-{self.source.name}-{i + current_entry_count}"
+                chunk.chunk_doc_db_id = chunk_doc_db_id
+                chunks_to_upsert.append(chunk)
+
+        entries_to_upsert = []
+        if self.DOC_DB_REQUIRES_EMBEDDINGS:
+            EmbeddingService.load_service_from_context_index(
+                domain_or_source=self.source
+            ).get_document_embeddings_for_chunks_to_upsert(chunks_to_upsert=chunks_to_upsert)
+            for chunk in chunks_to_upsert:
+                metadata = chunk.prepare_upsert_metadata()
+                entries_to_upsert.append(
+                    self.prepare_upsert_for_vectorstore_with_provider(
+                        id=chunk.chunk_doc_db_id, values=chunk.chunk_embedding, metadata=metadata
+                    )
+                )
+        else:
+            raise NotImplementedError
+
+        self.upsert(entries_to_upsert=entries_to_upsert, domain_name=self.domain_name)
+
+    def clear_existing_entries_by_id(
+        self,
+        domain_name: str,
+        doc_db_ids_requiring_deletion: list[str],
+        source_name: Optional[str] = None,
+    ):
+        existing_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
+            source_name=source_name, domain_name=domain_name
+        )
+
+        response = self.clear_existing_entries_by_id_with_provider(
+            doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
+            domain_name=domain_name,
+        )
+        post_delete_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
+            source_name=source_name, domain_name=domain_name
+        )
+        if existing_entry_count - post_delete_entry_count != len(doc_db_ids_requiring_deletion):
+            raise ValueError(
+                f"Deleted {len(doc_db_ids_requiring_deletion)} entries but expected to delete {existing_entry_count - post_delete_entry_count}.\n Response: {response}"
+            )
+        else:
+            self.log.info(
+                f"Deleted {len(doc_db_ids_requiring_deletion)} entries from {self.CLASS_NAME}.\n Response: {response}"
+            )
+
+    def upsert(
+        self,
+        domain_name: str,
+        entries_to_upsert: list[dict[str, Any]],
+    ):
+        current_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
+            source_name=self.source.name
+        )
+        self.log.info(f"Upserting {len(entries_to_upsert)} entries to {self.CLASS_NAME}")
+
+        response = self.upsert_with_provider(
+            entries_to_upsert=entries_to_upsert, domain_name=domain_name
+        )
+
+        post_upsert_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
+            source_name=self.source.name
+        )
+        if post_upsert_entry_count - current_entry_count != len(entries_to_upsert):
+            raise ValueError(
+                f"Upserted {len(entries_to_upsert)} entries but expected to upsert {post_upsert_entry_count - current_entry_count}.\n Response: {response}"
+            )
+        self.log.info(
+            f"Successfully upserted {len(entries_to_upsert)} entries to {self.CLASS_NAME}.\n Response: {response}"
+        )
+
+    def query_by_terms(self, domain_name: str, search_terms: list[str] | str) -> list[dict]:
+        if isinstance(search_terms, str):
+            search_terms = [search_terms]
+        retrieved_docs = []
+        for term in search_terms:
+            docs = self.query_by_terms_with_provider(search_terms=term, domain_name=domain_name)
+            if docs:
+                retrieved_docs.extend(docs)
+            else:
+                self.log.info(f"No documents found for {term}")
+        return retrieved_docs
+
+    def fetch_by_ids(self, domain_name: str, ids: list[int] | int) -> list[dict]:
+        if isinstance(ids, int):
+            ids = [ids]
+
+        docs = self.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
+        if not docs:
+            self.log.info(f"No documents found for {id}")
+        return docs
 
     @abstractmethod
-    def get_index_domain_or_source_entry_count(
+    def get_index_domain_or_source_entry_count_with_provider(
         self, source_name: Optional[str] = None, domain_name: Optional[str] = None
     ) -> int:
         raise NotImplementedError
 
     @abstractmethod
-    def query_by_terms(self, search_terms: list[str] | str, domain_name: str) -> list[dict]:
+    def query_by_terms_with_provider(
+        self, search_terms: list[str] | str, domain_name: str
+    ) -> list[dict]:
         raise NotImplementedError
 
     @abstractmethod
-    def fetch_by_ids(self, ids: list[int] | int, domain_name: str) -> list[dict]:
+    def fetch_by_ids_with_provider(self, ids: list[int] | int, domain_name: str) -> list[dict]:
         raise NotImplementedError
 
     @abstractmethod
-    def prepare_upsert_for_vectorstore(
+    def prepare_upsert_for_vectorstore_with_provider(
         self,
         id: str,
         values: Optional[list[float]],
@@ -46,183 +162,20 @@ class DatabaseBase(ABC, ModuleBase):
         raise NotImplementedError
 
     @abstractmethod
-    def upsert(self, entries_to_upsert: list[dict[str, Any]], domain_name: str):
+    def upsert_with_provider(
+        self, entries_to_upsert: list[dict[str, Any]], domain_name: str
+    ) -> Any:
         raise NotImplementedError
 
     @abstractmethod
-    def clear_existing_source(self, source_name: str, domain_name: str):
+    def clear_existing_source_with_provider(self, source_name: str, domain_name: str) -> Any:
         raise NotImplementedError
 
     @abstractmethod
-    def clear_existing_entries_by_id(
+    def clear_existing_entries_by_id_with_provider(
         self, doc_db_ids_requiring_deletion: list[str], domain_name: str
-    ):
+    ) -> Any:
         raise NotImplementedError
-
-
-class DatabaseService(ModuleBase):
-    CLASS_NAME: str = "database_service"
-    CLASS_UI_NAME: str = "Document Databases"
-    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
-    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
-    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
-
-    def __init__(
-        self,
-        source: Optional[SourceModel] = None,
-        domain: Optional[DomainModel] = None,
-        doc_db_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
-        doc_db_provider_config: dict[str, Any] = {},
-        domain_name: Optional[str] = None,
-    ):
-        if source or domain:
-            if source:
-                self.source = source
-                self.enabled_doc_db = source.enabled_doc_db
-                self.domain = source.domain_model
-
-            elif domain:
-                self.enabled_doc_db = domain.enabled_doc_db
-                self.domain = domain
-            self.doc_db_provider_name = self.enabled_doc_db.name
-            self.doc_db_provider_config = self.enabled_doc_db.config
-            self.domain_name = self.domain.name
-        elif doc_db_provider_name:
-            self.doc_db_provider_name = doc_db_provider_name
-            self.doc_db_provider_config = doc_db_provider_config
-            self.domain_name = domain_name
-        else:
-            raise ValueError(
-                "Must provide either SourceModel or DomainModel or doc_db_provider_name"
-            )
-        if not self.domain_name:
-            raise ValueError("Must provide domain_name")
-
-        self.doc_db_instance: DatabaseBase = self.get_requested_class_instance(
-            requested_class_name=self.doc_db_provider_name,
-            requested_class_config=self.doc_db_provider_config,
-        )
-        if self.doc_db_requires_embeddings:
-            self.doc_embedder_service: EmbeddingService = EmbeddingService(
-                source=self.source,
-                doc_embedder_provider_name=self.enabled_doc_db.enabled_doc_embedder.name,
-                doc_embedder_provider_config=self.enabled_doc_db.enabled_doc_embedder.config,
-            )
-
-    @property
-    def doc_db_requires_embeddings(self) -> bool:
-        return self.doc_db_instance.DOC_DB_REQUIRES_EMBEDDINGS
-
-    def upsert_documents_from_context_index_source(self, upsert_docs: list[IngestDoc]):
-        current_entry_count = self.doc_db_instance.get_index_domain_or_source_entry_count(
-            source_name=self.source.name
-        )
-        chunks_to_upsert: list[ChunkModel] = []
-        for doc in upsert_docs:
-            if not doc.existing_document_model:
-                raise ValueError(f"No existing_document_model for doc {doc.title}")
-            if not doc.existing_document_model.context_chunks:
-                raise ValueError(f"No context_chunks for doc {doc.title}")
-            for i, chunk in enumerate(doc.existing_document_model.context_chunks):
-                chunk_doc_db_id = f"id-{self.source.name}-{i + current_entry_count + 1}"
-                chunk.chunk_doc_db_id = chunk_doc_db_id
-                chunks_to_upsert.append(chunk)
-
-        entries_to_upsert = []
-        if self.doc_db_requires_embeddings:
-            self.doc_embedder_service.get_document_embeddings_for_chunks_to_upsert(
-                chunks_to_upsert=chunks_to_upsert
-            )
-            for chunk in chunks_to_upsert:
-                metadata = chunk.prepare_upsert_metadata()
-                entries_to_upsert.append(
-                    self.doc_db_instance.prepare_upsert_for_vectorstore(
-                        id=chunk.chunk_doc_db_id, values=chunk.chunk_embedding, metadata=metadata
-                    )
-                )
-        else:
-            raise NotImplementedError
-
-        self.upsert(entries_to_upsert=entries_to_upsert)
-        post_upsert_entry_count = self.doc_db_instance.get_index_domain_or_source_entry_count(
-            source_name=self.source.name
-        )
-        if post_upsert_entry_count - current_entry_count != len(entries_to_upsert):
-            raise ValueError(
-                f"Upserted {len(entries_to_upsert)} entries but expected to upsert {post_upsert_entry_count - current_entry_count}"
-            )
-        self.log.info(
-            f"Successfully upserted {len(entries_to_upsert)} entries to {self.doc_db_instance.CLASS_NAME}"
-        )
-
-    def clear_existing_entries_by_id(self, doc_db_ids_requiring_deletion: list[str]):
-        existing_entry_count = self.doc_db_instance.get_index_domain_or_source_entry_count(
-            source_name=self.source.name
-        )
-        self.doc_db_instance.clear_existing_entries_by_id(
-            doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
-            domain_name=self.domain_name,
-        )
-        post_delete_entry_count = self.doc_db_instance.get_index_domain_or_source_entry_count(
-            source_name=self.source.name
-        )
-        if existing_entry_count - post_delete_entry_count != len(doc_db_ids_requiring_deletion):
-            raise ValueError(
-                f"Deleted {len(doc_db_ids_requiring_deletion)} entries but expected to delete {existing_entry_count - post_delete_entry_count}"
-            )
-        else:
-            self.log.info(
-                f"Deleted {len(doc_db_ids_requiring_deletion)} entries from {self.doc_db_instance.CLASS_NAME}"
-            )
-
-    def upsert(
-        self,
-        entries_to_upsert: list[dict[str, Any]],
-    ):
-        self.log.info(
-            f"Upserting {len(entries_to_upsert)} entries to {self.doc_db_instance.CLASS_NAME}"
-        )
-        self.doc_db_instance.upsert(
-            entries_to_upsert=entries_to_upsert, domain_name=self.domain_name
-        )
-
-    def query_by_terms(self, search_terms: list[str] | str) -> list[dict]:
-        if isinstance(search_terms, str):
-            search_terms = [search_terms]
-        retrieved_docs = []
-        for term in search_terms:
-            docs = self.doc_db_instance.query_by_terms(
-                search_terms=term, domain_name=self.domain_name
-            )
-            if docs:
-                retrieved_docs.extend(docs)
-            else:
-                self.log.info(f"No documents found for {term}")
-        return retrieved_docs
-
-    def fetch_by_ids(self, ids: list[int] | int) -> list[dict]:
-        if isinstance(ids, int):
-            ids = [ids]
-
-        docs = self.doc_db_instance.fetch_by_ids(ids=ids, domain_name=self.domain_name)
-        if not docs:
-            self.log.info(f"No documents found for {id}")
-        return docs
-
-    # def create_service_management_settings_ui(self):
-    #     ui_components = {}
-
-    #     with gr.Accordion(label="Pinecone"):
-    #         pinecone_model_instance = self.context_index.get_or_create_doc_db_instance(
-    #             name="pinecone_database"
-    #         )
-    #         pinecone_database = PineconeDatabase(config_file_dict=pinecone_model_instance.config)
-    #         ui_components[
-    #             "pinecone_database"
-    #         ] = pinecone_database.create_provider_management_settings_ui()
-
-    #     return ui_components
 
     @classmethod
     def create_service_ui_components(
@@ -242,9 +195,23 @@ class DatabaseService(ModuleBase):
         provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=enabled_doc_db_name,
-            required_classes=cls.REQUIRED_CLASSES,
+            required_classes=cls.AVAILABLE_PROVIDERS,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )
 
         return provider_select_dd, service_providers_dict
+
+    # def create_service_management_settings_ui(self):
+    #     ui_components = {}
+
+    #     with gr.Accordion(label="Pinecone"):
+    #         pinecone_model_instance = self.context_index.get_or_create(
+    #             name="pinecone_database"
+    #         )
+    #         pinecone_database = PineconeDatabase(config_file_dict=pinecone_model_instance.config)
+    #         ui_components[
+    #             "pinecone_database"
+    #         ] = pinecone_database.create_provider_management_settings_ui()
+
+    #     return ui_components

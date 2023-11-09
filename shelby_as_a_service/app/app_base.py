@@ -1,15 +1,12 @@
 import concurrent.futures
 import logging
 import os
-import typing
 from decimal import Decimal
-from typing import Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Optional, Type
 
 from app.config_manager import ConfigManager
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
 
 
 class AppBase:
@@ -48,14 +45,13 @@ class AppBase:
     webui_sprite: Type
     discord_sprite: Type
     slack_sprite: Type
-    context_index: Type
 
     log: logging.Logger
 
     available_sprite_instances: list[Any] = []
     list_of_extension_configs: list[Any]
 
-    secrets: Dict[str, str] = {}
+    secrets: dict[str, str] = {}
 
     total_cost: Decimal = Decimal("0")
     last_request_cost: Decimal = Decimal("0")
@@ -99,7 +95,7 @@ class AppBase:
         return cls
 
     @staticmethod
-    def _load_sprite_instances(app_file_dict: Dict[str, Any]):
+    def _load_sprite_instances(app_file_dict: dict[str, Any]):
         """
         Loads the sprite instances.
 

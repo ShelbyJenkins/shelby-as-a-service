@@ -1,13 +1,6 @@
-import json
-import os
-import traceback
-import typing
-from enum import Enum
-from typing import Any, Final, Iterator, Literal, Optional, Type
+from typing import Any, Literal, Optional, get_args
 
 import gradio as gr
-import services.text_processing.text_utils as text_utils
-from app.module_base import ModuleBase
 from bs4 import BeautifulSoup
 from langchain.document_loaders import (
     GitbookLoader,
@@ -18,12 +11,12 @@ from langchain.document_loaders import (
 from langchain.schema import Document
 from pydantic import BaseModel
 
-from .document_loading_service import DocLoadingBase
+from .document_loading_service import DocLoadingService
 
 
-class GenericWebScraper(DocLoadingBase):
+class GenericWebScraper(DocLoadingService):
     class_name = Literal["generic_web_scraper"]
-    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generic Web Scraper"
 
     class ClassConfigModel(BaseModel):
@@ -39,7 +32,7 @@ class GenericWebScraper(DocLoadingBase):
         self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
         # super().__init__(config_file_dict=config_file_dict, **kwargs)
 
-    def load_docs(self, uri) -> list[Document]:
+    def load_docs_with_provider(self, uri) -> list[Document]:
         return WebBaseLoader(web_path=uri).load()
 
     @classmethod
@@ -56,9 +49,9 @@ class GenericWebScraper(DocLoadingBase):
         return ui_components
 
 
-class GenericRecursiveWebScraper(DocLoadingBase):
+class GenericRecursiveWebScraper(DocLoadingService):
     class_name = Literal["generic_recursive_web_scraper"]
-    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generic Resursive Web Scraper"
 
     class ClassConfigModel(BaseModel):
@@ -70,7 +63,7 @@ class GenericRecursiveWebScraper(DocLoadingBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         # super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
 
@@ -82,7 +75,7 @@ class GenericRecursiveWebScraper(DocLoadingBase):
             return text_element.get_text()
         return ""
 
-    def load_docs(self, uri) -> list[Document]:
+    def load_docs_with_provider(self, uri) -> list[Document]:
         return RecursiveUrlLoader(url=uri, extractor=self.custom_extractor).load()
 
     @classmethod

@@ -1,71 +1,45 @@
-import abc
-import typing
 from abc import ABC, abstractmethod
-from datetime import datetime
-from enum import Enum
-from typing import Any, Final, Iterator, Literal, Optional, Type, Union
+from typing import Any, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-import services.text_processing.text_utils as text_utils
-from app.module_base import ModuleBase
 from langchain.schema import Document
 from services.context_index.context_documents import IngestDoc
-from services.context_index.context_index_model import DocumentModel, DomainModel, SourceModel
+from services.context_index.context_index_model import DomainModel, SourceModel
+from services.service_base import ServiceBase
 
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class DocLoadingBase(ABC, ModuleBase):
-    @abstractmethod
-    def load_docs(self, uri: str) -> Optional[list[Document]]:
-        raise NotImplementedError
-
-
-class DocLoadingService(ModuleBase):
+class DocLoadingService(ABC, ServiceBase):
     CLASS_NAME: str = "doc_loader_service"
+    CONTEXT_INDEX_PROVIDER_KEY: str = "enabled_doc_loader"
     CLASS_UI_NAME: str = "Document Loading Service"
-    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
-    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
-    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
-    def __init__(
-        self,
-        source: Optional[SourceModel] = None,
-        doc_loader_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
-        doc_loader_provider_config: dict[str, Any] = {},
-    ):
-        if source:
-            self.source = source
-            self.enabled_doc_loader = source.enabled_doc_loader
-            self.domain = source.domain_model
-            self.doc_loader_provider_name = self.enabled_doc_loader.name
-            self.doc_loader_provider_config = self.enabled_doc_loader.config
-        elif doc_loader_provider_name:
-            self.doc_db_provider_name = doc_loader_provider_name
-            self.doc_db_provider_config = doc_loader_provider_config
-        else:
-            raise ValueError("Must provide either SourceModel or doc_loader_provider_name")
-        self.doc_loader_instance: DocLoadingBase = self.get_requested_class_instance(
-            requested_class_name=self.doc_loader_provider_name,
-            requested_class_config=self.doc_loader_provider_config,
-        )
+    @classmethod
+    def load_service_from_context_index(
+        cls, domain_or_source: DomainModel | SourceModel
+    ) -> "DocLoadingService":
+        return cls.get_instance_from_context_index(domain_or_source=domain_or_source)
 
     def load_docs_from_context_index_source(
         self,
-        source: SourceModel,
     ) -> Optional[list[IngestDoc]]:
+        self.check_for_source
+
         docs = self.load_docs(
-            uri=source.source_uri,
+            uri=self.source.source_uri,
         )
         if not docs:
-            self.log.info(f"No documents found for {source.name} @ {source.source_uri}")
+            self.log.info(f"No documents found for {self.source.name} @ {self.source.source_uri}")
             return None
         ingest_docs = []
         for doc in docs:
             ingest_docs.append(
-                IngestDoc.create_ingest_doc_from_langchain_document(doc=doc, source=source)
+                IngestDoc.create_ingest_doc_from_langchain_document(doc=doc, source=self.source)
             )
         return ingest_docs
 
@@ -73,12 +47,16 @@ class DocLoadingService(ModuleBase):
         self,
         uri: str,
     ) -> Optional[list[Document]]:
-        docs = self.doc_loader_instance.load_docs(uri)
+        docs = self.load_docs_with_provider(uri)
         if not docs:
-            self.log.info(f"No documents loaded from DocLoadingService: {self.doc_loader_instance}")
+            self.log.info(f"No documents loaded from DocLoadingService: {self.__class__.__name__}")
             return None
         self.log.info(f"Total documents loaded from DocLoadingService: {len(docs)}")
         return docs
+
+    @abstractmethod
+    def load_docs_with_provider(self, uri: str) -> Optional[list[Document]]:
+        raise NotImplementedError
 
     @classmethod
     def create_service_ui_components(

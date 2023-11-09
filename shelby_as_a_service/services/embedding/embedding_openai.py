@@ -38,14 +38,15 @@ class OpenAIEmbedding(EmbeddingBase):
     embedding_models: list
     model_instance: "ModelConfig"
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        # super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+    def __init__(self, config: dict[str, typing.Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
         self.model_instance = self.get_model_instance(
             requested_model_name=self.config.enabled_model_name
         )
 
-    def get_embedding_of_text(self, text: str, model_name: Optional[str] = None) -> list[float]:
+    def get_embedding_of_text_with_provider(
+        self, text: str, model_name: Optional[str] = None
+    ) -> list[float]:
         if model_name:
             self.model_instance = self.get_model_instance(requested_model_name=model_name)
 
@@ -62,7 +63,7 @@ class OpenAIEmbedding(EmbeddingBase):
 
         return text_embedding
 
-    def get_embeddings_from_list_of_texts(
+    def get_embeddings_from_list_of_texts_with_provider(
         self, texts: list[str], model_name: Optional[str] = None
     ) -> list[list[float]]:
         if model_name:

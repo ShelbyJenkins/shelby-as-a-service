@@ -10,10 +10,10 @@ import gradio as gr
 import yaml
 from pydantic import BaseModel
 
-from .ingest_processing_service import IngestProcessingBase
+from .ingest_processing_service import IngestProcessingService
 
 
-class OpenAPIMinifier(IngestProcessingBase):
+class OpenAPIMinifier(IngestProcessingService):
     class_name = Literal["open_api_minifier"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Open API Minifier"
@@ -82,9 +82,8 @@ class OpenAPIMinifier(IngestProcessingBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        # super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
         # self.index_agent = data_source_config.index_agent
         # self.config = data_source_config.index_agent.config
@@ -94,7 +93,10 @@ class OpenAPIMinifier(IngestProcessingBase):
 
         self.operationID_counter = 0
 
-    def run(self, open_api_specs):
+    def create_chunks_with_provider(self):
+        pass
+
+    def preprocess_document(self, open_api_specs):
         # Merge all specs and save a copy locally
         full_open_api_specs = self.create_full_spec(open_api_specs)
 

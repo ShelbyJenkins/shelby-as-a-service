@@ -5,23 +5,22 @@ from typing import Annotated, Any, Dict, Generator, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.llm.llm_openai import OpenAILLM
+from services.service_base import ServiceBase
 
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class LLMBase(ABC, ModuleBase):
+class LLMBase(ABC, ServiceBase):
     pass
 
 
-class LLMService(ModuleBase):
+class LLMService(ABC, ServiceBase):
     CLASS_NAME: str = "llm_service"
     CLASS_UI_NAME: str = "LLM Settings"
-    REQUIRED_CLASSES: list[Type] = AVAILABLE_PROVIDERS
-    LIST_OF_CLASS_NAMES: list[str] = list(typing.get_args(AVAILABLE_PROVIDERS_NAMES))
-    LIST_OF_CLASS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
     class ClassConfigModel(BaseModel):
