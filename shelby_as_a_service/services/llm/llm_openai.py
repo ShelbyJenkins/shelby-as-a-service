@@ -5,10 +5,10 @@ from typing import Any, Literal, Optional, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 import openai
-import services.prompt_templates.prompt_templates as PromptTemplates
 import services.text_processing.text_utils as text_utils
 from pydantic import BaseModel, Field
 from services.service_base import ServiceBase
+from services.text_processing.prompts.prompt_template_service import PromptTemplates
 from typing_extensions import Annotated
 
 

@@ -1,9 +1,8 @@
 from typing import Any, Iterator, Literal, Optional, Type, Union, get_args
 
 import gradio as gr
-from langchain.schema import Document
 from pydantic import BaseModel
-from services.context_index.context_documents import IngestDoc
+from services.context_index.doc_index.context_docs import IngestDoc
 
 from .. import text_utils
 from ..dfs_text_splitter import DFSTextSplitter

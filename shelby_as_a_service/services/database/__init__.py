@@ -1,8 +1,8 @@
 from typing import Literal
 
+from services.context_index.index_base import SqliteDatabase
 from services.database.local_file import LocalFileDatabase
 from services.database.pinecone import PineconeDatabase
-from services.database.sqlite import SqliteDatabase
 
 AVAILABLE_PROVIDERS_NAMES = Literal[
     PineconeDatabase.class_name,

@@ -5,9 +5,9 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from pydantic import BaseModel
 from services.context_index.context_index import ContextIndex
-from services.context_index.context_index_model import (
-    ContextIndexModel,
+from services.context_index.doc_index_model import (
     DocDBModel,
+    DocIndexModel,
     DocIngestProcessorModel,
     DocLoaderModel,
     DomainModel,
@@ -16,9 +16,8 @@ from services.context_index.context_index_model import (
 from services.context_index.ingest import DocIngest
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
-
-from shelby_as_a_service.services.service_base import ServiceBase
-from shelby_as_a_service.services.text_processing.ingest.ingest_processing_service import (
+from services.service_base import ServiceBase
+from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
 )
 
@@ -220,7 +219,7 @@ class ContextIndexView(ServiceBase):
                 with gr.Row():
                     input_components["make_new_from_template_dropdown"] = gr.Dropdown(
                         value=parent_instance.DEFAULT_TEMPLATE_NAME,
-                        choices=self.context_index.index.list_of_context_template_names,
+                        choices=self.context_index.index.list_of_doc_index_template_names,
                         label="Use Template",
                         allow_custom_value=False,
                     )
@@ -235,8 +234,8 @@ class ContextIndexView(ServiceBase):
 
             with gr.Accordion(label="Config Templates", open=False):
                 input_components["load_template_dropdown"] = gr.Dropdown(
-                    value=self.context_index.index.list_of_context_template_names[0],
-                    choices=self.context_index.index.list_of_context_template_names,
+                    value=self.context_index.index.list_of_doc_index_template_names[0],
+                    choices=self.context_index.index.list_of_doc_index_template_names,
                     label="Available Templates",
                     allow_custom_value=False,
                 )

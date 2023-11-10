@@ -4,7 +4,7 @@ from typing import Any, Optional
 import services.text_processing.text_utils as text_utils
 from langchain.schema import Document
 from pydantic import BaseModel
-from services.context_index.context_index_model import (
+from services.context_index.doc_index.doc_index_model import (
     ChunkModel,
     DocumentModel,
     DomainModel,

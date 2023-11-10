@@ -1,10 +1,7 @@
 from typing import Literal
 
-from shelby_as_a_service.services.document_loading.email_fastmail import EmailFastmail
-from shelby_as_a_service.services.document_loading.web import (
-    GenericRecursiveWebScraper,
-    GenericWebScraper,
-)
+from services.document_loading.email_fastmail import EmailFastmail
+from services.document_loading.web import GenericRecursiveWebScraper, GenericWebScraper
 
 AVAILABLE_PROVIDERS_NAMES = Literal[
     GenericWebScraper.class_name,

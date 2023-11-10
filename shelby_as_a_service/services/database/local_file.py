@@ -6,8 +6,7 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 import services.text_processing.text_utils as text_utils
 from pydantic import BaseModel
-
-from shelby_as_a_service.services.service_base import ServiceBase
+from services.service_base import ServiceBase
 
 
 class LocalFileDatabase(ServiceBase):

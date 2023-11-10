@@ -7,8 +7,7 @@ import interfaces.webui.gradio_helpers as GradioHelpers
 from agents.ceq.ceq_agent import CEQAgent
 from agents.vanillallm.vanillallm_agent import VanillaLLM
 from pydantic import BaseModel
-
-from shelby_as_a_service.services.service_base import ServiceBase
+from services.service_base import ServiceBase
 
 
 class MainChatView(ServiceBase):

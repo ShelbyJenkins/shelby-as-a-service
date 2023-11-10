@@ -2,34 +2,34 @@ import logging
 from typing import Any, Optional, Type, Union
 
 from services.database.database_service import DatabaseService
-from services.database.sqlite import SqliteDatabase
 from services.document_loading.document_loading_service import DocLoadingService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from shelby_as_a_service.services.text_processing.ingest.ingest_processing_service import (
+from services.context_index.index_base import SqliteDatabase
+from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
 )
 
-from ..ingest import DocIngest
-from .context_index_model import (
-    ContextIndexModel,
-    ContextTemplateModel,
+from services.context_index.doc_index.doc_ingest import DocIngest
+from 
+from .doc_index_model import (
     DocDBModel,
+    DocIndexModel,
+    DocIndexTemplateModel,
     DocIngestProcessorModel,
     DocLoaderModel,
     DomainModel,
     SourceModel,
 )
-from .context_templates import ContextTemplates
 
 
 class ContextIndex(SqliteDatabase):
-    context_index_model: ContextIndexModel
+    doc_index_model: DocIndexModel
     session: Session
     log: logging.Logger
     object_model: Union[DomainModel, SourceModel]
-    context_template: ContextTemplateModel
+    context_template: DocIndexTemplateModel
 
     def __init__(self) -> None:
         self.log = logging.getLogger(__name__)
@@ -43,14 +43,14 @@ class ContextIndex(SqliteDatabase):
             raise
 
     def setup_context_index(self):
-        if context_index_model := self.session.query(ContextIndexModel).first():
-            ContextIndex.context_index_model = context_index_model
+        if doc_index_model := self.session.query(DocIndexModel).first():
+            ContextIndex.doc_index_model = doc_index_model
             self.add_doc_dbs_to_index()
             self.add_default_context_templates_to_index()
             # Need a function here to update any new services/providers to sources/domains
         else:
-            ContextIndex.context_index_model = ContextIndexModel()
-            ContextIndex.session.add(ContextIndex.context_index_model)
+            ContextIndex.doc_index_model = DocIndexModel()
+            ContextIndex.session.add(ContextIndex.doc_index_model)
             ContextIndex.session.flush()
 
             self.add_doc_dbs_to_index()
@@ -63,15 +63,15 @@ class ContextIndex(SqliteDatabase):
     @staticmethod
     def commit_context_index():
         ContextIndex.session = ContextIndex.commit_session(ContextIndex.session)
-        ContextIndex.session.add(ContextIndex.context_index_model)
+        ContextIndex.session.add(ContextIndex.doc_index_model)
 
     @property
     def list_of_all_context_index_domain_names(self) -> list:
-        return [domain.name for domain in ContextIndex.context_index_model.domains]
+        return [domain.name for domain in ContextIndex.doc_index_model.domains]
 
     @property
-    def index(self) -> "ContextIndexModel":
-        return ContextIndex.context_index_model
+    def index(self) -> "DocIndexModel":
+        return ContextIndex.doc_index_model
 
     @property
     def domain(self) -> "DomainModel":
@@ -218,14 +218,14 @@ class ContextIndex(SqliteDatabase):
         self,
         id: Optional[int] = None,
         name: Optional[str] = None,
-    ) -> ContextTemplateModel:
-        list_of_model_instances = self.index.index_context_templates
+    ) -> DocIndexTemplateModel:
+        list_of_model_instances = self.index.doc_index_templates
         requested_instance = self.get_model_instance(
             list_of_model_instances=list_of_model_instances,
             id=id,
             name=name,
         )
-        if not isinstance(requested_instance, ContextTemplateModel):
+        if not isinstance(requested_instance, DocIndexTemplateModel):
             raise Exception(
                 "Unexpected error: requested_instance should be of type DocLoaderModel."
             )
@@ -275,7 +275,7 @@ class ContextIndex(SqliteDatabase):
         list_of_model_instances: Union[
             list[DomainModel],
             list[SourceModel],
-            list[ContextTemplateModel],
+            list[DocIndexTemplateModel],
             list[DocDBModel],
             list[DocLoaderModel],
             list[DocIngestProcessorModel],
@@ -285,7 +285,7 @@ class ContextIndex(SqliteDatabase):
     ) -> Union[
         DomainModel,
         SourceModel,
-        ContextTemplateModel,
+        DocIndexTemplateModel,
         DocDBModel,
         DocLoaderModel,
         DocIngestProcessorModel,
@@ -368,7 +368,7 @@ class ContextIndex(SqliteDatabase):
             new_description = DomainModel.DEFAULT_DESCRIPTION
         new_instance = DomainModel(name=new_name, description=new_description)
 
-        ContextIndex.context_index_model.domains.append(new_instance)
+        ContextIndex.doc_index_model.domains.append(new_instance)
         ContextIndex.session.flush()
 
         if not self.index.current_domain:
@@ -596,7 +596,7 @@ class ContextIndex(SqliteDatabase):
             existing_config = next(
                 (
                     doc_db
-                    for doc_db in ContextIndex.context_index_model.doc_dbs
+                    for doc_db in ContextIndex.doc_index_model.doc_dbs
                     if doc_db.name == doc_db_provider_name
                 ),
                 None,
@@ -604,17 +604,17 @@ class ContextIndex(SqliteDatabase):
 
             if not existing_config:
                 db_config = db_class.ClassConfigModel().model_dump()
-                ContextIndex.context_index_model.doc_dbs.append(
+                ContextIndex.doc_index_model.doc_dbs.append(
                     DocDBModel(name=doc_db_provider_name, config=db_config)
                 )
                 ContextIndex.session.flush()
 
     def add_default_context_templates_to_index(self):
-        for available_template in ContextTemplates.AVAILABLE_TEMPLATES:
+        for available_template in DocIndexTemplates.AVAILABLE_TEMPLATES:
             existing_config = next(
                 (
                     index_context_template
-                    for index_context_template in ContextIndex.context_index_model.index_context_templates
+                    for index_context_template in ContextIndex.doc_index_model.doc_index_templates
                     if index_context_template.name == available_template.TEMPLATE_NAME
                 ),
                 None,
@@ -637,7 +637,7 @@ class ContextIndex(SqliteDatabase):
                     batch_update_enabled=available_template.batch_update_enabled,
                 )
 
-                ContextIndex.context_index_model.index_context_templates.append(new_template)
+                ContextIndex.doc_index_model.doc_index_templates.append(new_template)
                 ContextIndex.session.flush()
 
     def save_config_as_template(
@@ -649,7 +649,7 @@ class ContextIndex(SqliteDatabase):
             new_template_name = parent_object.name
 
         new_context_template_name = self.check_and_handle_name_collision(
-            existing_names=ContextIndex.context_index_model.list_of_context_template_names,
+            existing_names=ContextIndex.doc_index_model.list_of_doc_index_template_names,
             new_name=new_template_name,
         )
         new_template = self.create_template(
@@ -663,7 +663,7 @@ class ContextIndex(SqliteDatabase):
         )
 
         # Append it to the index's list of context_configs
-        ContextIndex.context_index_model.index_context_templates.append(new_template)
+        ContextIndex.doc_index_model.doc_index_templates.append(new_template)
         ContextIndex.session.flush()
 
     def create_template(
@@ -676,7 +676,7 @@ class ContextIndex(SqliteDatabase):
         enabled_doc_db: DocDBModel,
         batch_update_enabled: bool,
     ):
-        return ContextTemplateModel(
+        return DocIndexTemplateModel(
             name=new_template_name,
             enabled_doc_ingest_processor_name=enabled_doc_ingest_processor_name,
             enabled_doc_ingest_processor_config=enabled_doc_ingest_processor_config,

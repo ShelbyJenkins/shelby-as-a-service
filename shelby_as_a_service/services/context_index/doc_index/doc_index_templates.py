@@ -5,13 +5,12 @@ from pydantic import BaseModel
 from services.database import LocalFileDatabase, PineconeDatabase
 from services.document_loading.web import GenericRecursiveWebScraper, GenericWebScraper
 from services.embedding.embedding_openai import OpenAIEmbedding
+from services.service_base import ServiceBase
+from services.text_processing.ingest_processing.ingest_ceq import IngestCEQ
 
-from shelby_as_a_service.services.service_base import ServiceBase
-from shelby_as_a_service.services.text_processing.ingest.ingest_ceq import IngestCEQ
 
-
-class ContextTemplates:
-    class DefaultContextTemplate:
+class DocIndexTemplates:
+    class DefaultDocIndexTemplate:
         TEMPLATE_NAME: str = "default_template_name"
         doc_ingest_processor_provider_name = IngestCEQ.CLASS_NAME
         doc_ingest_processor_config = IngestCEQ.ClassConfigModel()
@@ -23,7 +22,7 @@ class ContextTemplates:
 
         batch_update_enabled = True
 
-    class DefaultContextTemplate1:
+    class DefaultDocIndexTemplate1:
         TEMPLATE_NAME: str = "default_template_name1"
         doc_ingest_processor_provider_name = IngestCEQ.CLASS_NAME
         doc_ingest_processor_config = IngestCEQ.ClassConfigModel()
@@ -35,5 +34,5 @@ class ContextTemplates:
         batch_update_enabled = True
 
     AVAILABLE_TEMPLATES: list[
-        Union[Type[DefaultContextTemplate], Type[DefaultContextTemplate1]]
-    ] = [DefaultContextTemplate, DefaultContextTemplate1]
+        Union[Type[DefaultDocIndexTemplate], Type[DefaultDocIndexTemplate1]]
+    ] = [DefaultDocIndexTemplate, DefaultDocIndexTemplate1]

@@ -4,7 +4,7 @@ from typing import Any, Optional, Type
 
 from app.app_base import AppBase
 from pydantic import BaseModel
-from services.context_index.context_index_model import (
+from services.context_index.doc_index.doc_index_model import (
     DocDBModel,
     DocEmbeddingModel,
     DocIngestProcessorModel,

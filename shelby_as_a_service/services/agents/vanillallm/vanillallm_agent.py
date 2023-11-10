@@ -5,8 +5,7 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from pydantic import BaseModel, Field
 from services.llm.llm_service import LLMService
-
-from shelby_as_a_service.services.service_base import ServiceBase
+from services.service_base import ServiceBase
 
 
 class VanillaLLM(ServiceBase):

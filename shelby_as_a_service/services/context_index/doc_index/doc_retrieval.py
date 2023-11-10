@@ -5,9 +5,8 @@ import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from pydantic import BaseModel
 from services.embedding.embedding_service import EmbeddingService
+from services.service_base import ServiceBase
 from services.text_processing.process_retrieval import process_retrieved_docs
-
-from shelby_as_a_service.services.service_base import ServiceBase
 
 
 class DocRetrieval(ServiceBase):

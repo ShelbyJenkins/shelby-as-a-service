@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Type
 
 import interfaces.webui.gradio_helpers as GradioHelpers
-from services.context_index.context_documents import IngestDoc
-from services.context_index.context_index_model import (
+from services.context_index.doc_index.context_docs import IngestDoc
+from services.context_index.doc_index.doc_index_model import (
     ChunkModel,
     DocumentModel,
     DomainModel,

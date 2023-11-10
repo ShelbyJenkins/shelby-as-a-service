@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from services.database.sqlite import Base
+from services.context_index.index_base import Base
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, PickleType, String
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -49,10 +49,10 @@ class DocDBModel(Base):
     __tablename__ = "doc_dbs"
     id: Mapped[int] = mapped_column(primary_key=True)
     context_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("context_index_model.id"), nullable=True
+        Integer, ForeignKey("doc_index_model.id"), nullable=True
     )
-    context_index_model = relationship(
-        "ContextIndexModel", back_populates="doc_dbs", foreign_keys=[context_id]
+    doc_index_model = relationship(
+        "DocIndexModel", back_populates="doc_dbs", foreign_keys=[context_id]
     )
 
     doc_embedder_id: Mapped[int] = mapped_column(
@@ -71,14 +71,14 @@ class DocDBModel(Base):
     config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
 
-class ContextTemplateModel(Base):
-    __tablename__ = "index_context_templates"
+class DocIndexTemplateModel(Base):
+    __tablename__ = "doc_index_templates"
     id: Mapped[int] = mapped_column(primary_key=True)
 
     context_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("context_index_model.id"), nullable=True
+        Integer, ForeignKey("doc_index_model.id"), nullable=True
     )
-    context_index_model = relationship("ContextIndexModel", foreign_keys=[context_id])
+    doc_index_model = relationship("DocIndexModel", foreign_keys=[context_id])
 
     enabled_doc_loader_name: Mapped[str] = mapped_column(String)
     enabled_doc_loader_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
@@ -208,10 +208,10 @@ class DomainModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     context_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("context_index_model.id"), nullable=True
+        Integer, ForeignKey("doc_index_model.id"), nullable=True
     )
-    context_index_model: Mapped["ContextIndexModel"] = relationship(
-        "ContextIndexModel", foreign_keys=[context_id]
+    doc_index_model: Mapped["DocIndexModel"] = relationship(
+        "DocIndexModel", foreign_keys=[context_id]
     )
 
     current_source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
@@ -268,22 +268,22 @@ class DomainModel(Base):
     )
 
 
-class ContextIndexModel(Base):
-    __tablename__ = "context_index_model"
+class DocIndexModel(Base):
+    __tablename__ = "doc_index_model"
     id: Mapped[int] = mapped_column(primary_key=True)
 
     current_domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
     current_domain = relationship("DomainModel", foreign_keys=[current_domain_id])
     domains: Mapped[list[DomainModel]] = relationship(
         "DomainModel",
-        back_populates="context_index_model",
+        back_populates="doc_index_model",
         cascade="all, delete-orphan",
         foreign_keys=[DomainModel.context_id],
     )
 
     doc_dbs: Mapped[list[DocDBModel]] = relationship(
         "DocDBModel",
-        back_populates="context_index_model",
+        back_populates="doc_index_model",
         foreign_keys="DocDBModel.context_id",
     )
 
@@ -291,14 +291,12 @@ class ContextIndexModel(Base):
     def list_of_doc_db_names(self) -> list:
         return [doc_db.name for doc_db in self.doc_dbs]
 
-    index_context_templates: Mapped[list[ContextTemplateModel]] = relationship(
-        "ContextTemplateModel",
-        back_populates="context_index_model",
-        foreign_keys=[ContextTemplateModel.context_id],
+    doc_index_templates: Mapped[list[DocIndexTemplateModel]] = relationship(
+        "DocIndexTemplateModel",
+        back_populates="doc_index_model",
+        foreign_keys=[DocIndexTemplateModel.context_id],
     )
 
     @property
-    def list_of_context_template_names(self) -> list:
-        return [
-            index_context_template.name for index_context_template in self.index_context_templates
-        ]
+    def list_of_doc_index_template_names(self) -> list:
+        return [doc_index_template.name for doc_index_template in self.doc_index_templates]

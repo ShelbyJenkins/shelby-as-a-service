@@ -4,7 +4,7 @@ from typing import Any, Final, Iterator, Literal, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from services.context_index.context_index_model import (
+from services.context_index.doc_index_model import (
     ChunkModel,
     DocDBModel,
     DocEmbeddingModel,

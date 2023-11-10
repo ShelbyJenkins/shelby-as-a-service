@@ -8,8 +8,7 @@ import services.text_processing.text_utils as text_utils
 from pydantic import BaseModel, Field
 from services.context_index.retrieval import DocRetrieval
 from services.llm.llm_service import LLMService
-
-from shelby_as_a_service.services.service_base import ServiceBase
+from services.service_base import ServiceBase
 
 
 class CEQAgent(ServiceBase):

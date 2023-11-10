@@ -3,7 +3,7 @@ import os
 import re
 import shutil
 import string
-from typing import Any, Literal, Type, Union, get_args
+from typing import Any, Literal, get_args
 from urllib.parse import urlparse
 
 import gradio as gr

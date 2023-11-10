@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from services.context_index.context_index_model import DomainModel, SourceModel
+from services.context_index.doc_index.doc_index_model import DomainModel, SourceModel
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 
 # from modules.index.data_model import DataModels
-from shelby_as_a_service.services.service_base import ServiceBase
-from shelby_as_a_service.services.text_processing.ingest.ingest_processing_service import (
+from services.service_base import ServiceBase
+from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
 )
 

@@ -11,8 +11,7 @@ from interfaces.webui.views.context_index_view import ContextIndexView
 from interfaces.webui.views.main_chat_view import MainChatView
 from interfaces.webui.views.settings_view import SettingsView
 from pydantic import BaseModel
-
-from shelby_as_a_service.services.service_base import ServiceBase
+from services.service_base import ServiceBase
 
 
 class GradioUI(ServiceBase):

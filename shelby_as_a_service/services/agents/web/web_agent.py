@@ -9,8 +9,7 @@ import services.text_processing.text_utils as text_utils
 from agents.ingest.ingest_agent import IngestAgent
 from pydantic import BaseModel
 from services.llm.llm_service import LLMService
-
-from shelby_as_a_service.services.service_base import ServiceBase
+from services.service_base import ServiceBase
 
 # endregion
 #

@@ -6,8 +6,7 @@ import services.text_processing.text_utils as text_utils
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
 from services.embedding.embedding_service import EmbeddingService
-
-from shelby_as_a_service.services.service_base import ServiceBase
+from services.service_base import ServiceBase
 
 
 class OpenAIEmbedding(EmbeddingService):

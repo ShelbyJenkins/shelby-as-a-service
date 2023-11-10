@@ -1,7 +1,7 @@
 from typing import Literal, Type
 
-from services.text_processing.ingest.ingest_ceq import IngestCEQ
-from services.text_processing.ingest.ingest_open_api import OpenAPIMinifier
+from services.text_processing.ingest_processing.ingest_ceq import IngestCEQ
+from services.text_processing.ingest_processing.ingest_open_api import OpenAPIMinifier
 
 AVAILABLE_PROVIDERS_NAMES = Literal[
     IngestCEQ.class_name,
