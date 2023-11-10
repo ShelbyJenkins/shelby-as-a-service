@@ -1,7 +1,7 @@
 import importlib
 import json
 import os
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 import yaml
 

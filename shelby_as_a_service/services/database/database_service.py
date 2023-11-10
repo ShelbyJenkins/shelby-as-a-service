@@ -209,7 +209,7 @@ class DatabaseService(ABC, ServiceBase):
     #         pinecone_model_instance = self.context_index.get_or_create(
     #             name="pinecone_database"
     #         )
-    #         pinecone_database = PineconeDatabase(config_file_dict=pinecone_model_instance.config)
+    #         pinecone_database = PineconeDatabase(config=pinecone_model_instance.config)
     #         ui_components[
     #             "pinecone_database"
     #         ] = pinecone_database.create_provider_management_settings_ui()

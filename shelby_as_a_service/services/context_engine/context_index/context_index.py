@@ -4,10 +4,14 @@ from typing import Any, Optional, Type, Union
 from services.database.database_service import DatabaseService
 from services.database.sqlite import SqliteDatabase
 from services.document_loading.document_loading_service import DocLoadingService
-from services.text_processing.ingest_processing_service import IngestProcessingService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from shelby_as_a_service.services.text_processing.ingest.ingest_processing_service import (
+    IngestProcessingService,
+)
+
+from ..ingest import DocIngest
 from .context_index_model import (
     ContextIndexModel,
     ContextTemplateModel,
@@ -18,7 +22,6 @@ from .context_index_model import (
     SourceModel,
 )
 from .context_templates import ContextTemplates
-from .ingest import DocIngest
 
 
 class ContextIndex(SqliteDatabase):

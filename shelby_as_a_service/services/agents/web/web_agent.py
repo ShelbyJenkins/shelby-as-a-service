@@ -7,15 +7,16 @@ from urllib.parse import urlparse, urlunparse
 import gradio as gr
 import services.text_processing.text_utils as text_utils
 from agents.ingest.ingest_agent import IngestAgent
-from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.llm.llm_service import LLMService
+
+from shelby_as_a_service.services.service_base import ServiceBase
 
 # endregion
 #
 
 
-class WebAgent(ModuleBase):
+class WebAgent(ServiceBase):
     CLASS_NAME: str = "web_agent"
     CLASS_UI_NAME: str = "URL Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "web_prompt.yaml"

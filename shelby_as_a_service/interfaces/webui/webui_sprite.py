@@ -1,14 +1,15 @@
 import typing
-from typing import Any, Dict, Generator, Optional, Type, Union
+from typing import Any, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
 from interfaces.webui.gradio_ui import GradioUI
 from pydantic import BaseModel
 
+from shelby_as_a_service.services.service_base import ServiceBase
 
-class WebUISprite(ModuleBase):
+
+class WebUISprite(ServiceBase):
     CLASS_NAME: str = "webui_sprite"
     CLASS_UI_NAME: str = "webui_sprite"
     REQUIRED_CLASSES: list[Type] = [GradioUI]
@@ -23,9 +24,9 @@ class WebUISprite(ModuleBase):
     config: ClassConfigModel
     gradio_ui: GradioUI
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
         GradioUI.webui_sprite = self
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        super().__init__(config=config, **kwargs)
 
     def _log(self, message):
         self.log.info(message)

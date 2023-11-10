@@ -16,7 +16,7 @@ from utils.app_base import AppBase
 # endregion
 
 
-class ActionAgent(ModuleBase):
+class ActionAgent(ServiceBase):
     # ActionAgent
     action_llm_model: str = "gpt-4"
     # QueryAgent

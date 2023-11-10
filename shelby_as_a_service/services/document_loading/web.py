@@ -28,9 +28,8 @@ class GenericWebScraper(DocLoadingService):
     config: ClassConfigModel
     ui_components: dict[str, Any]
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
-        # super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
     def load_docs_with_provider(self, uri) -> list[Document]:
         return WebBaseLoader(web_path=uri).load()
@@ -63,9 +62,8 @@ class GenericRecursiveWebScraper(DocLoadingService):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        # super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.config = self.ClassConfigModel(**kwargs, **config_file_dict)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:

@@ -39,7 +39,7 @@ class PineconeDatabase(DatabaseService):
 
     def __init__(
         self,
-        config: dict[str, typing.Any] = {},
+        config: dict[str, Any] = {},
         **kwargs,
     ):
         super().__init__(config=config, **kwargs)

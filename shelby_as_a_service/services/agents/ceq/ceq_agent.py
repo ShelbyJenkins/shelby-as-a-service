@@ -5,13 +5,14 @@ from typing import Annotated, Any, Generator, Optional, Type, Union
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 import services.text_processing.text_utils as text_utils
-from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.context_index.retrieval import DocRetrieval
 from services.llm.llm_service import LLMService
 
+from shelby_as_a_service.services.service_base import ServiceBase
 
-class CEQAgent(ModuleBase):
+
+class CEQAgent(ServiceBase):
     """
     CEQ (Context enhanced querying) is a subset of RAG (Retrieval Augmented Generation).
     CEQAgent generates responses to user queries using by
@@ -37,11 +38,13 @@ class CEQAgent(ModuleBase):
         The configuration settings for the CEQ agent module.
 
         Attributes:
-            enabled_data_domains (list[str]): A list of enabled data domains.
+            enabled_domains (list[str]): A list of enabled data domains.
             context_to_response_ratio (float): The ratio of context tokens to response tokens to use for generating the response.
         """
 
-        enabled_data_domains: list[str] = ["all"]
+        llm_provider_name: str = "openai_llm"
+        model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
+        enabled_domains: list[str] = ["all"]
         context_to_response_ratio: Annotated[float, Field(ge=0, le=1.0)] = 0.5
 
         class Config:
@@ -52,8 +55,8 @@ class CEQAgent(ModuleBase):
     doc_retrieval: DocRetrieval
     list_of_required_class_instances: list
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
     def run_chat(
         self,
@@ -95,7 +98,7 @@ class CEQAgent(ModuleBase):
         documents = self.doc_retrieval.get_documents(
             query=chat_in,
             max_total_tokens=available_request_tokens,
-            enabled_data_domains=self.config.enabled_data_domains,
+            enabled_domains=self.config.enabled_domains,
         )
 
         previous_response: Optional[dict] = None
@@ -200,7 +203,7 @@ class CEQAgent(ModuleBase):
         components = {}
 
         with gr.Tab(label=self.doc_retrieval.CLASS_UI_NAME):
-            components["enabled_data_domains"] = gr.Dropdown(
+            components["enabled_domains"] = gr.Dropdown(
                 choices=["tatum", "None", "all", "Custom"],
                 value="all",
                 label="Topics to Search",

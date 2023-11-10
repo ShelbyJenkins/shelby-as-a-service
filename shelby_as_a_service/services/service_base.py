@@ -25,27 +25,16 @@ class ServiceBase(AppBase):
     source: SourceModel
     domain: DomainModel
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs) -> None:
+    def __init__(self, config: dict[str, Any] = {}, **kwargs) -> None:
         self.log = logging.getLogger(self.__class__.__name__)
 
-        if (class_config_file_dict := config_file_dict.get(self.CLASS_NAME, {})) == {}:
-            class_config_file_dict = config_file_dict
+        if (class_config := config.get(self.CLASS_NAME, {})) == {}:
+            class_config = config
 
-        merged_config = {**kwargs, **class_config_file_dict}
+        merged_config = {**kwargs, **class_config}
         self.config = self.ClassConfigModel(**merged_config)
 
         self.set_secrets()
-
-    def set_secrets(self) -> None:
-        if required_secrets := getattr(self, "REQUIRED_SECRETS", None):
-            for required_secret in required_secrets:
-                env_secret = None
-                secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
-                env_secret = os.environ.get(secret_str, None)
-                if env_secret:
-                    AppBase.secrets[required_secret] = env_secret
-                else:
-                    print(f"Secret: {required_secret} is None!")
 
     @staticmethod
     def get_requested_class(
@@ -59,17 +48,18 @@ class ServiceBase(AppBase):
                 return available_class
         raise ValueError(f"Requested class {requested_class} not found in {available_classes}")
 
+    @classmethod
     def get_requested_class_instance(
-        self, requested_class_name: str, requested_class_config: dict[str, Any] = {}, **kwargs
+        cls, requested_class_name: str, requested_class_config: dict[str, Any] = {}, **kwargs
     ) -> Any:
-        for available_class in self.AVAILABLE_PROVIDERS:
+        for available_class in cls.AVAILABLE_PROVIDERS:
             if (
                 available_class.CLASS_NAME == requested_class_name
                 or available_class.CLASS_UI_NAME == requested_class_name
             ):
-                return available_class(config_file_dict=requested_class_config, **kwargs)
+                return available_class(config=requested_class_config, **kwargs)
         raise ValueError(
-            f"Requested class {requested_class_name} not found in {self.AVAILABLE_PROVIDERS}"
+            f"Requested class {requested_class_name} not found in {cls.AVAILABLE_PROVIDERS}"
         )
 
     @classmethod
@@ -100,7 +90,7 @@ class ServiceBase(AppBase):
 
         for available_class in cls.AVAILABLE_PROVIDERS:
             if available_class.CLASS_NAME == provider_name:
-                instance = available_class(config_file_dict=provider_config)
+                instance = available_class(config=provider_config)
                 setattr(instance, "source", source)
                 setattr(instance, "domain", domain)
         raise ValueError(f"Requested class {provider_name} not found in {cls.AVAILABLE_PROVIDERS}")

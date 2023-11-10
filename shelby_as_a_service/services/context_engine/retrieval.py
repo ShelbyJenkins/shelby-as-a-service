@@ -1,15 +1,16 @@
 import typing
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.embedding.embedding_service import EmbeddingService
 from services.text_processing.process_retrieval import process_retrieved_docs
 
+from shelby_as_a_service.services.service_base import ServiceBase
 
-class DocRetrieval(ModuleBase):
+
+class DocRetrieval(ServiceBase):
     CLASS_NAME: str = "doc_retrieval"
     CLASS_UI_NAME: str = "doc_retrieval"
 
@@ -28,8 +29,8 @@ class DocRetrieval(ModuleBase):
     list_of_required_class_instances: list[Any]
     embedding_service: EmbeddingService
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
     def get_documents(
         self,
@@ -38,7 +39,7 @@ class DocRetrieval(ModuleBase):
         doc_max_tokens: Optional[float] = None,
         max_total_tokens: Optional[float] = None,
         docs_max_count: Optional[float] = None,
-        enabled_data_domains: Optional[list[str]] = None,
+        enabled_domains: Optional[list[str]] = None,
         topic_constraint_enabled: Optional[bool] = None,
         keyword_generator_enabled: Optional[bool] = None,
         doc_relevancy_check_enabled: Optional[bool] = None,
@@ -50,7 +51,7 @@ class DocRetrieval(ModuleBase):
             query (str): The query to retrieve documents for.
             retrieve_n_docs (int, optional): The number of documents to retrieve from the database. Defaults to None.
             docs_max_count (int, optional): The maximum number of documents to return from the. Defaults to None.
-            enabled_data_domains (list[str], optional): The data domains to retrieve documents from. Defaults to None.
+            enabled_domains (list[str], optional): The data domains to retrieve documents from. Defaults to None.
             topic_constraint_enabled (bool, optional): Whether to enable topic constraints. Defaults to None.
             keyword_generator_enabled (bool, optional): Whether to enable keyword generation. Defaults to None.
             doc_relevancy_check_enabled (bool, optional): Whether to enable document relevancy check. Defaults to None.
@@ -59,11 +60,11 @@ class DocRetrieval(ModuleBase):
             list[Dict[str, Any]]: A list of parsed documents.
         """
 
-        if enabled_data_domains is None:
-            enabled_data_domains = ["all"]
-        if enabled_data_domains == ["all"]:
+        if enabled_domains is None:
+            enabled_domains = ["all"]
+        if enabled_domains == ["all"]:
             print("get all data domains here")
-            # enabled_data_domains
+            # enabled_domains
 
         if (
             self.config.topic_constraint_enabled
@@ -97,7 +98,7 @@ class DocRetrieval(ModuleBase):
             returned_documents_list = self._retrieve_docs(
                 search_terms=query_embedding,
                 retrieve_n_docs=retrieve_n_docs,
-                enabled_data_domains=enabled_data_domains,
+                enabled_domains=enabled_domains,
             )
 
             returned_documents_list = process_retrieved_docs(
@@ -131,9 +132,9 @@ class DocRetrieval(ModuleBase):
             )
         return returned_documents_list
 
-    def _retrieve_docs(self, search_terms, retrieve_n_docs, enabled_data_domains) -> list[Any]:
+    def _retrieve_docs(self, search_terms, retrieve_n_docs, enabled_domains) -> list[Any]:
         returned_documents_list = []
-        for domain_name in enabled_data_domains:
+        for domain_name in enabled_domains:
             returned_documents = self.database_service.query_index(
                 search_terms=search_terms,
                 retrieve_n_docs=retrieve_n_docs,

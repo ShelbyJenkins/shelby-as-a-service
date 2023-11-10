@@ -12,10 +12,6 @@ from services.service_base import ServiceBase
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
-class LLMBase(ABC, ServiceBase):
-    pass
-
-
 class LLMService(ABC, ServiceBase):
     CLASS_NAME: str = "llm_service"
     CLASS_UI_NAME: str = "LLM Settings"
@@ -23,68 +19,44 @@ class LLMService(ABC, ServiceBase):
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
 
-    class ClassConfigModel(BaseModel):
-        llm_provider_name: str = "openai_llm"
-        model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
-
-        class Config:
-            extra = "ignore"
-
-    config: ClassConfigModel
-
-    def __init__(
-        self,
-        llm_provider_name: Optional[AVAILABLE_PROVIDERS_NAMES] = None,
-        config_file_dict: dict[str, typing.Any] = {},
+    @classmethod
+    def load_service_from_provider_name(
+        cls,
+        llm_provider_name: AVAILABLE_PROVIDERS_NAMES,
+        llm_provider_config: dict[str, Any] = {},
         **kwargs,
-    ):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
-
-        if llm_provider_name is None:
-            self.llm_provider_name = self.config.llm_provider_name
-        else:
-            self.llm_provider_name = llm_provider_name
-
-        self.current_llm_provider = self.get_requested_class_instance(self.llm_provider_name)
-        self.doc_db_instance: LLMBase = self.get_requested_class_instance(
-            requested_class_name=self.llm_provider_name,
-            requested_class_config=config_file_dict,
+    ) -> "LLMService":
+        return cls.get_requested_class_instance(
+            requested_class_name=llm_provider_name,
+            requested_class_config=llm_provider_config,
+            **kwargs,
         )
 
     def create_chat(
         self,
         query=None,
-        prompt_template_path=None,
-        documents=None,
-        llm_provider=None,
         llm_model_name=None,
         logit_bias=None,
         max_tokens=None,
         stream=None,
     ):
-        provider_instance = self.get_requested_class_instance(
-            llm_provider if llm_provider is not None else self.config.llm_provider,
-        )
-        if provider_instance:
-            response = {}
-            for response in provider_instance.create_chat(
-                query=query,
-                prompt_template_path=prompt_template_path,
-                documents=documents,
-                llm_model_name=llm_model_name,
-                logit_bias=logit_bias,
-                max_tokens=max_tokens,
-                stream=stream,
-            ):
-                yield response
+        response = {}
+        for response in self.create_chat_with_provider(
+            query=query,
+            llm_model_name=llm_model_name,
+            logit_bias=logit_bias,
+            max_tokens=max_tokens,
+            stream=stream,
+        ):
+            yield response
 
-            return {
-                "response_content_string": response["response_content_string"],
-                "total_prompt_tokens": f"Request token count: {response['total_prompt_tokens']}",
-                "total_completion_tokens": f"Response token count: {response['total_completion_tokens']}",
-                "total_token_count": f"Total token count: {response['total_token_count']}",
-                "model_name": response["model_name"],
-            }
+        return {
+            "response_content_string": response["response_content_string"],
+            "total_prompt_tokens": f"Request token count: {response['total_prompt_tokens']}",
+            "total_completion_tokens": f"Response token count: {response['total_completion_tokens']}",
+            "total_token_count": f"Total token count: {response['total_token_count']}",
+            "model_name": response["model_name"],
+        }
 
     def get_available_request_tokens(
         self,
@@ -123,29 +95,41 @@ class LLMService(ABC, ServiceBase):
         else:
             return 0, 0
 
-    @classmethod
-    def create_settings_ui(self):
-        components = {}
+    @abstractmethod
+    def create_chat_with_provider(
+        self,
+        query=None,
+        documents=None,
+        llm_model_name=None,
+        logit_bias=None,
+        max_tokens=None,
+        stream=None,
+    ):
+        raise NotImplementedError
 
-        components["model_token_utilization"] = gr.Slider(
-            value=cls.config.model_token_utilization,
-            label="Percent of Model Context Size to Use",
-            minimum=0.0,
-            maximum=1.0,
-            step=0.05,
-            min_width=0,
-        )
+    # @classmethod
+    # def create_settings_ui(cls):
+    #     components = {}
 
-        components["llm_provider"] = gr.Dropdown(
-            value=cls.current_llm_provider.CLASS_UI_NAME,
-            choices=cls.list_of_class_ui_names,
-            label="LLM Provider",
-            container=True,
-        )
+    #     components["model_token_utilization"] = gr.Slider(
+    #         value=cls.config.model_token_utilization,
+    #         label="Percent of Model Context Size to Use",
+    #         minimum=0.0,
+    #         maximum=1.0,
+    #         step=0.05,
+    #         min_width=0,
+    #     )
 
-        for provider_instance in cls.list_of_required_class_instances:
-            provider_instance.create_settings_ui()
+    #     components["llm_provider"] = gr.Dropdown(
+    #         value=cls.current_llm_provider.CLASS_UI_NAME,
+    #         choices=cls.list_of_class_ui_names,
+    #         label="LLM Provider",
+    #         container=True,
+    #     )
 
-        GradioHelpers.create_settings_event_listener(cls.config, components)
+    #     for provider_instance in cls.list_of_required_class_instances:
+    #         provider_instance.create_settings_ui()
 
-        return components
+    #     GradioHelpers.create_settings_event_listener(cls.config, components)
+
+    #     return components

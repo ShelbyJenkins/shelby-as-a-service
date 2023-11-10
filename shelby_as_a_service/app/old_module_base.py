@@ -23,22 +23,22 @@ class ModuleBase(AppBase):
     log = logging.getLogger("ModuleBase")
     REQUIRED_CLASSES: list[Type["ModuleBase"]] = []
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs) -> None:
+    def __init__(self, config: dict[str, Any] = {}, **kwargs) -> None:
         self.log = logging.getLogger(self.__class__.__name__)
 
         self.list_of_class_names = []
         self.list_of_class_ui_names = []
         self.list_of_required_class_instances = []
 
-        if (class_config_file_dict := config_file_dict.get(self.CLASS_NAME, {})) == {}:
-            class_config_file_dict = config_file_dict
+        if (class_config := config.get(self.CLASS_NAME, {})) == {}:
+            class_config = config
 
-        merged_config = {**kwargs, **class_config_file_dict}
+        merged_config = {**kwargs, **class_config}
 
         if model_definitions := getattr(self, "MODEL_DEFINITIONS", None):
             self.list_of_available_model_names = []
             available_models = ModuleBase.create_model_instances(
-                self, model_definitions, class_config_file_dict, **kwargs
+                self, model_definitions, class_config, **kwargs
             )
             merged_config["available_models"] = available_models
 
@@ -52,7 +52,7 @@ class ModuleBase(AppBase):
             if (class_name := getattr(required_class, "CLASS_NAME", None)) is None:
                 self.log.error(f"Class name not found for {required_class}")
                 continue
-            new_instance: "ModuleBase" = required_class(class_config_file_dict, **kwargs)
+            new_instance: "ModuleBase" = required_class(class_config, **kwargs)
             setattr(self, class_name, new_instance)
 
             self.list_of_class_names.append(new_instance.CLASS_NAME)
@@ -64,31 +64,20 @@ class ModuleBase(AppBase):
 
     def create_model_instances(
         self,
-        model_definitions: dict[str, typing.Any],
-        class_config_file_dict: dict[str, typing.Any] = {},
+        model_definitions: dict[str, Any],
+        class_config: dict[str, Any] = {},
         **kwargs,
     ) -> dict[str, BaseModel]:
         available_models = {}
         for model_name, definition in model_definitions.items():
-            model_config_file_dict = class_config_file_dict.get(model_name, {})
-            new_model_instance = self.ModelConfig(**{**model_config_file_dict, **definition})
+            model_config = class_config.get(model_name, {})
+            new_model_instance = self.ModelConfig(**{**model_config, **definition})
             self.list_of_available_model_names.append(model_name)
             available_models[model_name] = new_model_instance
 
         if models_type := getattr(self, "MODELS_TYPE", None):
             setattr(self, models_type, self.list_of_available_model_names)
         return available_models
-
-    def set_secrets(self) -> None:
-        if required_secrets := getattr(self, "REQUIRED_SECRETS", None):
-            for required_secret in required_secrets:
-                env_secret = None
-                secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
-                env_secret = os.environ.get(secret_str, None)
-                if env_secret:
-                    AppBase.secrets[required_secret] = env_secret
-                else:
-                    print(f"Secret: {required_secret} is None!")
 
     def get_model_instance(self, requested_model_name: str) -> Any:
         model_instance = None
@@ -99,30 +88,3 @@ class ModuleBase(AppBase):
                 return model_instance
 
         raise ValueError(f"Requested model {requested_model_name} not found.")
-
-    @staticmethod
-    def get_requested_class(
-        requested_class: str, available_classes: list[typing.Type["ModuleBase"]]
-    ) -> Any:
-        for available_class in available_classes:
-            if (
-                available_class.CLASS_NAME == requested_class
-                or available_class.CLASS_UI_NAME == requested_class
-            ):
-                return available_class
-        raise ValueError(f"Requested class {requested_class} not found in {available_classes}")
-
-    def get_requested_class_instance(
-        self,
-        requested_class_name: str,
-        requested_class_config: dict[str, Any] = {},
-    ) -> Any:
-        for available_class in self.REQUIRED_CLASSES:
-            if (
-                available_class.CLASS_NAME == requested_class_name
-                or available_class.CLASS_UI_NAME == requested_class_name
-            ):
-                return available_class(config_file_dict=requested_class_config)
-        raise ValueError(
-            f"Requested class {requested_class_name} not found in {self.REQUIRED_CLASSES}"
-        )

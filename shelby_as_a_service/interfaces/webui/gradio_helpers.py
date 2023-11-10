@@ -1,8 +1,9 @@
 import typing
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import gradio as gr
-from app.module_base import ModuleBase
+
+from shelby_as_a_service.services.service_base import ServiceBase
 
 
 def abstract_service_ui_components(

@@ -7,12 +7,12 @@ import interfaces.webui.gradio_helpers as GradioHelpers
 import openai
 import services.prompt_templates.prompt_templates as PromptTemplates
 import services.text_processing.text_utils as text_utils
-from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
+from services.service_base import ServiceBase
 from typing_extensions import Annotated
 
 
-class OpenAILLM(ModuleBase):
+class OpenAILLM(ServiceBase):
     class_name = Literal["openai_llm"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI LLM"
@@ -74,15 +74,13 @@ class OpenAILLM(ModuleBase):
     llm_models: list
     current_model_class: ModelConfig
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
         self.set_current_model(self.config.enabled_model_name)
 
-    def create_chat(
+    def create_chat_with_provider(
         self,
         query=None,
-        prompt_template_path=None,
-        documents=None,
         llm_model_name: Optional[str] = None,
         max_tokens=None,
         logit_bias=None,
@@ -90,8 +88,6 @@ class OpenAILLM(ModuleBase):
     ):
         prompt, llm_model, total_prompt_tokens = self.prep_chat(
             query=query,
-            prompt_template_path=prompt_template_path,
-            documents=documents,
             llm_model_name=llm_model_name,
         )
 
@@ -225,25 +221,6 @@ class OpenAILLM(ModuleBase):
                     "model_name": llm_model.MODEL_NAME,
                 }
                 return response
-
-    def prep_chat(
-        self, query, prompt_template_path=None, documents=None, llm_model_name: Optional[str] = None
-    ) -> typing.Tuple[list[dict[str, str]], "ModelConfig", int]:
-        llm_model = self.get_model(requested_model_name=llm_model_name)
-
-        prompt = PromptTemplates.create_openai_prompt(
-            query=query,
-            prompt_template_path=prompt_template_path,
-            documents=documents,
-        )
-
-        total_prompt_tokens = text_utils.tiktoken_len_of_openai_prompt(prompt, llm_model)
-
-        if prompt is None or llm_model is None or total_prompt_tokens is None:
-            raise ValueError(
-                f"Error with input values - prompt: {prompt}, model: {llm_model}, total_prompt_tokens: {total_prompt_tokens}"
-            )
-        return prompt, llm_model, total_prompt_tokens
 
     def create_settings_ui(self):
         model_dropdown = gr.Dropdown(

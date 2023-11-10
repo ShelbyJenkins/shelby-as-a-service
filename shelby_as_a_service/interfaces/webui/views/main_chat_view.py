@@ -1,16 +1,17 @@
 import typing
 from decimal import Decimal
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 from agents.ceq.ceq_agent import CEQAgent
 from agents.vanillallm.vanillallm_agent import VanillaLLM
-from app.module_base import ModuleBase
 from pydantic import BaseModel
 
+from shelby_as_a_service.services.service_base import ServiceBase
 
-class MainChatView(ModuleBase):
+
+class MainChatView(ServiceBase):
     CLASS_NAME: str = "main_chat_view"
     CLASS_UI_NAME: str = "Chat"
     SETTINGS_UI_COL = 2
@@ -31,8 +32,8 @@ class MainChatView(ModuleBase):
     vanillallm_agent: Any
     current_agent_instance: Any
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
         self.current_agent_instance = self.get_requested_class_instance(
             self.config.current_agent_name

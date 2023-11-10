@@ -191,3 +191,14 @@ class AppBase:
                 sprite = getattr(cls, sprite_name)
                 sprite.run_sprite()
                 # executor.submit(run_sprite_with_restart, sprite)
+
+    def set_secrets(self) -> None:
+        if required_secrets := getattr(self, "REQUIRED_SECRETS", None):
+            for required_secret in required_secrets:
+                env_secret = None
+                secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
+                env_secret = os.environ.get(secret_str, None)
+                if env_secret:
+                    AppBase.secrets[required_secret] = env_secret
+                else:
+                    print(f"Secret: {required_secret} is None!")

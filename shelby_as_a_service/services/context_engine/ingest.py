@@ -1,15 +1,18 @@
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-# from modules.index.data_model import DataModels
-from app.module_base import ModuleBase
 from services.context_index.context_index_model import DomainModel, SourceModel
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
-from services.text_processing.ingest_processing_service import IngestProcessingService
+
+# from modules.index.data_model import DataModels
+from shelby_as_a_service.services.service_base import ServiceBase
+from shelby_as_a_service.services.text_processing.ingest.ingest_processing_service import (
+    IngestProcessingService,
+)
 
 
-class DocIngest(ModuleBase):
+class DocIngest(ServiceBase):
     CLASS_NAME: str = "doc_ingest"
     CLASS_UI_NAME: str = "doc_ingest"
 

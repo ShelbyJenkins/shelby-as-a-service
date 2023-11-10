@@ -3,7 +3,6 @@ from typing import Any, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
 from pydantic import BaseModel
 from services.context_index.context_index import ContextIndex
 from services.context_index.context_index_model import (
@@ -17,10 +16,14 @@ from services.context_index.context_index_model import (
 from services.context_index.ingest import DocIngest
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
-from services.text_processing.ingest_processing_service import IngestProcessingService
+
+from shelby_as_a_service.services.service_base import ServiceBase
+from shelby_as_a_service.services.text_processing.ingest.ingest_processing_service import (
+    IngestProcessingService,
+)
 
 
-class ContextIndexView(ModuleBase):
+class ContextIndexView(ServiceBase):
     CLASS_NAME: str = "context_index_view"
     CLASS_UI_NAME: str = "Context Index"
     SETTINGS_UI_COL = 4
@@ -48,8 +51,8 @@ class ContextIndexView(ModuleBase):
     domains_dd: gr.Dropdown
     sources_dd: gr.Dropdown
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
         self.doc_loader_service = DocLoadingService
         self.database_service = DatabaseService

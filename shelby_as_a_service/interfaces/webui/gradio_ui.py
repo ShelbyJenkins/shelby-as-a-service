@@ -2,19 +2,20 @@ import asyncio
 import threading
 import typing
 from decimal import Decimal
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 import gradio as gr
 from app.config_manager import ConfigManager
-from app.module_base import ModuleBase
 from interfaces.webui.gradio_themes import AtYourServiceTheme
 from interfaces.webui.views.context_index_view import ContextIndexView
 from interfaces.webui.views.main_chat_view import MainChatView
 from interfaces.webui.views.settings_view import SettingsView
 from pydantic import BaseModel
 
+from shelby_as_a_service.services.service_base import ServiceBase
 
-class GradioUI(ModuleBase):
+
+class GradioUI(ServiceBase):
     CLASS_NAME: str = "gradio_ui"
     CLASS_UI_NAME: str = "gradio_ui"
     settings_ui_col_scaling = 2
@@ -37,9 +38,9 @@ class GradioUI(ModuleBase):
     list_of_required_class_instances: list
     list_of_extension_configs: Optional[list]
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
         ConfigManager.add_extension_views_to_gradio_ui(self, self.list_of_extension_configs)
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        super().__init__(config=config, **kwargs)
 
     def create_gradio_interface(self):
         all_setting_ui_tabs = []

@@ -3,13 +3,14 @@ from decimal import Decimal
 from typing import Any, Literal, Optional, Type
 
 import services.text_processing.text_utils as text_utils
-from app.module_base import ModuleBase
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
-from services.embedding.embedding_service import EmbeddingBase
+from services.embedding.embedding_service import EmbeddingService
+
+from shelby_as_a_service.services.service_base import ServiceBase
 
 
-class OpenAIEmbedding(EmbeddingBase):
+class OpenAIEmbedding(EmbeddingService):
     class_name = Literal["openai_embedding"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI Embedding"
@@ -38,7 +39,7 @@ class OpenAIEmbedding(EmbeddingBase):
     embedding_models: list
     model_instance: "ModelConfig"
 
-    def __init__(self, config: dict[str, typing.Any] = {}, **kwargs):
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
         super().__init__(config=config, **kwargs)
         self.model_instance = self.get_model_instance(
             requested_model_name=self.config.enabled_model_name

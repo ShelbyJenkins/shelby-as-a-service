@@ -3,12 +3,13 @@ from typing import Annotated, Any, Dict, Generator, Optional, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
 from pydantic import BaseModel, Field
 from services.llm.llm_service import LLMService
 
+from shelby_as_a_service.services.service_base import ServiceBase
 
-class VanillaLLM(ModuleBase):
+
+class VanillaLLM(ServiceBase):
     CLASS_NAME: str = "vanillallm_agent"
     CLASS_UI_NAME = "VanillaLLM Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/vanillallm/vanillallm_prompt_templates.yaml"
@@ -16,6 +17,8 @@ class VanillaLLM(ModuleBase):
 
     class ClassConfigModel(BaseModel):
         agent_select_status_message: str = "EZPZ"
+        model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
+        llm_provider_name: str = "openai_llm"
 
         class Config:
             extra = "ignore"
@@ -24,10 +27,8 @@ class VanillaLLM(ModuleBase):
     llm_service: LLMService
     list_of_required_class_instances: list
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(
-            config_file_dict=config_file_dict, llm_provider="openai_llm", model="gpt-4", **kwargs
-        )
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, llm_provider="openai_llm", model="gpt-4", **kwargs)
 
     def run_chat(
         self,

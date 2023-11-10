@@ -1,13 +1,14 @@
 import typing
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
-from app.module_base import ModuleBase
 from pydantic import BaseModel
 
+from shelby_as_a_service.services.service_base import ServiceBase
 
-class SettingsView(ModuleBase):
+
+class SettingsView(ServiceBase):
     CLASS_NAME: str = "settings_view"
     CLASS_UI_NAME: str = "⚙️"
     SETTINGS_UI_COL = 4
@@ -21,8 +22,8 @@ class SettingsView(ModuleBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
     def create_primary_ui(self):
         components = {}

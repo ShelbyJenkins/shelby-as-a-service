@@ -1,15 +1,16 @@
 import os
 import typing
-from typing import Any, Dict, Type, Union
+from typing import Any, Type, Union
 
 import gradio as gr
 import interfaces.webui.gradio_helpers as GradioHelpers
 import services.text_processing.text_utils as text_utils
-from app.module_base import ModuleBase
 from pydantic import BaseModel
 
+from shelby_as_a_service.services.service_base import ServiceBase
 
-class LocalFileDatabase(ModuleBase):
+
+class LocalFileDatabase(ServiceBase):
     CLASS_NAME: str = "local_file_database"
     CLASS_UI_NAME: str = "Local Files as a Database"
 
@@ -18,8 +19,8 @@ class LocalFileDatabase(ModuleBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict: dict[str, typing.Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(self, config: dict[str, Any] = {}, **kwargs):
+        super().__init__(config=config, **kwargs)
 
     def write_documents_to_database(self, documents, data_domain, data_source):
         domain_name_file_path = os.path.join(
