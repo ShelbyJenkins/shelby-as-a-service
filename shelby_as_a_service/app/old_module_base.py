@@ -58,9 +58,9 @@ class ModuleBase(AppBase):
             self.list_of_class_names.append(new_instance.CLASS_NAME)
             self.list_of_class_ui_names.append(new_instance.CLASS_UI_NAME)
             self.list_of_required_class_instances.append(new_instance)
-        from services.context_index.context_index import ContextIndex
+        from services.context_index.context_index import DocIndex
 
-        self.context_index: ContextIndex
+        self.doc_index: DocIndex
 
     def create_model_instances(
         self,

@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
     __abstract__ = True
 
 
-class SqliteDatabase(AppBase):
+class IndexBase(AppBase):
     class_name = Literal["index"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Local Index - SQLite"

@@ -73,7 +73,7 @@ class IngestProcessingService(ABC, ServiceBase):
             doc_db_ids_requiring_deletion.extend(self.clear_and_get_existing_doc_db_chunks(doc))
             upsert_docs.append(self.create_document_and_chunk_models(text_chunks, doc))
 
-        self.context_index.session.commit()
+        self.doc_index.session.commit()
         self.log.info(f"Min: {min(self.docs_token_counts)}")
         self.log.info(f"Avg: {int(sum(self.docs_token_counts) / len(self.docs_token_counts))}")
         self.log.info(f"Max: {max(self.docs_token_counts)}")
@@ -88,7 +88,7 @@ class IngestProcessingService(ABC, ServiceBase):
             return []
         for chunk in ingest_doc.existing_document_model.context_chunks:
             doc_db_ids.append(chunk.id)
-            self.context_index.session.delete(chunk)
+            self.doc_index.session.delete(chunk)
         return doc_db_ids
 
     def create_document_and_chunk_models(

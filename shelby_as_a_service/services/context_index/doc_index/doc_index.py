@@ -6,7 +6,7 @@ from services.document_loading.document_loading_service import DocLoadingService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from services.context_index.index_base import SqliteDatabase
+from services.context_index.index_base import IndexBase
 from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
 )
@@ -24,7 +24,7 @@ from .doc_index_model import (
 )
 
 
-class ContextIndex(SqliteDatabase):
+class DocIndex(IndexBase):
     doc_index_model: DocIndexModel
     session: Session
     log: logging.Logger
@@ -34,44 +34,44 @@ class ContextIndex(SqliteDatabase):
     def __init__(self) -> None:
         self.log = logging.getLogger(__name__)
 
-        ContextIndex.setup_index()
-        ContextIndex.session = ContextIndex.get_session()
+        DocIndex.setup_index()
+        DocIndex.session = DocIndex.get_session()
         try:
             self.setup_context_index()
         except SQLAlchemyError:
-            ContextIndex.session.rollback()
+            DocIndex.session.rollback()
             raise
 
     def setup_context_index(self):
         if doc_index_model := self.session.query(DocIndexModel).first():
-            ContextIndex.doc_index_model = doc_index_model
+            DocIndex.doc_index_model = doc_index_model
             self.add_doc_dbs_to_index()
             self.add_default_context_templates_to_index()
             # Need a function here to update any new services/providers to sources/domains
         else:
-            ContextIndex.doc_index_model = DocIndexModel()
-            ContextIndex.session.add(ContextIndex.doc_index_model)
-            ContextIndex.session.flush()
+            DocIndex.doc_index_model = DocIndexModel()
+            DocIndex.session.add(DocIndex.doc_index_model)
+            DocIndex.session.flush()
 
             self.add_doc_dbs_to_index()
             self.add_default_context_templates_to_index()
 
             self.create_domain()
 
-        ContextIndex.commit_context_index()
+        DocIndex.commit_context_index()
 
     @staticmethod
     def commit_context_index():
-        ContextIndex.session = ContextIndex.commit_session(ContextIndex.session)
-        ContextIndex.session.add(ContextIndex.doc_index_model)
+        DocIndex.session = DocIndex.commit_session(DocIndex.session)
+        DocIndex.session.add(DocIndex.doc_index_model)
 
     @property
     def list_of_all_context_index_domain_names(self) -> list:
-        return [domain.name for domain in ContextIndex.doc_index_model.domains]
+        return [domain.name for domain in DocIndex.doc_index_model.domains]
 
     @property
     def index(self) -> "DocIndexModel":
-        return ContextIndex.doc_index_model
+        return DocIndex.doc_index_model
 
     @property
     def domain(self) -> "DomainModel":
@@ -87,7 +87,7 @@ class ContextIndex(SqliteDatabase):
 
     @property
     def list_of_all_context_index_source_names(self) -> list:
-        all_sources = ContextIndex.session.query(SourceModel).all()
+        all_sources = DocIndex.session.query(SourceModel).all()
         return [source.name for source in all_sources]
 
     def parse_parent_instance(
@@ -136,7 +136,7 @@ class ContextIndex(SqliteDatabase):
                 name=name,
                 config=provider_class_model.ClassConfigModel(**config).model_dump(),
             )
-            ContextIndex.session.flush()
+            DocIndex.session.flush()
         if not isinstance(requested_instance, DocIngestProcessorModel):
             raise Exception(
                 "Unexpected error: requested_instance should be of type DocIngestProcessorModel."
@@ -174,7 +174,7 @@ class ContextIndex(SqliteDatabase):
                 name=name,
                 config=provider_class_model.ClassConfigModel(**config).model_dump(),
             )
-            ContextIndex.session.flush()
+            DocIndex.session.flush()
         if not isinstance(requested_instance, DocLoaderModel):
             raise Exception(
                 "Unexpected error: requested_instance should be of type DocLoaderModel."
@@ -206,7 +206,7 @@ class ContextIndex(SqliteDatabase):
                 name=name,
                 config=provider_class_model.ClassConfigModel(**config).model_dump(),
             )
-            ContextIndex.session.flush()
+            DocIndex.session.flush()
         if not isinstance(requested_instance, DocDBModel):
             raise Exception(
                 "Unexpected error: requested_instance should be of type DocLoaderModel."
@@ -349,7 +349,7 @@ class ContextIndex(SqliteDatabase):
         else:
             raise Exception(f"Unexpected error: {set_model_type.__name__} not found.")
 
-        ContextIndex.session.flush()
+        DocIndex.session.flush()
 
     def create_domain(
         self,
@@ -368,12 +368,12 @@ class ContextIndex(SqliteDatabase):
             new_description = DomainModel.DEFAULT_DESCRIPTION
         new_instance = DomainModel(name=new_name, description=new_description)
 
-        ContextIndex.doc_index_model.domains.append(new_instance)
-        ContextIndex.session.flush()
+        DocIndex.doc_index_model.domains.append(new_instance)
+        DocIndex.session.flush()
 
         if not self.index.current_domain:
             self.index.current_domain = new_instance
-            ContextIndex.session.flush()
+            DocIndex.session.flush()
         if not clone_name and not clone_id:
             if not requested_template_name:
                 requested_template_name = new_instance.DEFAULT_TEMPLATE_NAME
@@ -437,11 +437,11 @@ class ContextIndex(SqliteDatabase):
         new_instance = SourceModel(name=new_name, description=new_description)
 
         parent_domain.sources.append(new_instance)
-        ContextIndex.session.flush()
+        DocIndex.session.flush()
 
         if not parent_domain.current_source:
             parent_domain.current_source = new_instance
-            ContextIndex.session.flush()
+            DocIndex.session.flush()
         if not clone_name and not clone_id:
             if not requested_template_name:
                 requested_template_name = new_instance.DEFAULT_TEMPLATE_NAME
@@ -507,7 +507,7 @@ class ContextIndex(SqliteDatabase):
                 "Unexpected error: enabled_doc_loader should be of type DocLoaderModel."
             )
         target_instance.doc_loaders.append(enabled_doc_loader)
-        ContextIndex.session.flush()
+        DocIndex.session.flush()
         target_instance.enabled_doc_loader = enabled_doc_loader
 
         if enabled_doc_ingest_processor_name is None:
@@ -523,7 +523,7 @@ class ContextIndex(SqliteDatabase):
                 "Unexpected error: enabled_doc_ingest_processor should be of type DocIngestProcessorModel."
             )
         target_instance.doc_ingest_processors.append(enabled_doc_ingest_processor)
-        ContextIndex.session.flush()
+        DocIndex.session.flush()
         target_instance.enabled_doc_ingest_processor = enabled_doc_ingest_processor
 
         if enabled_doc_db_name is None:
@@ -531,7 +531,7 @@ class ContextIndex(SqliteDatabase):
         target_instance.enabled_doc_db = self.get_or_create_doc_db_instance(
             name=enabled_doc_db_name
         )
-        ContextIndex.session.flush()
+        DocIndex.session.flush()
 
     def get_service_provider_class_model(
         self,
@@ -588,7 +588,7 @@ class ContextIndex(SqliteDatabase):
         else:
             raise Exception(f"Unexpected error: {requested_model_type.__name__} not found.")
 
-        ContextIndex.session.flush()
+        DocIndex.session.flush()
 
     def add_doc_dbs_to_index(self):
         for db_class in DatabaseService.REQUIRED_CLASSES:
@@ -596,7 +596,7 @@ class ContextIndex(SqliteDatabase):
             existing_config = next(
                 (
                     doc_db
-                    for doc_db in ContextIndex.doc_index_model.doc_dbs
+                    for doc_db in DocIndex.doc_index_model.doc_dbs
                     if doc_db.name == doc_db_provider_name
                 ),
                 None,
@@ -604,17 +604,17 @@ class ContextIndex(SqliteDatabase):
 
             if not existing_config:
                 db_config = db_class.ClassConfigModel().model_dump()
-                ContextIndex.doc_index_model.doc_dbs.append(
+                DocIndex.doc_index_model.doc_dbs.append(
                     DocDBModel(name=doc_db_provider_name, config=db_config)
                 )
-                ContextIndex.session.flush()
+                DocIndex.session.flush()
 
     def add_default_context_templates_to_index(self):
         for available_template in DocIndexTemplates.AVAILABLE_TEMPLATES:
             existing_config = next(
                 (
                     index_context_template
-                    for index_context_template in ContextIndex.doc_index_model.doc_index_templates
+                    for index_context_template in DocIndex.doc_index_model.doc_index_templates
                     if index_context_template.name == available_template.TEMPLATE_NAME
                 ),
                 None,
@@ -637,8 +637,8 @@ class ContextIndex(SqliteDatabase):
                     batch_update_enabled=available_template.batch_update_enabled,
                 )
 
-                ContextIndex.doc_index_model.doc_index_templates.append(new_template)
-                ContextIndex.session.flush()
+                DocIndex.doc_index_model.doc_index_templates.append(new_template)
+                DocIndex.session.flush()
 
     def save_config_as_template(
         self,
@@ -649,7 +649,7 @@ class ContextIndex(SqliteDatabase):
             new_template_name = parent_object.name
 
         new_context_template_name = self.check_and_handle_name_collision(
-            existing_names=ContextIndex.doc_index_model.list_of_doc_index_template_names,
+            existing_names=DocIndex.doc_index_model.list_of_doc_index_template_names,
             new_name=new_template_name,
         )
         new_template = self.create_template(
@@ -663,8 +663,8 @@ class ContextIndex(SqliteDatabase):
         )
 
         # Append it to the index's list of context_configs
-        ContextIndex.doc_index_model.doc_index_templates.append(new_template)
-        ContextIndex.session.flush()
+        DocIndex.doc_index_model.doc_index_templates.append(new_template)
+        DocIndex.session.flush()
 
     def create_template(
         self,

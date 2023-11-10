@@ -7,7 +7,7 @@ from typing import Any, Optional, Type
 import gradio as gr
 from app.config_manager import ConfigManager
 from interfaces.webui.gradio_themes import AtYourServiceTheme
-from interfaces.webui.views.context_index_view import ContextIndexView
+from interfaces.webui.views.context_index_view import DocIndexView
 from interfaces.webui.views.main_chat_view import MainChatView
 from interfaces.webui.views.settings_view import SettingsView
 from pydantic import BaseModel
@@ -20,8 +20,8 @@ class GradioUI(ServiceBase):
     settings_ui_col_scaling = 2
     primary_ui_col_scaling = 8
 
-    # REQUIRED_CLASSES: list[Type] = [MainChatView, ContextIndexView, SettingsView]
-    REQUIRED_CLASSES: list[Type] = [MainChatView, ContextIndexView]
+    # REQUIRED_CLASSES: list[Type] = [MainChatView, DocIndexView, SettingsView]
+    REQUIRED_CLASSES: list[Type] = [MainChatView, DocIndexView]
     # REQUIRED_CLASSES: list[Type] = [MainChatView]
 
     class ClassConfigModel(BaseModel):

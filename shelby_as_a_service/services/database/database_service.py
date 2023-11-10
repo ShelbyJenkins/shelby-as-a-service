@@ -206,7 +206,7 @@ class DatabaseService(ABC, ServiceBase):
     #     ui_components = {}
 
     #     with gr.Accordion(label="Pinecone"):
-    #         pinecone_model_instance = self.context_index.get_or_create(
+    #         pinecone_model_instance = self.doc_index.get_or_create(
     #             name="pinecone_database"
     #         )
     #         pinecone_database = PineconeDatabase(config=pinecone_model_instance.config)

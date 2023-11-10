@@ -84,9 +84,9 @@ class AppBase:
 
         AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
         cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app_config.app_name, "index")
-        from services.context_index.context_index import ContextIndex
+        from services.context_index.doc_index.doc_index import DocIndex
 
-        AppBase.context_index: ContextIndex = ContextIndex()
+        AppBase.doc_index: DocIndex = DocIndex()
 
         AppBase._load_sprite_instances(app_file_dict)
 

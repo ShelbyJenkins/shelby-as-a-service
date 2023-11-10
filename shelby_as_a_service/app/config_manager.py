@@ -124,7 +124,7 @@ class ConfigManager:
         return app_name
 
     @staticmethod
-    def load_app(app_name) -> Dict[str, Any]:
+    def load_app(app_name) -> dict[str, Any]:
         try:
             with open(
                 f"app/your_apps/{app_name}/app_config.json",
@@ -260,7 +260,7 @@ class ConfigManager:
         app_dict = {}
         app_dict["app"] = AppBase.app_config.model_dump()
 
-        # app_dict[AppBase.context_index.CLASS_NAME] = AppBase.context_index.index_config.model_dump()
+        # app_dict[AppBase.doc_index.CLASS_NAME] = AppBase.doc_index.index_config.model_dump()
 
         for sprite in AppBase.available_sprite_instances:
             recurse(sprite, app_dict)
