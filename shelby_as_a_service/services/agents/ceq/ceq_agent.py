@@ -3,15 +3,15 @@ import typing
 from typing import Annotated, Any, Generator, Literal, Optional, Type, Union, get_args
 
 import gradio as gr
-import services.text_processing.text_utils as text_utils
+import services.llm as llm
 from pydantic import BaseModel, Field
-from services.context_index.retrieval import DocRetrieval
-from services.gradio_interface.gradio_service import GradioService
+from services.agents.agent_base import AgentBase
+from services.context_index.doc_index.doc_retrieval import DocRetrieval
+from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_service import LLMService
-from services.service_base import ServiceBase
 
 
-class CEQAgent(ServiceBase):
+class CEQAgent(AgentBase):
     """
     CEQ (Context enhanced querying) is a subset of RAG (Retrieval Augmented Generation).
     CEQAgent generates responses to user queries using by
@@ -55,14 +55,16 @@ class CEQAgent(ServiceBase):
     doc_retrieval: DocRetrieval
     list_of_required_class_instances: list
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(
+            config_file_dict=config_file_dict, llm_provider_name="openai_llm", **kwargs
+        )
 
-    def run_chat(
+    def create_chat(
         self,
         chat_in,
-        llm_provider: Optional[str] = None,
-        llm_model_name: Optional[str] = None,
+        llm_provider_name: llm.AVAILABLE_PROVIDERS_NAMES,
+        llm_model_name: str,
         model_token_utilization: Optional[float] = None,
         context_to_response_ratio: Optional[float] = None,
         stream: Optional[bool] = None,
@@ -84,32 +86,45 @@ class CEQAgent(ServiceBase):
         Yields:
             str: The generated response to the user input.
         """
-        available_request_tokens, max_tokens = self.llm_service.get_available_request_tokens(
+        prompt = self.create_prompt(
             query=chat_in,
+            llm_provider_name=llm_provider_name,
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
-            model_token_utilization=model_token_utilization,
+        )
+
+        available_request_tokens, _ = self.llm_service.get_available_request_tokens(
+            prompt=prompt,
+            model_token_utilization=model_token_utilization
+            if model_token_utilization is not None
+            else self.config.model_token_utilization,
             context_to_response_ratio=context_to_response_ratio
             if context_to_response_ratio is not None
             else self.config.context_to_response_ratio,
-            llm_provider=llm_provider,
+            llm_provider_name=llm_provider_name,
             llm_model_name=llm_model_name,
         )
 
-        documents = self.doc_retrieval.get_documents(
+        context_docs = self.doc_retrieval.get_documents(
             query=chat_in,
             max_total_tokens=available_request_tokens,
             enabled_domains=self.config.enabled_domains,
         )
 
+        prompt = self.create_prompt(
+            query=chat_in,
+            llm_provider_name=llm_provider_name,
+            prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
+            context_docs=context_docs,
+        )
+
         previous_response: Optional[dict] = None
         final_response: Optional[dict] = None
+
         for current_response in self.llm_service.create_chat(
-            query=chat_in,
-            prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
-            documents=documents,
-            llm_provider=llm_provider,
+            prompt=prompt,
+            llm_provider_name=llm_provider_name,
             llm_model_name=llm_model_name,
-            max_tokens=max_tokens,
+            model_token_utilization=model_token_utilization,
             stream=stream,
         ):
             if previous_response is not None:
@@ -122,7 +137,7 @@ class CEQAgent(ServiceBase):
         llm_model_name = final_response.get("model_name", None) or "unknown llm model"  # type: ignore
         response_content_string = final_response.get("response_content_string", None)  # type: ignore
 
-        full_response = self._ceq_append_meta(response_content_string, documents, llm_model_name)
+        full_response = self._ceq_append_meta(response_content_string, context_docs, llm_model_name)
 
         if sprite_name == "webui_sprite":
             yield self._parse_local_markdown(full_response)
@@ -223,4 +238,4 @@ class CEQAgent(ServiceBase):
         with gr.Tab(label=self.llm_service.CLASS_UI_NAME):
             self.llm_service.create_settings_ui()
 
-        GradioService.create_settings_event_listener(self.config, components)
+        # GradioService.create_settings_event_listener(self.config, components)

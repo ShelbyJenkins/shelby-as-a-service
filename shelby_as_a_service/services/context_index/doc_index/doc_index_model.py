@@ -69,7 +69,7 @@ class DocDBModel(Base):
     doc_embedder_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("doc_embedders.id"), nullable=True
     )
-    enabled_doc_embedder = relationship("DocLoaderModel", foreign_keys=[doc_embedder_id])
+    enabled_doc_embedder = relationship("DocEmbeddingModel", foreign_keys=[doc_embedder_id])
     doc_embedders: Mapped[list[DocEmbeddingModel]] = relationship(
         "DocEmbeddingModel",
         back_populates="doc_db_model",
@@ -221,7 +221,7 @@ class SourceModel(Base):
         cascade="all, delete-orphan",
         foreign_keys=[DocumentModel.source_id],
     )
-    date_of_last_successful_update: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    date_of_last_successful_update: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
 
 class DomainModel(Base):

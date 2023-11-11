@@ -1,15 +1,14 @@
 from typing import Any, Iterator, Literal, Optional, Type, Union, get_args
 
 import gradio as gr
+import services.text_processing.text_utils as text_utils
 from pydantic import BaseModel
 from services.context_index.doc_index.context_docs import IngestDoc
-
-from .. import text_utils
-from ..dfs_text_splitter import DFSTextSplitter
-from .ingest_processing_service import IngestProcessingService
+from services.text_processing.dfs_text_splitter import DFSTextSplitter
+from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 
 
-class IngestCEQ(IngestProcessingService):
+class IngestCEQ(IngestProcessingBase):
     class_name = Literal["ceq_ingest_processor"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Context Enhanced Query Ingest Processor"
@@ -26,8 +25,8 @@ class IngestCEQ(IngestProcessingService):
     domain_name: str
     source_name: str
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
         self.text_splitter = DFSTextSplitter(
             goal_length=self.config.text_splitter_goal_length,

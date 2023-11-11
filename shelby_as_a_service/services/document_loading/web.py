@@ -10,11 +10,10 @@ from langchain.document_loaders import (
 )
 from langchain.schema import Document
 from pydantic import BaseModel
+from services.document_loading.document_loading_base import DocLoadingBase
 
-from .document_loading_service import DocLoadingService
 
-
-class GenericWebScraper(DocLoadingService):
+class GenericWebScraper(DocLoadingBase):
     class_name = Literal["generic_web_scraper"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generic Web Scraper"
@@ -28,8 +27,8 @@ class GenericWebScraper(DocLoadingService):
     config: ClassConfigModel
     ui_components: dict[str, Any]
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def load_docs_with_provider(self, uri) -> list[Document]:
         return WebBaseLoader(web_path=uri).load()
@@ -48,7 +47,7 @@ class GenericWebScraper(DocLoadingService):
         return ui_components
 
 
-class GenericRecursiveWebScraper(DocLoadingService):
+class GenericRecursiveWebScraper(DocLoadingBase):
     class_name = Literal["generic_recursive_web_scraper"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generic Resursive Web Scraper"
@@ -62,8 +61,8 @@ class GenericRecursiveWebScraper(DocLoadingService):
 
     config: ClassConfigModel
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:

@@ -5,11 +5,10 @@ from typing import Any, Literal, Optional, Type
 import services.text_processing.text_utils as text_utils
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
-from services.embedding.embedding_service import EmbeddingService
-from services.service_base import ServiceBase
+from services.embedding.embedding_base import EmbeddingBase
 
 
-class OpenAIEmbedding(EmbeddingService):
+class OpenAIEmbedding(EmbeddingBase):
     class_name = Literal["openai_embedding"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI Embedding"
@@ -38,11 +37,8 @@ class OpenAIEmbedding(EmbeddingService):
     embedding_models: list
     model_instance: "ModelConfig"
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
-        self.model_instance = self.get_model_instance(
-            requested_model_name=self.config.enabled_model_name
-        )
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def get_embedding_of_text_with_provider(
         self, text: str, model_name: Optional[str] = None

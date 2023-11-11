@@ -9,11 +9,10 @@ from urllib.parse import urlparse
 import gradio as gr
 import yaml
 from pydantic import BaseModel
+from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 
-from .ingest_processing_service import IngestProcessingService
 
-
-class OpenAPIMinifier(IngestProcessingService):
+class OpenAPIMinifier(IngestProcessingBase):
     class_name = Literal["open_api_minifier"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Open API Minifier"
@@ -82,8 +81,8 @@ class OpenAPIMinifier(IngestProcessingService):
 
     config: ClassConfigModel
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
         # self.index_agent = data_source_config.index_agent
         # self.config = data_source_config.index_agent.config
@@ -93,7 +92,7 @@ class OpenAPIMinifier(IngestProcessingService):
 
         self.operationID_counter = 0
 
-    def create_chunks_with_provider(self):
+    def create_chunks(self):
         pass
 
     def preprocess_document(self, open_api_specs):

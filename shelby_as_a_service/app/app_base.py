@@ -20,11 +20,9 @@ class AppBase:
     - run_sprites(cls): Runs the enabled sprites.
     """
 
-    AVAILABLE_SPRITES: list[str] = ["webui_sprite"]
-    # AVAILABLE_SPRITES: list[str] = ["webui_sprite", "discord_sprite", "slack_sprite"]
     APP_DIR_PATH: str = "app/your_apps"
 
-    class AppConfigModel(BaseModel):
+    class ClassConfigModel(BaseModel):
         """
         A class representing the application configuration model.
 
@@ -40,15 +38,11 @@ class AppBase:
         enabled_extensions: list[str] = []
         disabled_extensions: list[str] = []
 
-    app_config: AppConfigModel
-
-    webui_sprite: Type
-    discord_sprite: Type
-    slack_sprite: Type
+    config: ClassConfigModel
 
     log: logging.Logger
 
-    available_sprite_instances: list[Any] = []
+    enabled_sprite_instances: list[Type] = []
     list_of_extension_configs: list[Any]
 
     secrets: dict[str, str] = {}
@@ -76,66 +70,64 @@ class AppBase:
             ConfigManager.check_and_create_base()
             app_name = ConfigManager.load_webui_sprite_default_config()
 
-        app_file_dict = ConfigManager.load_app(app_name)
-        AppBase.app_config = AppBase.AppConfigModel(**app_file_dict.get("app", {}))
+        config_file_dict = ConfigManager.load_app(app_name)
+        AppBase.config = AppBase.ClassConfigModel(**config_file_dict.get("app", {}))
         AppBase._get_logger(logger_name=app_name)
         AppBase.log.info(f"Setting up app instance: {app_name}...")
 
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
         AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
-        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app_config.app_name, "index")
+        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.config.app_name, "index")
         from services.context_index.doc_index.doc_index import DocIndex
 
         AppBase.doc_index: DocIndex = DocIndex()
 
-        AppBase._load_sprite_instances(app_file_dict)
+        AppBase._load_sprite_instances(config_file_dict)
 
         ConfigManager.update_config_file_from_loaded_models()
 
         return cls
 
     @staticmethod
-    def _load_sprite_instances(app_file_dict: dict[str, Any]):
+    def _load_sprite_instances(config_file_dict: dict[str, Any]):
         """
         Loads the sprite instances.
 
         Args:
-        - app_file_dict: A dictionary representing the application configuration file.
+        - config_file_dict: A dictionary representing the application configuration file.
 
         Returns:
         - None
         """
-        for sprite_name in AppBase.AVAILABLE_SPRITES:
-            match sprite_name:
-                case "webui_sprite":
-                    from shelby_as_a_service.interfaces.webui_sprite import WebUISprite
+        import interfaces as interfaces
 
-                    # ConfigManager.add_extensions_to_sprite(
-                    #     AppBase.list_of_extension_configs, WebUISprite
-                    # )
-                    AppBase.webui_sprite = WebUISprite(app_file_dict)
+        AppBase.AVAILABLE_SPRITES: list[Type] = interfaces.AVAILABLE_SPRITES
+        AppBase.AVAILABLE_SPRITE_NAMES = interfaces.AVAILABLE_SPRITE_NAMES
+        AppBase.AVAILABLE_SPRITE_UI_NAMES: list[str] = interfaces.AVAILABLE_SPRITE_UI_NAMES
+        for sprite in AppBase.AVAILABLE_SPRITES:
+            if sprite.CLASS_NAME in AppBase.config.enabled_sprites:
+                # ConfigManager.add_extensions_to_sprite(
+                #     AppBase.list_of_extension_configs, sprite
+                # )
 
-                    AppBase.available_sprite_instances.append(AppBase.webui_sprite)
+                AppBase.enabled_sprite_instances.append(sprite(config_file_dict=config_file_dict))
 
-                # case "discord_sprite":
-                #     from interfaces.bots.discord_sprite import DiscordSprite
+            # case "discord_sprite":
+            #     from interfaces.bots.discord_sprite import DiscordSprite
 
-                # ConfigManager.add_extensions_to_sprite(AppBase.list_of_extension_configs, DiscordSprite)
-                #     AppBase.discord_sprite = DiscordSprite(app_file_dict)
+            # ConfigManager.add_extensions_to_sprite(AppBase.list_of_extension_configs, DiscordSprite)
+            #     AppBase.discord_sprite = sprite(config_file_dict)
 
-                #     AppBase.available_sprite_instances.append(AppBase.discord_sprite)
+            #     AppBase.enabled_sprite_instances.append(AppBase.discord_sprite)
 
-                # case "slack_sprite":
-                #     from interfaces.bots.slack_sprite import SlackSprite
+            # case "slack_sprite":
+            #     from interfaces.bots.slack_sprite import SlackSprite
 
-                # ConfigManager.add_extensions_to_sprite(AppBase.list_of_extension_configs, SlackSprite)
-                #     AppBase.slack_sprite = SlackSprite(app_file_dict)
+            # ConfigManager.add_extensions_to_sprite(AppBase.list_of_extension_configs, SlackSprite)
+            #     AppBase.slack_sprite = sprite(config_file_dict)
 
-                #     AppBase.available_sprite_instances.append(AppBase.slack_sprite)
-
-                case _:
-                    print("oops")
+            #     AppBase.enabled_sprite_instances.append(AppBase.slack_sprite)
 
     @classmethod
     def _get_logger(cls, logger_name: Optional[str] = None):
@@ -154,7 +146,7 @@ class AppBase:
                     "Logger must be initialized with an logger_name before it can be used without it."
                 )
 
-            logs_dir = os.path.join(AppBase.APP_DIR_PATH, AppBase.app_config.app_name, "logs")
+            logs_dir = os.path.join(AppBase.APP_DIR_PATH, AppBase.config.app_name, "logs")
             os.makedirs(logs_dir, exist_ok=True)
             log_file_path = os.path.join(logs_dir, f"{logger_name}.log")
 
@@ -172,12 +164,6 @@ class AppBase:
     def run_sprites(cls):
         """
         Runs the sprites.
-
-        Args:
-        - None
-
-        Returns:
-        - None
         """
 
         def run_sprite_with_restart(sprite):
@@ -188,8 +174,7 @@ class AppBase:
                     AppBase.log.error(f"Sprite crashed with error: {e}. Restarting...")
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for sprite_name in AppBase.app_config.enabled_sprites:
-                sprite = getattr(cls, sprite_name)
+            for sprite in AppBase.enabled_sprite_instances:
                 sprite.run_sprite()
                 # executor.submit(run_sprite_with_restart, sprite)
 
@@ -197,7 +182,7 @@ class AppBase:
         if required_secrets := getattr(self, "REQUIRED_SECRETS", None):
             for required_secret in required_secrets:
                 env_secret = None
-                secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
+                secret_str = f"{AppBase.config.app_name}_{required_secret}".upper()
                 env_secret = os.environ.get(secret_str, None)
                 if env_secret:
                     AppBase.secrets[required_secret] = env_secret

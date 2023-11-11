@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
 from typing import Any, Optional, Type
 
+import services.text_processing.ingest_processing as ingest_processing
 from services.context_index.doc_index.context_docs import IngestDoc
 from services.context_index.doc_index.doc_index_model import (
     ChunkModel,
@@ -8,24 +8,17 @@ from services.context_index.doc_index.doc_index_model import (
     DomainModel,
     SourceModel,
 )
-from services.gradio_interface.gradio_service import GradioService
-from services.service_base import ServiceBase
-from services.text_processing.ingest_processing import (
-    AVAILABLE_PROVIDERS,
-    AVAILABLE_PROVIDERS_NAMES,
-    AVAILABLE_PROVIDERS_UI_NAMES,
-)
+from services.gradio_interface.gradio_base import GradioBase
+from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 from services.text_processing.text_utils import tiktoken_len
 
 
-class IngestProcessingService(ABC, ServiceBase):
+class IngestProcessingService(IngestProcessingBase):
     CLASS_NAME: str = "doc_ingest_processor_service"
-    DOC_INDEX_KEY: str = "enabled_doc_ingest_processor"
     CLASS_UI_NAME: str = "Document Ingest Processor Service"
-    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
-    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
-
+    AVAILABLE_PROVIDERS: list[Type] = ingest_processing.AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = ingest_processing.AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = ingest_processing.AVAILABLE_PROVIDERS_NAMES
     successfully_chunked_counter: int = 0
     docs_token_counts: list[int] = []
 
@@ -151,17 +144,6 @@ class IngestProcessingService(ABC, ServiceBase):
                     break
             self.log.info(f"Found {len(existing_document_models)} existing_document_models")
 
-    @abstractmethod
-    def preprocess_document(self, doc: IngestDoc) -> IngestDoc:
-        raise NotImplementedError
-
-    @abstractmethod
-    def create_chunks_with_provider(
-        self,
-        text: str | dict,
-    ) -> Optional[list[str]]:
-        raise NotImplementedError
-
     @classmethod
     def create_service_ui_components(
         cls,
@@ -177,7 +159,7 @@ class IngestProcessingService(ABC, ServiceBase):
 
         text_processing_provider_name = parent_instance.enabled_doc_ingest_processor.name
 
-        provider_select_dd, service_providers_dict = GradioService.abstract_service_ui_components(
+        provider_select_dd, service_providers_dict = GradioBase.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=text_processing_provider_name,
             required_classes=cls.AVAILABLE_PROVIDERS,

@@ -2,13 +2,14 @@ import typing
 from typing import Annotated, Any, Generator, Literal, Optional, Type, get_args
 
 import gradio as gr
+import services.llm as llm
 from pydantic import BaseModel, Field
-from services.gradio_interface.gradio_service import GradioService
+from services.agents.agent_base import AgentBase
+from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_service import LLMService
-from services.service_base import ServiceBase
 
 
-class VanillaLLM(ServiceBase):
+class VanillaLLM(AgentBase):
     class_name = Literal["vanillallm_agent"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME = "VanillaLLM Agent"
@@ -25,40 +26,32 @@ class VanillaLLM(ServiceBase):
 
     config: ClassConfigModel
     llm_service: LLMService
-    list_of_required_class_instances: list
+    list_of_required_class_instances: list[LLMService] = []
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, llm_provider="openai_llm", model="gpt-4", **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(
+            config_file_dict=config_file_dict, llm_provider_name="openai_llm", **kwargs
+        )
 
-    def run_chat(
+    def create_chat(
         self,
         chat_in: str,
-        llm_provider: Optional[str] = None,
-        llm_model_name: Optional[str] = None,
+        llm_provider_name: llm.AVAILABLE_PROVIDERS_NAMES,
+        llm_model_name: str,
         model_token_utilization: Optional[float] = None,
         stream: Optional[bool] = None,
-        sprite_name: Optional[str] = "webui_sprite",
     ):
-        _, max_tokens = self.llm_service.get_available_request_tokens(
+        prompt = self.create_prompt(
             query=chat_in,
+            llm_provider_name=llm_provider_name,
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
-            model_token_utilization=model_token_utilization,
-            llm_provider=llm_provider,
-            llm_model_name=llm_model_name,
         )
 
         for response in self.llm_service.create_chat(
-            query=chat_in,
-            prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
-            max_tokens=max_tokens,
+            prompt=prompt,
+            llm_provider_name=llm_provider_name,
+            llm_model_name=llm_model_name,
+            model_token_utilization=model_token_utilization,
+            stream=stream,
         ):
             yield response["response_content_string"]
-
-    def create_settings_ui(self):
-        components = {}
-
-        for class_instance in self.list_of_required_class_instances:
-            with gr.Tab(label=class_instance.CLASS_UI_NAME):
-                class_instance.create_settings_ui()
-
-        GradioService.create_settings_event_listener(self.config, components)

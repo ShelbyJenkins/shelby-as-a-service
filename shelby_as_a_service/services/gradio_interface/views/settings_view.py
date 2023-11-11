@@ -3,11 +3,10 @@ from typing import Any, Literal, Optional, Type, get_args
 
 import gradio as gr
 from pydantic import BaseModel
-from services.gradio_interface.gradio_service import GradioService
-from services.service_base import ServiceBase
+from services.gradio_interface.gradio_base import GradioBase
 
 
-class SettingsView(GradioService):
+class SettingsView(GradioBase):
     class_name = Literal["settings_view"]
     CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "⚙️"
@@ -22,8 +21,8 @@ class SettingsView(GradioService):
 
     config: ClassConfigModel
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def create_primary_ui(self):
         components = {}

@@ -235,7 +235,7 @@ class ConfigManager:
             try:
                 module = importlib.import_module(import_path)
                 cls = getattr(module, view_class_name)
-                gradio_instance.AVAILABLE_VIEWS.append(cls)
+                gradio_instance.REQUIRED_CLASSES.append(cls)
 
             except ImportError as e:
                 print(f"Failed to import module: {import_path}. Error: {str(e)}")
@@ -244,6 +244,7 @@ class ConfigManager:
                     f"Failed to find class: {view_class_name} in module: {import_path}. Error: {str(e)}"
                 )
 
+    # rename config to config_file_dict
     @staticmethod
     def update_config_file_from_loaded_models():
         from app.app_base import AppBase
@@ -258,11 +259,9 @@ class ConfigManager:
                     recurse(child_class_instance, module_config_dict)
 
         app_dict = {}
-        app_dict["app"] = AppBase.app_config.model_dump()
+        app_dict["app"] = AppBase.config.model_dump()
 
-        # app_dict[AppBase.doc_index.CLASS_NAME] = AppBase.doc_index.index_config.model_dump()
-
-        for sprite in AppBase.available_sprite_instances:
+        for sprite in AppBase.enabled_sprite_instances:
             recurse(sprite, app_dict)
 
-        ConfigManager.save_app(AppBase.app_config.app_name, app_dict)
+        ConfigManager.save_app(AppBase.config.app_name, app_dict)

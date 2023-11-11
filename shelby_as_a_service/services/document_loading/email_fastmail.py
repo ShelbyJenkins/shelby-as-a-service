@@ -7,11 +7,10 @@ import gradio as gr
 import requests
 from langchain.schema import Document
 from pydantic import BaseModel
+from services.document_loading.document_loading_base import DocLoadingBase
 
-from .document_loading_service import DocLoadingService
 
-
-class EmailFastmail(DocLoadingService):
+class EmailFastmail(DocLoadingBase):
     """The tiniest JMAP client you can imagine.
     From: https://github.com/fastmail/JMAP-Samples/blob/main/python3/tiny_jmap_library.py"""
 
@@ -36,8 +35,8 @@ class EmailFastmail(DocLoadingService):
     token: str
     api_url: str
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
         """Initialize using a hostname, username and bearer token"""
         self.session = None
         self.account_id = None

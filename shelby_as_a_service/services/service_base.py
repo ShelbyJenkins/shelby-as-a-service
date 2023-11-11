@@ -25,15 +25,35 @@ class ServiceBase(AppBase):
     config: BaseModel
     source: SourceModel
     domain: DomainModel
+    list_of_class_names: list[str]
+    list_of_class_ui_names: list[str]
+    list_of_required_class_instances: list[Type]
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs) -> None:
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs) -> None:
         self.log = logging.getLogger(self.__class__.__name__)
 
-        class_config = config.get(self.CLASS_NAME, {})
-        merged_config = {**kwargs, **class_config}
-        self.config = self.ClassConfigModel(**merged_config)
+        class_config = config_file_dict.get(self.CLASS_NAME, {})
+        if getattr(self, "ClassConfigModel", None):
+            merged_config = {**kwargs, **class_config}
+            self.config = self.ClassConfigModel(**merged_config)
 
         self.set_secrets()
+
+        if (required_classes := getattr(self, "REQUIRED_CLASSES", None)) is None:
+            return
+        self.list_of_class_names = []
+        self.list_of_class_ui_names = []
+        self.list_of_required_class_instances = []
+        for required_class in required_classes:
+            if (class_name := getattr(required_class, "CLASS_NAME", None)) is None:
+                raise Exception(f"Class name not found for {required_class}")
+
+            new_instance: "ServiceBase" = required_class(class_config, **kwargs)
+            setattr(self, class_name, new_instance)
+
+            self.list_of_class_names.append(new_instance.CLASS_NAME)
+            self.list_of_class_ui_names.append(new_instance.CLASS_UI_NAME)
+            self.list_of_required_class_instances.append(new_instance)
 
     @staticmethod
     def get_requested_class(
@@ -47,8 +67,18 @@ class ServiceBase(AppBase):
                 return available_class
         raise ValueError(f"Requested class {requested_class} not found in {available_classes}")
 
+    @staticmethod
+    def get_requested_class_instance(requested_class: str, available_classes: list[Type]) -> Any:
+        for available_class in available_classes:
+            if (
+                available_class.CLASS_NAME == requested_class
+                or available_class.CLASS_UI_NAME == requested_class
+            ):
+                return available_class
+        raise ValueError(f"Requested class {requested_class} not found in {available_classes}")
+
     @classmethod
-    def get_requested_class_instance(
+    def init_requested_class_instance(
         cls, requested_class_name: str, requested_class_config: dict[str, Any] = {}, **kwargs
     ) -> Any:
         for available_class in cls.AVAILABLE_PROVIDERS:

@@ -49,6 +49,9 @@ class IngestDoc(BaseModel):
     date_of_creation: datetime
     date_published: datetime
 
+    class Config:
+        arbitrary_types_allowed = True
+
     @staticmethod
     def create_ingest_doc_from_langchain_document(
         doc: Document | dict, source: SourceModel

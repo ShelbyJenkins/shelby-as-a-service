@@ -1,23 +1,21 @@
-from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
+import services.document_loading as document_loading
 from langchain.schema import Document
 from services.context_index.doc_index.context_docs import IngestDoc
 from services.context_index.doc_index.doc_index_model import DomainModel, SourceModel
-from services.service_base import ServiceBase
+from services.document_loading.document_loading_base import DocLoadingBase
+from services.gradio_interface.gradio_base import GradioBase
 
-from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
-
-class DocLoadingService(ABC, ServiceBase):
+class DocLoadingService(DocLoadingBase):
     CLASS_NAME: str = "doc_loader_service"
-    DOC_INDEX_KEY: str = "enabled_doc_loader"
+
     CLASS_UI_NAME: str = "Document Loading Service"
-    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
-    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
+    AVAILABLE_PROVIDERS: list[Type] = document_loading.AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = document_loading.AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = document_loading.AVAILABLE_PROVIDERS_NAMES
 
     @classmethod
     def load_service_from_context_index(
@@ -54,14 +52,10 @@ class DocLoadingService(ABC, ServiceBase):
         self.log.info(f"Total documents loaded from DocLoadingService: {len(docs)}")
         return docs
 
-    @abstractmethod
-    def load_docs_with_provider(self, uri: str) -> Optional[list[Document]]:
-        raise NotImplementedError
-
     @classmethod
     def create_service_ui_components(
         cls,
-        parent_instance: Union[DomainModel, SourceModel],
+        parent_instance: DomainModel | SourceModel,
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}
@@ -73,7 +67,7 @@ class DocLoadingService(ABC, ServiceBase):
 
         enabled_doc_loader_name = parent_instance.enabled_doc_loader.name
 
-        provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
+        provider_select_dd, service_providers_dict = GradioBase.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=enabled_doc_loader_name,
             required_classes=cls.AVAILABLE_PROVIDERS,

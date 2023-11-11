@@ -23,18 +23,6 @@ def tiktoken_len_of_document_list(texts: list[str]) -> int:
     return token_count
 
 
-def tiktoken_len_of_openai_prompt(prompt, llm_model) -> int:
-    num_tokens = 0
-    for message in prompt:
-        num_tokens += llm_model.TOKENS_PER_MESSAGE
-        for key, value in message.items():
-            num_tokens += tiktoken_len(value, llm_model.MODEL_NAME)
-            if key == "name":
-                num_tokens += llm_model.TOKENS_PER_NAME
-    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
-    return num_tokens
-
-
 def clean_text_content(text: str) -> str:
     text = strip_unwanted_chars(text)
     text = reduce_excess_whitespace(text)

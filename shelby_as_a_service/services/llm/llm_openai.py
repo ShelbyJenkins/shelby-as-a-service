@@ -3,16 +3,14 @@ from decimal import Decimal
 from typing import Any, Literal, Optional, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
 import openai
 import services.text_processing.text_utils as text_utils
 from pydantic import BaseModel, Field
-from services.service_base import ServiceBase
-from services.text_processing.prompts.prompt_template_service import PromptTemplates
+from services.llm.llm_base import LLMBase
 from typing_extensions import Annotated
 
 
-class OpenAILLM(ServiceBase):
+class OpenAILLM(LLMBase):
     class_name = Literal["openai_llm"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI LLM"
@@ -74,31 +72,21 @@ class OpenAILLM(ServiceBase):
     llm_models: list
     current_model_class: ModelConfig
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.set_current_model(self.config.enabled_model_name)
 
-    def create_chat_with_provider(
+    def create_chat(
         self,
-        query=None,
-        llm_model_name: Optional[str] = None,
+        prompt,
+        llm_model_instance,
         max_tokens=None,
         logit_bias=None,
         stream=None,
     ):
-        prompt, llm_model, total_prompt_tokens = self.prep_chat(
-            query=query,
-            llm_model_name=llm_model_name,
-        )
-
-        if max_tokens is None:
-            max_tokens = llm_model.max_tokens
-        while max_tokens + total_prompt_tokens > (llm_model.TOKENS_MAX - 15):
-            max_tokens -= 1
-
-        if (llm_model.stream and stream is None) or (stream is True):
+        if (llm_model_instance.stream and stream is None) or (stream is True):
             yield from self._create_streaming_chat(
-                prompt, max_tokens, total_prompt_tokens, llm_model
+                prompt, max_tokens, total_prompt_tokens, llm_model_instance
             )
         else:
             if logit_bias is None:
@@ -292,16 +280,3 @@ class OpenAILLM(ServiceBase):
             inputs=model_dropdown,
             outputs=models_list,
         )
-
-    def set_current_model(self, requested_model):
-        output = []
-        for model_name, model in self.config.available_models.items():
-            ui_name = model_name
-            if ui_name == requested_model:
-                self.current_model_class = model
-                self.config.enabled_model_name = ui_name
-                ModuleBase.update_settings_file = True
-                output.append(gr.Group(visible=True))
-            else:
-                output.append(gr.Group(visible=False))
-        return output

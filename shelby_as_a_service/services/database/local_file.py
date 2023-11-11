@@ -18,8 +18,8 @@ class LocalFileDatabase(ServiceBase):
 
     config: ClassConfigModel
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def write_documents_to_database(self, documents, data_domain, data_source):
         domain_name_file_path = os.path.join(

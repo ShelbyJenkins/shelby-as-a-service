@@ -5,9 +5,9 @@ import services.text_processing.text_utils as text_utils
 import yaml
 
 
-def create_openai_prompt(query, prompt_template_path, documents=None) -> list[Dict[str, str]]:
+def create_openai_prompt(query, prompt_template_path, context_docs=None) -> list[dict[str, str]]:
     prompt_template = load_prompt_template(prompt_template_path)
-    document_string = create_document_string(documents)
+    document_string = create_document_string(context_docs)
     if query:
         user_content = "Query: " + query
     else:
@@ -21,6 +21,18 @@ def create_openai_prompt(query, prompt_template_path, documents=None) -> list[Di
         {"role": "system", "content": prompt_template},
         {"role": "user", "content": user_content},
     ]
+
+
+def tiktoken_len_of_openai_prompt(prompt, llm_model_instance) -> int:
+    num_tokens = 0
+    for message in prompt:
+        num_tokens += llm_model_instance.TOKENS_PER_MESSAGE
+        for key, value in message.items():
+            num_tokens += text_utils.tiktoken_len(value, llm_model_instance.MODEL_NAME)
+            if key == "name":
+                num_tokens += llm_model_instance.TOKENS_PER_NAME
+    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+    return num_tokens
 
 
 def create_document_string(documents=None):

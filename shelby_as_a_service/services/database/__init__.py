@@ -1,6 +1,5 @@
 from typing import Literal
 
-from services.database.local_file import LocalFileDatabase
 from services.database.pinecone import PineconeDatabase
 
 AVAILABLE_PROVIDERS_NAMES = Literal[PineconeDatabase.class_name,]

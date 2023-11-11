@@ -1,11 +1,9 @@
 import typing
 from typing import Any, Optional, Type, Union
 
-from pydantic import BaseModel
-from services.database import LocalFileDatabase, PineconeDatabase
+from services.database import PineconeDatabase
 from services.document_loading.web import GenericRecursiveWebScraper, GenericWebScraper
 from services.embedding.embedding_openai import OpenAIEmbedding
-from services.service_base import ServiceBase
 from services.text_processing.ingest_processing.ingest_ceq import IngestCEQ
 
 

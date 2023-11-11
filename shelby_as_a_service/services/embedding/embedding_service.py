@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Final, Iterator, Literal, Optional, Type, Union
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
-from services.context_index.doc_index_model import (
+import services.embedding as embedding
+from services.context_index.doc_index.doc_index_model import (
     ChunkModel,
     DocDBModel,
     DocEmbeddingModel,
@@ -12,18 +12,16 @@ from services.context_index.doc_index_model import (
     DomainModel,
     SourceModel,
 )
-from services.service_base import ServiceBase
-
-from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
+from services.embedding.embedding_base import EmbeddingBase
 
 
-class EmbeddingService(ABC, ServiceBase):
+class EmbeddingService(EmbeddingBase):
     CLASS_NAME: str = "embedding_service"
-    DOC_INDEX_KEY: str = "enabled_doc_embedder"
+
     CLASS_UI_NAME: str = "Embedding Service"
-    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
-    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
+    AVAILABLE_PROVIDERS: list[Type] = embedding.AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = embedding.AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = embedding.AVAILABLE_PROVIDERS_NAMES
 
     @classmethod
     def load_service_from_context_index(
@@ -36,7 +34,7 @@ class EmbeddingService(ABC, ServiceBase):
         text: str,
         model_name: Optional[str] = None,
     ) -> list[float]:
-        text_embedding = self.get_embedding_of_text_with_provider(text=text, model_name=model_name)
+        text_embedding = self.get_embedding_of_text(text=text, model_name=model_name)
         if text_embedding is None:
             raise ValueError("No embedding returned")
         return text_embedding
@@ -46,9 +44,7 @@ class EmbeddingService(ABC, ServiceBase):
         texts: list[str],
         model_name: Optional[str] = None,
     ) -> list[list[float]]:
-        text_embeddings = self.get_embeddings_from_list_of_texts_with_provider(
-            texts=texts, model_name=model_name
-        )
+        text_embeddings = self.get_embeddings_from_list_of_texts(texts=texts, model_name=model_name)
         if text_embeddings is None:
             raise ValueError("No embeddings returned")
         self.log.info(f"Got {len(text_embeddings)} embeddings")
@@ -68,15 +64,3 @@ class EmbeddingService(ABC, ServiceBase):
 
         for i, chunk in enumerate(chunks_to_upsert):
             chunk.chunk_embedding = upsert_docs_text_embeddings[i]
-
-    @abstractmethod
-    def get_embedding_of_text_with_provider(
-        self, text: str, model_name: Optional[str] = None
-    ) -> list[float]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_embeddings_from_list_of_texts_with_provider(
-        self, texts: list[str], model_name: Optional[str] = None
-    ) -> list[list[float]]:
-        raise NotImplementedError

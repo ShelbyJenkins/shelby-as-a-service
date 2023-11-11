@@ -1,10 +1,9 @@
-import typing
 from typing import Any, Optional, Type
 
 import gradio as gr
 from pydantic import BaseModel
 from services.embedding.embedding_service import EmbeddingService
-from services.gradio_interface.gradio_service import GradioService
+from services.gradio_interface.gradio_base import GradioBase
 from services.service_base import ServiceBase
 from services.text_processing.process_retrieval import process_retrieved_docs
 
@@ -28,8 +27,8 @@ class DocRetrieval(ServiceBase):
     list_of_required_class_instances: list[Any]
     embedding_service: EmbeddingService
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def get_documents(
         self,
@@ -180,6 +179,6 @@ class DocRetrieval(ServiceBase):
                 min_width=0,
             )
 
-        GradioService.create_settings_event_listener(self.config, components)
+        GradioBase.create_settings_event_listener(self.config, components)
 
         return components

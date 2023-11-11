@@ -1,24 +1,20 @@
-from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, Union
 
+import services.database as database
 from services.context_index.doc_index.context_docs import IngestDoc
 from services.context_index.doc_index.doc_index_model import ChunkModel, DomainModel, SourceModel
+from services.database.database_base import DatabaseBase
 from services.embedding.embedding_service import EmbeddingService
-from services.gradio_interface.gradio_service import GradioService
-from services.service_base import ServiceBase
-
-from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
+from services.gradio_interface.gradio_base import GradioBase
 
 
-class DatabaseService(ABC, ServiceBase):
+class DatabaseService(DatabaseBase):
     CLASS_NAME: str = "database_service"
-    DOC_INDEX_KEY: str = "enabled_doc_db"
+
     CLASS_UI_NAME: str = "Document Databases"
-    AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
-    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = AVAILABLE_PROVIDERS_NAMES
-    DOC_DB_REQUIRES_EMBEDDINGS: bool
-    domain_name: str
+    AVAILABLE_PROVIDERS: list[Type] = database.AVAILABLE_PROVIDERS
+    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = database.AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_NAMES = database.AVAILABLE_PROVIDERS_NAMES
 
     @classmethod
     def load_service_from_context_index(
@@ -136,51 +132,10 @@ class DatabaseService(ABC, ServiceBase):
             self.log.info(f"No documents found for {id}")
         return docs
 
-    @abstractmethod
-    def get_index_domain_or_source_entry_count_with_provider(
-        self, source_name: Optional[str] = None, domain_name: Optional[str] = None
-    ) -> int:
-        raise NotImplementedError
-
-    @abstractmethod
-    def query_by_terms_with_provider(
-        self, search_terms: list[str] | str, domain_name: str
-    ) -> list[dict]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def fetch_by_ids_with_provider(self, ids: list[int] | int, domain_name: str) -> list[dict]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def prepare_upsert_for_vectorstore_with_provider(
-        self,
-        id: str,
-        values: Optional[list[float]],
-        metadata: dict[str, Any],
-    ) -> dict[str, Any]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def upsert_with_provider(
-        self, entries_to_upsert: list[dict[str, Any]], domain_name: str
-    ) -> Any:
-        raise NotImplementedError
-
-    @abstractmethod
-    def clear_existing_source_with_provider(self, source_name: str, domain_name: str) -> Any:
-        raise NotImplementedError
-
-    @abstractmethod
-    def clear_existing_entries_by_id_with_provider(
-        self, doc_db_ids_requiring_deletion: list[str], domain_name: str
-    ) -> Any:
-        raise NotImplementedError
-
     @classmethod
     def create_service_ui_components(
         cls,
-        parent_instance: Union[DomainModel, SourceModel],
+        parent_instance: DomainModel | SourceModel,
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}
@@ -192,7 +147,7 @@ class DatabaseService(ABC, ServiceBase):
 
         enabled_doc_db_name = parent_instance.enabled_doc_db.name
 
-        provider_select_dd, service_providers_dict = GradioService.abstract_service_ui_components(
+        provider_select_dd, service_providers_dict = GradioBase.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=enabled_doc_db_name,
             required_classes=cls.AVAILABLE_PROVIDERS,

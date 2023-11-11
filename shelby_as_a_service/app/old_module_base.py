@@ -78,13 +78,3 @@ class ModuleBase(AppBase):
         if models_type := getattr(self, "MODELS_TYPE", None):
             setattr(self, models_type, self.list_of_available_model_names)
         return available_models
-
-    def get_model_instance(self, requested_model_name: str) -> Any:
-        model_instance = None
-
-        for model_name, model in self.MODEL_DEFINITIONS.items():
-            if model_name == requested_model_name:
-                model_instance = self.ModelConfig(**model)
-                return model_instance
-
-        raise ValueError(f"Requested model {requested_model_name} not found.")

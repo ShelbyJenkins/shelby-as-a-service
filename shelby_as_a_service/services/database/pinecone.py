@@ -5,10 +5,10 @@ from typing import Any, Literal, Optional
 import gradio as gr
 import pinecone
 from pydantic import BaseModel
-from services.database.database_service import DatabaseService
+from services.database.database_base import DatabaseBase
 
 
-class PineconeDatabase(DatabaseService):
+class PineconeDatabase(DatabaseBase):
     class_name = Literal["pinecone_database"]
     CLASS_NAME: class_name = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "Pinecone Database"
@@ -42,7 +42,7 @@ class PineconeDatabase(DatabaseService):
         config: dict[str, Any] = {},
         **kwargs,
     ):
-        super().__init__(config=config, **kwargs)
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
         if (api_key := self.secrets.get("pinecone_api_key")) is None:
             raise ValueError("Pinecone API Key not found.")
@@ -186,7 +186,7 @@ class PineconeDatabase(DatabaseService):
         # hard_query_response = self.pinecone_index.query(
         #     top_k=retrieve_n_docs,
         #     include_values=False,
-        #     namespace=AppBase.app_config.app_name,
+        #     namespace=AppBase.config.app_name,
         #     include_metadata=True,
         #     filter=hard_filter,
         #     vector=dense_embedding
