@@ -1,7 +1,7 @@
 # region
 
 import typing
-from typing import Any, Generator, Optional, Type
+from typing import Any, Generator, Literal, Optional, Type, get_args
 from urllib.parse import urlparse, urlunparse
 
 import gradio as gr

@@ -4,8 +4,6 @@ from typing import Any, Optional
 from services.context_index.doc_index.doc_index_model import DomainModel, SourceModel
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
-
-# from modules.index.data_model import DataModels
 from services.service_base import ServiceBase
 from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
@@ -31,7 +29,7 @@ class DocIngest(ServiceBase):
         else:
             raise ValueError("Must provide either source or domain")
 
-        cls.context_index.commit_context_index()
+        cls.doc_index.commit_context_index()
 
         for source in sources:
             last_successful_update = getattr(source, "date_of_last_successful_update", "Never")
@@ -52,7 +50,7 @@ class DocIngest(ServiceBase):
                         break
                 except Exception as error:
                     cls.log.info(f"An error occurred: {error}")
-                    cls.context_index.session.rollback()
+                    cls.doc_index.session.rollback()
                     if i < retry_count:
                         continue
                     else:
@@ -80,7 +78,7 @@ class DocIngest(ServiceBase):
 
         if not upsert_docs:
             cls.log.info(f"🔴 No new or post-processed documents for {source.name}")
-            cls.context_index.session.rollback()
+            cls.doc_index.session.rollback()
             return True
 
         doc_db_service = DatabaseService.load_service_from_context_index(domain_or_source=source)
@@ -92,5 +90,5 @@ class DocIngest(ServiceBase):
             domain_name=source.domain_model.name,
             doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
         )
-        cls.context_index.commit_context_index()
+        cls.doc_index.commit_context_index()
         return True

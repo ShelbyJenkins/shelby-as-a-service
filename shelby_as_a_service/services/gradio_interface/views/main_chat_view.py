@@ -1,17 +1,17 @@
 import typing
 from decimal import Decimal
-from typing import Any, Optional, Type
+from typing import Any, Literal, Optional, Type, get_args
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
-from agents.ceq.ceq_agent import CEQAgent
-from agents.vanillallm.vanillallm_agent import VanillaLLM
 from pydantic import BaseModel
-from services.service_base import ServiceBase
+from services.agents.ceq.ceq_agent import CEQAgent
+from services.agents.vanillallm.vanillallm_agent import VanillaLLM
+from services.gradio_interface.gradio_service import GradioService
 
 
-class MainChatView(ServiceBase):
-    CLASS_NAME: str = "main_chat_view"
+class MainChatView(GradioService):
+    class_name = Literal["main_chat_view"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Chat"
     SETTINGS_UI_COL = 2
     PRIMARY_UI_COL = 8
@@ -177,7 +177,7 @@ class MainChatView(ServiceBase):
                         self.config.current_agent_ui_name = agent.CLASS_UI_NAME
                         self.current_agent_instance = agent
 
-                ModuleBase.update_settings_file = True
+                self.update_settings_file = True
 
             def get_nav_evt(evt: gr.SelectData):
                 output = set_agent_view(evt.value)
@@ -190,7 +190,7 @@ class MainChatView(ServiceBase):
 
         create_nav_events(agent_settings_list)
 
-        GradioHelpers.create_settings_event_listener(self.config, components)
+        self.create_settings_event_listener(self.config, components)
 
     def create_event_handlers(self, components):
         def get_spend():

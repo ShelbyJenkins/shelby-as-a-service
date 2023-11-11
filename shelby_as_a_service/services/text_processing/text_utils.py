@@ -194,3 +194,12 @@ def extract_uri(doc: dict | Document) -> str:
 
 def hash_content(content) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def check_and_handle_name_collision(existing_names: list[str], new_name: str) -> str:
+    i = 0
+    test_name = new_name
+    while test_name in existing_names:
+        test_name = f"{new_name}_{i}"
+        i += 1
+    return test_name

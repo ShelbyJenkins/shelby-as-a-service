@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from services.context_index.doc_index.doc_index_model import (
     DocDBModel,
     DocEmbeddingModel,
+    DocIndexModel,
     DocIngestProcessorModel,
     DocLoaderModel,
     DomainModel,
@@ -16,7 +17,7 @@ from services.context_index.doc_index.doc_index_model import (
 
 class ServiceBase(AppBase):
     CLASS_NAME: str
-    CONTEXT_INDEX_PROVIDER_KEY: str
+    DOC_INDEX_KEY: str
     CLASS_UI_NAME: str
     AVAILABLE_PROVIDERS: list[Type["ServiceBase"]]
     log: logging.Logger
@@ -28,9 +29,7 @@ class ServiceBase(AppBase):
     def __init__(self, config: dict[str, Any] = {}, **kwargs) -> None:
         self.log = logging.getLogger(self.__class__.__name__)
 
-        if (class_config := config.get(self.CLASS_NAME, {})) == {}:
-            class_config = config
-
+        class_config = config.get(self.CLASS_NAME, {})
         merged_config = {**kwargs, **class_config}
         self.config = self.ClassConfigModel(**merged_config)
 
@@ -63,13 +62,13 @@ class ServiceBase(AppBase):
         )
 
     @classmethod
-    def get_instance_from_context_index(
+    def init_instance_from_doc_index(
         cls,
         domain_or_source: SourceModel | DomainModel,
         doc_db: Optional[DocDBModel] = None,
     ) -> Any:
         context_index_provider: DocLoaderModel | DocIngestProcessorModel | DocEmbeddingModel | DocDBModel
-        provider_key = cls.CONTEXT_INDEX_PROVIDER_KEY
+        provider_key = cls.DOC_INDEX_KEY
         if doc_db:
             context_index_provider = getattr(doc_db, provider_key)
         else:

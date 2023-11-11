@@ -1,13 +1,11 @@
-import typing
-from typing import Any, Optional, Type, Union
+from typing import Any, Literal, Optional, Type, Union, get_args
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
 from pydantic import BaseModel
+from services.context_index.doc_index import DOC_INDEX_MODEL_NAMES, DOC_INDEX_MODELS
 from services.context_index.doc_index.doc_index import DocIndex
 from services.context_index.doc_index.doc_index_model import (
     DocDBModel,
-    DocIndexModel,
     DocIngestProcessorModel,
     DocLoaderModel,
     DomainModel,
@@ -16,33 +14,18 @@ from services.context_index.doc_index.doc_index_model import (
 from services.context_index.doc_index.doc_ingest import DocIngest
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
-from services.service_base import ServiceBase
+from services.gradio_interface.gradio_service import GradioService
 from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
 )
 
 
-class DocIndexView(ServiceBase):
-    CLASS_NAME: str = "context_index_view"
+class DocIndexView(GradioService):
+    class_name = Literal["context_index_view"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Context Index"
     SETTINGS_UI_COL = 4
     PRIMARY_UI_COL = 6
-
-    class ClassConfigModel(BaseModel):
-        current_domain_name: str = "default_data_domain"
-        current_source_name: str = "default_data_source"
-
-        class Config:
-            extra = "ignore"
-
-    config: ClassConfigModel
-    list_of_class_ui_names: list
-    list_of_required_class_instances: list
-    doc_ingest: Type[DocIngest]
-    doc_ingest_processor_service: Type[IngestProcessingService]
-    doc_loader_service: Type[DocLoadingService]
-    database_service: Type[DatabaseService]
-    context_index: DocIndex
 
     uic: dict[str, Any]
     domain_tab_dict: dict[str, Any]
@@ -50,9 +33,7 @@ class DocIndexView(ServiceBase):
     domains_dd: gr.Dropdown
     sources_dd: gr.Dropdown
 
-    def __init__(self, config: dict[str, Any] = {}, **kwargs):
-        super().__init__(config=config, **kwargs)
-
+    def __init__(self):
         self.doc_loader_service = DocLoadingService
         self.database_service = DatabaseService
         self.doc_ingest_processor_service = IngestProcessingService
@@ -83,8 +64,8 @@ class DocIndexView(ServiceBase):
 
             with gr.Tab(label="Management"):
                 save_button = gr.Button(value="Save Changes", variant="primary", min_width=0)
-                ui_components = self.database_service.create_service_management_settings_ui()
-                self.create_management_tab_event_handlers(ui_components, save_button)
+                # ui_components = self.database_service.create_service_management_settings_ui()
+                # self.create_management_tab_event_handlers(ui_components, save_button)
 
     def quick_add(self):
         self.uic["ingest_button"] = gr.Button(
@@ -114,7 +95,7 @@ class DocIndexView(ServiceBase):
             )
             self.uic["sources_dropdown"] = gr.Dropdown(
                 value=self.doc_index.domain.source.object_model.name,
-                choices=self.doc_index.domain.list_of_source_names,
+                choices=self.doc_index.domain.source_names,
                 label="Current Source",
                 allow_custom_value=False,
             )
@@ -129,14 +110,14 @@ class DocIndexView(ServiceBase):
         with gr.Row():
             self.domains_dd = gr.Dropdown(
                 value=self.doc_index.domain.name,
-                choices=self.doc_index.list_of_all_context_index_domain_names,
+                choices=self.doc_index.domain_names,
                 label="Current Domain",
                 allow_custom_value=False,
                 multiselect=False,
             )
             self.sources_dd = gr.Dropdown(
                 value=self.doc_index.source.name,
-                choices=self.doc_index.domain.list_of_source_names,
+                choices=self.doc_index.domain.source_names,
                 label="Current Source",
                 allow_custom_value=False,
                 multiselect=False,
@@ -373,7 +354,7 @@ class DocIndexView(ServiceBase):
         )
         services_components["doc_dbs"] = doc_dbs_components_dict
 
-        return GradioHelpers.list_provider_config_components(services_components)
+        return self.list_provider_config_components(services_components)
 
     def create_builder_event_handlers(self):
         def update_domain_or_source_tab_config_components(
@@ -383,12 +364,15 @@ class DocIndexView(ServiceBase):
             output = []
 
             if domain_or_source is DomainModel:
-                parent_instance = self.doc_index.get_domain_instance(name=set_instance_name)
+                parent_instance = self.doc_index.get_index_model_instance(
+                    list_of_instances=self.doc_index.index.domains,
+                    name=set_instance_name,
+                )
                 self.doc_index.index.current_domain = parent_instance
             elif domain_or_source is SourceModel:
-                parent_instance = self.doc_index.get_source_instance(
+                parent_instance = self.doc_index.get_index_model_instance(
                     name=set_instance_name,
-                    parent_domain=self.doc_index.domain,
+                    list_of_instances=self.doc_index.domain.sources,
                 )
                 self.doc_index.domain.current_source = parent_instance
                 DocIndex.session.flush()
@@ -405,12 +389,10 @@ class DocIndexView(ServiceBase):
         self.domains_dd.change(
             fn=lambda *x: self.save_provider_settings(
                 provider_config_components_values=x,
-                parent_domain=self.doc_index.domain,
+                domain_or_source=self.doc_index.domain,
             ),
             inputs=set(
-                GradioHelpers.list_provider_config_components(
-                    self.domain_tab_dict["services_components"]
-                )
+                self.list_provider_config_components(self.domain_tab_dict["services_components"])
             ),
         ).success(
             fn=lambda *x: save_domain_or_source_config_settings(
@@ -427,7 +409,7 @@ class DocIndexView(ServiceBase):
             outputs=list(self.domain_tab_dict["domain_or_source_config"].values()),
         ).success(
             fn=lambda: self.update_services_and_providers(parent_instance=self.doc_index.domain),
-            outputs=GradioHelpers.list_provider_config_components(
+            outputs=self.list_provider_config_components(
                 self.domain_tab_dict["services_components"]
             ),
         ).success(
@@ -438,12 +420,10 @@ class DocIndexView(ServiceBase):
         self.sources_dd.change(
             fn=lambda *x: self.save_provider_settings(
                 provider_config_components_values=x,
-                parent_source=self.doc_index.source,
+                domain_or_source=self.doc_index.source,
             ),
             inputs=set(
-                GradioHelpers.list_provider_config_components(
-                    self.source_tab_dict["services_components"]
-                )
+                self.list_provider_config_components(self.source_tab_dict["services_components"])
             ),
         ).success(
             fn=lambda *x: save_domain_or_source_config_settings(
@@ -460,7 +440,7 @@ class DocIndexView(ServiceBase):
             outputs=list(self.source_tab_dict["domain_or_source_config"].values()),
         ).success(
             fn=lambda: self.update_services_and_providers(parent_instance=self.doc_index.source),
-            outputs=GradioHelpers.list_provider_config_components(
+            outputs=self.list_provider_config_components(
                 self.source_tab_dict["services_components"]
             ),
         )
@@ -490,23 +470,19 @@ class DocIndexView(ServiceBase):
         ).success(
             fn=lambda *x: self.save_provider_settings(
                 provider_config_components_values=x,
-                parent_domain=self.doc_index.domain,
+                domain_or_source=self.doc_index.domain,
             ),
             inputs=set(
-                GradioHelpers.list_provider_config_components(
-                    self.domain_tab_dict["services_components"]
-                )
+                self.list_provider_config_components(self.domain_tab_dict["services_components"])
             ),
         )
         self.source_tab_dict["buttons"]["save_changes_button"].click(
             fn=lambda *x: self.save_provider_settings(
                 provider_config_components_values=x,
-                parent_source=self.doc_index.source,
+                domain_or_source=self.doc_index.source,
             ),
             inputs=set(
-                GradioHelpers.list_provider_config_components(
-                    self.source_tab_dict["services_components"]
-                )
+                self.list_provider_config_components(self.source_tab_dict["services_components"])
             ),
         ).success(
             fn=lambda *x: save_domain_or_source_config_settings(
@@ -522,13 +498,13 @@ class DocIndexView(ServiceBase):
             component_values,
         ):
             if domain_or_source is DomainModel:
-                create = self.doc_index.create_domain
+                create = self.doc_index.create_domain_or_source
                 clone_name = self.doc_index.domain.name
                 set_current = lambda instance: setattr(
                     self.doc_index.index, "current_domain", instance
                 )
             elif domain_or_source is SourceModel:
-                create = lambda **kwargs: self.doc_index.create_source(
+                create = lambda **kwargs: self.doc_index.create_domain_or_source(
                     parent_domain=self.doc_index.domain, **kwargs
                 )
                 clone_name = self.doc_index.source.name
@@ -587,12 +563,12 @@ class DocIndexView(ServiceBase):
             if domain_or_source is DomainModel:
                 return gr.update(
                     value=self.doc_index.domain.name,
-                    choices=self.doc_index.list_of_all_context_index_domain_names,
+                    choices=self.doc_index.domain_names,
                 )
             elif domain_or_source is SourceModel:
                 return gr.update(
                     value=self.doc_index.source.name,
-                    choices=self.doc_index.domain.list_of_source_names,
+                    choices=self.doc_index.domain.source_names,
                 )
             else:
                 raise ValueError(f"domain_or_source must be DomainModel or SourceModel")
@@ -604,78 +580,57 @@ class DocIndexView(ServiceBase):
     ):
         def select_enabled_provider_event(
             provider_select_dd: gr.Dropdown,
-            set_model_type: Union[
-                Type[DocDBModel], Type[DocLoaderModel], Type[DocIngestProcessorModel]
-            ],
+            doc_index_model_name: DOC_INDEX_MODEL_NAMES,
         ):
             provider_select_dd.input(
                 fn=lambda x: self.doc_index.set_current_domain_or_source_provider_instance(
                     domain_or_source=domain_or_source,
-                    set_model_type=set_model_type,
+                    doc_index_model_name=doc_index_model_name,
                     set_name=x,
                 ),
                 inputs=provider_select_dd,
             )
 
-        select_enabled_provider_event(dropdowns["doc_loaders_dd"], DocLoaderModel)
-        select_enabled_provider_event(dropdowns["doc_ingest_proc_dd"], DocIngestProcessorModel)
-        select_enabled_provider_event(dropdowns["doc_dbs_dd"], DocDBModel)
+        select_enabled_provider_event(dropdowns["doc_loaders_dd"], DocLoaderModel.CLASS_NAME)
+        select_enabled_provider_event(
+            dropdowns["doc_ingest_proc_dd"], DocIngestProcessorModel.CLASS_NAME
+        )
+        select_enabled_provider_event(dropdowns["doc_dbs_dd"], DocDBModel.CLASS_NAME)
 
     def save_provider_settings(
         self,
         provider_config_components_values,
-        parent_domain: Optional[DomainModel] = None,
-        parent_source: Optional[SourceModel] = None,
+        domain_or_source: Optional[DomainModel | SourceModel] = None,
     ):
+        if isinstance(domain_or_source, DomainModel):
+            domain_or_source = self.doc_index.domain
+        elif isinstance(domain_or_source, SourceModel):
+            domain_or_source = self.doc_index.source
+
+        provider_name = None
+        provider_model = None
         for component, component_value in provider_config_components_values[0].items():
-            self.save_component_value_to_provider_config_dict(
-                parent_domain=parent_domain,
-                parent_source=parent_source,
-                service_name=component.elem_classes[0],
-                provider_name=component.elem_classes[1],
-                provider_config_key=component.elem_id,
-                component_value=component_value,
-            )
+            if component.elem_classes[1] != provider_name:
+                service_name = component.elem_classes[0]
+                provider_name = component.elem_classes[1]
+                provider_model = self.doc_index.get_provider_instance_model_from_service_name(
+                    service_name=service_name,
+                    provider_name=provider_name,
+                    domain_or_source=domain_or_source,
+                )
+                if not hasattr(provider_model, "config"):
+                    raise ValueError(f"provider_model {provider_model} has no config attribute")
+            if (
+                provider_model is not None
+                and provider_model.config.get(component.elem_id, None) is not None
+            ):
+                provider_model.config[component.elem_id] = component_value
+
         DocIndex.commit_context_index()
-
-    def save_component_value_to_provider_config_dict(
-        self,
-        parent_domain: Optional[DomainModel],
-        parent_source: Optional[SourceModel],
-        service_name: str,
-        provider_name: str,
-        provider_config_key: str,
-        component_value: Any,
-    ):
-        match service_name:
-            case DocLoadingService.CLASS_NAME:
-                provider_model = self.doc_index.get_or_create_doc_loader_instance(
-                    parent_domain=parent_domain,
-                    parent_source=parent_source,
-                    name=provider_name,
-                )
-            case IngestProcessingService.CLASS_NAME:
-                provider_model = self.doc_index.get_or_create_doc_ingest_processor_instance(
-                    parent_domain=parent_domain,
-                    parent_source=parent_source,
-                    name=provider_name,
-                )
-            case DatabaseService.CLASS_NAME:
-                provider_model = self.doc_index.get_or_create_doc_db_instance(
-                    name=provider_name,
-                )
-            case _:
-                raise ValueError(
-                    f"service_name must be {DocLoadingService.CLASS_NAME}, {IngestProcessingService.CLASS_NAME}, or {DatabaseService.CLASS_NAME}"
-                )
-
-        if hasattr(provider_model, "config"):
-            if provider_model.config.get(provider_config_key, None):
-                provider_model.config[provider_config_key] = component_value
 
     def create_management_tab_event_handlers(self, ui_components, save_button):
         for name, component_dict in ui_components.items():
-            GradioHelpers.set_components_elem_id_and_classes(
+            self.set_components_elem_id_and_classes(
                 provider_config_components=component_dict,
                 provider_name=name,
                 service_name=DatabaseService.CLASS_NAME,

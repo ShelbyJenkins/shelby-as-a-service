@@ -1,6 +1,20 @@
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Type
+
+from services.agents import AVAILABLE_AGENT_NAMES, AVAILABLE_AGENT_UI_NAMES, AVAILABLE_AGENTS
+from services.service_base import ServiceBase
+
+
+class AgentService(ABC, ServiceBase):
+    CLASS_NAME: str = "agent_service"
+    CLASS_UI_NAME: str = "Agent Service"
+    AVAILABLE_AGENTS: list[Type] = AVAILABLE_AGENTS
+    AVAILABLE_AGENT_UI_NAMES: list[str] = AVAILABLE_AGENT_UI_NAMES
+    AVAILABLE_AGENT_NAMES = AVAILABLE_AGENT_NAMES
+
     def prep_chat(
         self, query, llm_model_name: Optional[str] = None
-    ) -> typing.Tuple[list[dict[str, str]], "ModelConfig", int]:
+    ) -> tuple[list[dict[str, str]], "ModelConfig", int]:
         llm_model = self.get_model(requested_model_name=llm_model_name)
 
         prompt = PromptTemplates.create_openai_prompt(

@@ -235,7 +235,7 @@ class ConfigManager:
             try:
                 module = importlib.import_module(import_path)
                 cls = getattr(module, view_class_name)
-                gradio_instance.REQUIRED_CLASSES.append(cls)
+                gradio_instance.AVAILABLE_VIEWS.append(cls)
 
             except ImportError as e:
                 print(f"Failed to import module: {import_path}. Error: {str(e)}")

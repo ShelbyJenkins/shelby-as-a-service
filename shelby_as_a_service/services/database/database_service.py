@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, Union
 
-import interfaces.webui.gradio_helpers as GradioHelpers
 from services.context_index.doc_index.context_docs import IngestDoc
 from services.context_index.doc_index.doc_index_model import ChunkModel, DomainModel, SourceModel
 from services.embedding.embedding_service import EmbeddingService
+from services.gradio_interface.gradio_service import GradioService
 from services.service_base import ServiceBase
 
 from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
@@ -12,7 +12,7 @@ from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDER
 
 class DatabaseService(ABC, ServiceBase):
     CLASS_NAME: str = "database_service"
-    CONTEXT_INDEX_PROVIDER_KEY: str = "enabled_doc_db"
+    DOC_INDEX_KEY: str = "enabled_doc_db"
     CLASS_UI_NAME: str = "Document Databases"
     AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
@@ -24,7 +24,7 @@ class DatabaseService(ABC, ServiceBase):
     def load_service_from_context_index(
         cls, domain_or_source: DomainModel | SourceModel
     ) -> "DatabaseService":
-        instance: DatabaseService = cls.get_instance_from_context_index(
+        instance: DatabaseService = cls.init_instance_from_doc_index(
             domain_or_source=domain_or_source
         )
         setattr(instance, "domain_name", instance.domain.name)
@@ -185,14 +185,14 @@ class DatabaseService(ABC, ServiceBase):
     ):
         provider_configs_dict = {}
 
-        for provider in cls.context_index.index.doc_dbs:
+        for provider in cls.doc_index.index.doc_dbs:
             name = provider.name
             config = provider.config
             provider_configs_dict[name] = config
 
         enabled_doc_db_name = parent_instance.enabled_doc_db.name
 
-        provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
+        provider_select_dd, service_providers_dict = GradioService.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=enabled_doc_db_name,
             required_classes=cls.AVAILABLE_PROVIDERS,

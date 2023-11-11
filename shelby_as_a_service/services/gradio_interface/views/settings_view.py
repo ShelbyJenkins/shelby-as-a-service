@@ -1,14 +1,15 @@
 import typing
-from typing import Any, Optional, Type
+from typing import Any, Literal, Optional, Type, get_args
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
 from pydantic import BaseModel
+from services.gradio_interface.gradio_service import GradioService
 from services.service_base import ServiceBase
 
 
-class SettingsView(ServiceBase):
-    CLASS_NAME: str = "settings_view"
+class SettingsView(GradioService):
+    class_name = Literal["settings_view"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "⚙️"
     SETTINGS_UI_COL = 4
     PRIMARY_UI_COL = 6

@@ -55,6 +55,7 @@ class AppBase:
 
     total_cost: Decimal = Decimal("0")
     last_request_cost: Decimal = Decimal("0")
+    update_settings_file: bool = False
 
     @classmethod
     def setup_app(cls, app_name):
@@ -108,7 +109,7 @@ class AppBase:
         for sprite_name in AppBase.AVAILABLE_SPRITES:
             match sprite_name:
                 case "webui_sprite":
-                    from interfaces.webui.webui_sprite import WebUISprite
+                    from shelby_as_a_service.interfaces.webui_sprite import WebUISprite
 
                     # ConfigManager.add_extensions_to_sprite(
                     #     AppBase.list_of_extension_configs, WebUISprite

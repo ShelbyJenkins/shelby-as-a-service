@@ -1,8 +1,6 @@
-import typing
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type
 
-import interfaces.webui.gradio_helpers as GradioHelpers
 from services.context_index.doc_index.context_docs import IngestDoc
 from services.context_index.doc_index.doc_index_model import (
     ChunkModel,
@@ -10,15 +8,19 @@ from services.context_index.doc_index.doc_index_model import (
     DomainModel,
     SourceModel,
 )
+from services.gradio_interface.gradio_service import GradioService
 from services.service_base import ServiceBase
+from services.text_processing.ingest_processing import (
+    AVAILABLE_PROVIDERS,
+    AVAILABLE_PROVIDERS_NAMES,
+    AVAILABLE_PROVIDERS_UI_NAMES,
+)
 from services.text_processing.text_utils import tiktoken_len
-
-from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDERS_UI_NAMES
 
 
 class IngestProcessingService(ABC, ServiceBase):
     CLASS_NAME: str = "doc_ingest_processor_service"
-    CONTEXT_INDEX_PROVIDER_KEY: str = "enabled_doc_ingest_processor"
+    DOC_INDEX_KEY: str = "enabled_doc_ingest_processor"
     CLASS_UI_NAME: str = "Document Ingest Processor Service"
     AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
@@ -31,7 +33,7 @@ class IngestProcessingService(ABC, ServiceBase):
     def load_service_from_context_index(
         cls, domain_or_source: DomainModel | SourceModel
     ) -> "IngestProcessingService":
-        return cls.get_instance_from_context_index(domain_or_source=domain_or_source)
+        return cls.init_instance_from_doc_index(domain_or_source=domain_or_source)
 
     def create_chunks(
         self,
@@ -175,7 +177,7 @@ class IngestProcessingService(ABC, ServiceBase):
 
         text_processing_provider_name = parent_instance.enabled_doc_ingest_processor.name
 
-        provider_select_dd, service_providers_dict = GradioHelpers.abstract_service_ui_components(
+        provider_select_dd, service_providers_dict = GradioService.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=text_processing_provider_name,
             required_classes=cls.AVAILABLE_PROVIDERS,

@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Any, Literal, get_args
 
 from services.context_index.index_base import Base
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, PickleType, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, PickleType, String
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class DocIngestProcessorModel(Base):
-    __tablename__ = "doc_ingest_processors"
+    class_name = Literal["doc_ingest_processors"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
     domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
@@ -15,13 +20,15 @@ class DocIngestProcessorModel(Base):
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
     source_model = relationship("SourceModel", foreign_keys=[source_id])
 
-    DEFAULT_DOC_INGEST_PROCESSOR_NAME: str = "process_ingest_documents"
+    DEFAULT_PROVIDER_NAME: str = "process_ingest_documents"
     name: Mapped[str] = mapped_column(String)
     config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
 
 class DocLoaderModel(Base):
-    __tablename__ = "doc_loaders"
+    class_name = Literal["doc_loaders"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
     domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
@@ -29,24 +36,28 @@ class DocLoaderModel(Base):
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
     source_model = relationship("SourceModel", foreign_keys=[source_id])
 
-    DEFAULT_DOC_LOADER_NAME: str = "generic_recursive_web_scraper"
+    DEFAULT_PROVIDER_NAME: str = "generic_recursive_web_scraper"
     name: Mapped[str] = mapped_column(String)
     config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
 
 class DocEmbeddingModel(Base):
-    __tablename__ = "doc_embedders"
+    class_name = Literal["doc_embedders"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
     doc_db_model: Mapped["DocDBModel"] = relationship("DocDBModel", foreign_keys=[doc_db_id])
 
-    DEFAULT_DOC_EMBEDDER_NAME: str = "openai_embedding"
+    DEFAULT_PROVIDER_NAME: str = "openai_embedding"
     name: Mapped[str] = mapped_column(String, unique=True)
     config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
 
 class DocDBModel(Base):
-    __tablename__ = "doc_dbs"
+    class_name = Literal["doc_dbs"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
     context_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("doc_index_model.id"), nullable=True
@@ -66,12 +77,15 @@ class DocDBModel(Base):
         foreign_keys=[DocEmbeddingModel.doc_db_id],
     )
 
-    DEFAULT_DOC_DB_NAME: str = "pinecone_database"
+    DEFAULT_PROVIDER_NAME: str = "pinecone_database"
     name: Mapped[str] = mapped_column(String, unique=True)
     config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
 
 class DocIndexTemplateModel(Base):
+    class_name = Literal["documents"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     __tablename__ = "doc_index_templates"
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -94,6 +108,9 @@ class DocIndexTemplateModel(Base):
 
 
 class ChunkModel(Base):
+    class_name = Literal["documents"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     __tablename__ = "chunks"
     id: Mapped[int] = mapped_column(primary_key=True)
     document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"), nullable=True)
@@ -120,7 +137,9 @@ class ChunkModel(Base):
 
 
 class DocumentModel(Base):
-    __tablename__ = "documents"
+    class_name = Literal["documents"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
     source_model: Mapped["SourceModel"] = relationship("SourceModel", foreign_keys=[source_id])
@@ -154,7 +173,9 @@ class DocumentModel(Base):
 
 
 class SourceModel(Base):
-    __tablename__ = "sources"
+    class_name = Literal["sources"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
     domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
@@ -204,7 +225,9 @@ class SourceModel(Base):
 
 
 class DomainModel(Base):
-    __tablename__ = "domains"
+    class_name = Literal["domains"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
     context_id: Mapped[int] = mapped_column(
@@ -224,7 +247,7 @@ class DomainModel(Base):
     )
 
     @property
-    def list_of_source_names(self) -> list:
+    def source_names(self) -> list:
         return [source.name for source in self.sources]
 
     doc_ingest_processor_id: Mapped[int] = mapped_column(
@@ -269,7 +292,9 @@ class DomainModel(Base):
 
 
 class DocIndexModel(Base):
-    __tablename__ = "doc_index_model"
+    class_name = Literal["doc_index_model"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
+    __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
     current_domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)

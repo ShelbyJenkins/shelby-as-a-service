@@ -1,15 +1,16 @@
 import typing
-from typing import Annotated, Any, Dict, Generator, Optional, Type, Union
+from typing import Annotated, Any, Generator, Literal, Optional, Type, get_args
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
 from pydantic import BaseModel, Field
+from services.gradio_interface.gradio_service import GradioService
 from services.llm.llm_service import LLMService
 from services.service_base import ServiceBase
 
 
 class VanillaLLM(ServiceBase):
-    CLASS_NAME: str = "vanillallm_agent"
+    class_name = Literal["vanillallm_agent"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME = "VanillaLLM Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/vanillallm/vanillallm_prompt_templates.yaml"
     REQUIRED_CLASSES: list[Type] = [LLMService]
@@ -60,4 +61,4 @@ class VanillaLLM(ServiceBase):
             with gr.Tab(label=class_instance.CLASS_UI_NAME):
                 class_instance.create_settings_ui()
 
-        GradioHelpers.create_settings_event_listener(self.config, components)
+        GradioService.create_settings_event_listener(self.config, components)

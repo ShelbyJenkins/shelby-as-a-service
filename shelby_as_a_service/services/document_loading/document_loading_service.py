@@ -13,7 +13,7 @@ from . import AVAILABLE_PROVIDERS, AVAILABLE_PROVIDERS_NAMES, AVAILABLE_PROVIDER
 
 class DocLoadingService(ABC, ServiceBase):
     CLASS_NAME: str = "doc_loader_service"
-    CONTEXT_INDEX_PROVIDER_KEY: str = "enabled_doc_loader"
+    DOC_INDEX_KEY: str = "enabled_doc_loader"
     CLASS_UI_NAME: str = "Document Loading Service"
     AVAILABLE_PROVIDERS: list[Type] = AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = AVAILABLE_PROVIDERS_UI_NAMES
@@ -23,7 +23,7 @@ class DocLoadingService(ABC, ServiceBase):
     def load_service_from_context_index(
         cls, domain_or_source: DomainModel | SourceModel
     ) -> "DocLoadingService":
-        return cls.get_instance_from_context_index(domain_or_source=domain_or_source)
+        return cls.init_instance_from_doc_index(domain_or_source=domain_or_source)
 
     def load_docs_from_context_index_source(
         self,

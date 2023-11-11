@@ -1,12 +1,12 @@
 import re
 import typing
-from typing import Annotated, Any, Generator, Optional, Type, Union
+from typing import Annotated, Any, Generator, Literal, Optional, Type, Union, get_args
 
 import gradio as gr
-import interfaces.webui.gradio_helpers as GradioHelpers
 import services.text_processing.text_utils as text_utils
 from pydantic import BaseModel, Field
 from services.context_index.retrieval import DocRetrieval
+from services.gradio_interface.gradio_service import GradioService
 from services.llm.llm_service import LLMService
 from services.service_base import ServiceBase
 
@@ -24,7 +24,8 @@ class CEQAgent(ServiceBase):
                  context_to_response_ratio=None, stream=None, sprite_name="webui_sprite"): Generates a response to user input.
     """
 
-    CLASS_NAME: str = "ceq_agent"
+    class_name = Literal["ceq_agent"]
+    CLASS_NAME: class_name = get_args(class_name)[0]
     CLASS_UI_NAME: str = "CEQ"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/ceq/ceq_prompt_templates.yaml"
     DATA_DOMAIN_NONE_FOUND_MESSAGE: str = (
@@ -222,4 +223,4 @@ class CEQAgent(ServiceBase):
         with gr.Tab(label=self.llm_service.CLASS_UI_NAME):
             self.llm_service.create_settings_ui()
 
-        GradioHelpers.create_settings_event_listener(self.config, components)
+        GradioService.create_settings_event_listener(self.config, components)

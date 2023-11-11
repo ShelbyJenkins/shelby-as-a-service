@@ -1,6 +1,6 @@
 import os
 import typing
-from typing import Any, Literal, get_args
+from typing import Any, Literal, Optional, get_args
 
 from app.app_base import AppBase
 from sqlalchemy import create_engine
@@ -43,3 +43,33 @@ class IndexBase(AppBase):
         finally:
             session.close()
             return cls.get_session()
+
+    @staticmethod
+    def get_index_model_instance(
+        list_of_instances: Any,
+        id: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> Any:
+        if id:
+            if (
+                requested_instance := next(
+                    (instance for instance in list_of_instances if instance.id == id),
+                    None,
+                )
+            ) is None:
+                raise Exception(f"id {id} not found in {list_of_instances}.")
+        elif name:
+            if (
+                requested_instance := next(
+                    (instance for instance in list_of_instances if instance.name == name),
+                    None,
+                )
+            ) is None:
+                raise Exception(f"name {name} not found in {list_of_instances}.")
+        else:
+            raise Exception("Unexpected error: id or name should not be None at this point.")
+
+        if requested_instance is None:
+            raise Exception("Unexpected error: domain should not be None at this point.")
+
+        return requested_instance
