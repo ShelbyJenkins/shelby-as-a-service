@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type
 
-from services.context_index.doc_index.context_docs import IngestDoc
+from context_index.doc_index.context_docs import IngestDoc
 from services.service_base import ServiceBase
 
 
 class IngestProcessingBase(ABC, ServiceBase):
     DOC_INDEX_KEY: str = "enabled_doc_ingest_processor"
 
-    def preprocess_document(self, doc: IngestDoc) -> IngestDoc:
+    def preprocess_text_with_provider(self, text: str) -> str:
         raise NotImplementedError
 
     def create_chunks_with_provider(

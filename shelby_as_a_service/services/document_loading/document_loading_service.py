@@ -1,35 +1,65 @@
 from typing import Any, Optional, Type, Union
 
+import context_index.doc_index as doc_index_models
 import gradio as gr
 import services.document_loading as document_loading
+from context_index.doc_index.context_docs import IngestDoc
 from langchain.schema import Document
-from services.context_index.doc_index.context_docs import IngestDoc
-from services.context_index.doc_index.doc_index_model import DomainModel, SourceModel
 from services.document_loading.document_loading_base import DocLoadingBase
 from services.gradio_interface.gradio_base import GradioBase
 
 
 class DocLoadingService(DocLoadingBase):
     CLASS_NAME: str = "doc_loader_service"
-
     CLASS_UI_NAME: str = "Document Loading Service"
     AVAILABLE_PROVIDERS: list[Type] = document_loading.AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = document_loading.AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = document_loading.AVAILABLE_PROVIDERS_NAMES
+    list_of_doc_loader_provider_instances: list[DocLoadingBase] = []
+    current_doc_loader_provider: DocLoadingBase
 
-    @classmethod
-    def load_service_from_context_index(
-        cls, domain_or_source: DomainModel | SourceModel
-    ) -> "DocLoadingService":
-        return cls.init_instance_from_doc_index(domain_or_source=domain_or_source)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.list_of_doc_loader_provider_instances = self.list_of_required_class_instances
+        doc_loader_provider_name = kwargs.get("doc_loader_provider_name", None)
+        if doc_loader_provider_name:
+            self.current_doc_loader_provider = self.get_requested_class_instance(
+                requested_class=doc_loader_provider_name,
+                available_classes=self.list_of_doc_loader_provider_instances,
+            )
+
+    def get_doc_loader_instance(
+        self,
+        doc_loader_provider_name: Optional[document_loading.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_loader_instance: Optional[DocLoadingBase] = None,
+    ) -> DocLoadingBase:
+        if doc_loader_provider_name and doc_index_loader_instance:
+            raise ValueError(
+                "Must provide either doc_loader_provider_name or doc_index_loader_instance, not both."
+            )
+        if doc_loader_provider_name:
+            doc_loader = self.get_requested_class_instance(
+                requested_class=doc_loader_provider_name,
+                available_classes=self.list_of_doc_loader_provider_instances,
+            )
+        elif doc_index_loader_instance:
+            doc_loader = doc_index_loader_instance
+        else:
+            doc_loader = self.current_doc_loader_provider
+        if doc_loader is None:
+            raise ValueError("doc_loader must not be None")
+        return doc_loader
 
     def load_docs_from_context_index_source(
         self,
+        source: doc_index_models.SourceModel,
     ) -> Optional[list[IngestDoc]]:
-        self.check_for_source
-
+        doc_index_loader_instance: DocLoadingBase = self.init_provider_instance_from_doc_index(
+            domain_or_source=source
+        )
         docs = self.load_docs(
             uri=self.source.source_uri,
+            doc_index_loader_instance=doc_index_loader_instance,
         )
         if not docs:
             self.log.info(f"No documents found for {self.source.name} @ {self.source.source_uri}")
@@ -44,8 +74,14 @@ class DocLoadingService(DocLoadingBase):
     def load_docs(
         self,
         uri: str,
+        doc_loader_provider_name: Optional[document_loading.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_loader_instance: Optional[DocLoadingBase] = None,
     ) -> Optional[list[Document]]:
-        docs = self.load_docs_with_provider(uri)
+        doc_loader = self.get_doc_loader_instance(
+            doc_loader_provider_name=doc_loader_provider_name,
+            doc_index_loader_instance=doc_index_loader_instance,
+        )
+        docs = doc_loader.load_docs_with_provider(uri)
         if not docs:
             self.log.info(f"No documents loaded from DocLoadingService: {self.__class__.__name__}")
             return None
@@ -53,9 +89,9 @@ class DocLoadingService(DocLoadingBase):
         return docs
 
     @classmethod
-    def create_service_ui_components(
+    def create_doc_index_ui_components(
         cls,
-        parent_instance: DomainModel | SourceModel,
+        parent_instance: doc_index_models.DomainModel | doc_index_models.SourceModel,
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}

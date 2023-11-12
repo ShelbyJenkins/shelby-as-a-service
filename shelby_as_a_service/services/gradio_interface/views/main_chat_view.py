@@ -2,8 +2,8 @@ import typing
 from decimal import Decimal
 from typing import Any, Literal, Optional, Type, get_args
 
+import agents as agents
 import gradio as gr
-import services.agents as agents
 from pydantic import BaseModel
 from services.gradio_interface.gradio_base import GradioBase
 
@@ -43,7 +43,7 @@ class MainChatView(GradioBase):
     def run_chat(self, chat_in):
         self.log.info(f"Running query: {chat_in}")
 
-        response = self.current_agent_instance.run_chat(
+        response = self.current_agent_instance.create_chat(
             chat_in=chat_in,
         )
         yield from response
@@ -167,7 +167,7 @@ class MainChatView(GradioBase):
             self.config.current_agent_ui_name
             for agent_instance in self.list_of_agent_instances:
                 with gr.Tab(label=agent_instance.CLASS_UI_NAME) as agent_settings:
-                    agent_instance.create_settings_ui()
+                    agent_instance.create_main_chat_ui()
 
                 agent_settings_list.append(agent_settings)
 

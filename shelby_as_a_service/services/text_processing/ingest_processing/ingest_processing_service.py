@@ -1,13 +1,9 @@
 from typing import Any, Optional, Type
 
+import context_index.doc_index as doc_index_models
 import services.text_processing.ingest_processing as ingest_processing
-from services.context_index.doc_index.context_docs import IngestDoc
-from services.context_index.doc_index.doc_index_model import (
-    ChunkModel,
-    DocumentModel,
-    DomainModel,
-    SourceModel,
-)
+import services.text_processing.text_utils as text_utils
+from context_index.doc_index.context_docs import IngestDoc
 from services.gradio_interface.gradio_base import GradioBase
 from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 from services.text_processing.text_utils import tiktoken_len
@@ -21,18 +17,52 @@ class IngestProcessingService(IngestProcessingBase):
     AVAILABLE_PROVIDERS_NAMES = ingest_processing.AVAILABLE_PROVIDERS_NAMES
     successfully_chunked_counter: int = 0
     docs_token_counts: list[int] = []
+    list_of_doc_ingest_processor_provider_instances: list[IngestProcessingBase] = []
+    current_doc_ingest_processor_provider: IngestProcessingBase
 
-    @classmethod
-    def load_service_from_context_index(
-        cls, domain_or_source: DomainModel | SourceModel
-    ) -> "IngestProcessingService":
-        return cls.init_instance_from_doc_index(domain_or_source=domain_or_source)
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.list_of_doc_ingest_processor_provider_instances = self.list_of_required_class_instances
+        doc_ingest_processor_name = kwargs.get("doc_ingest_processor_name", None)
+        if doc_ingest_processor_name:
+            self.current_doc_ingest_processor_provider = self.get_requested_class_instance(
+                requested_class=doc_ingest_processor_name,
+                available_classes=self.list_of_doc_ingest_processor_provider_instances,
+            )
+
+    def get_doc_ingest_processor_instance(
+        self,
+        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
+    ) -> IngestProcessingBase:
+        if doc_ingest_processor_name and doc_index_ingest_processor_instance:
+            raise ValueError(
+                "Must provide either doc_ingest_processor_name or doc_index_ingest_processor_instance, not both."
+            )
+        if doc_ingest_processor_name:
+            doc_ingest_processor = self.get_requested_class_instance(
+                requested_class=doc_ingest_processor_name,
+                available_classes=self.list_of_doc_ingest_processor_provider_instances,
+            )
+        elif doc_index_ingest_processor_instance:
+            doc_ingest_processor = doc_index_ingest_processor_instance
+        else:
+            doc_ingest_processor = self.current_doc_ingest_processor_provider
+        if doc_ingest_processor is None:
+            raise ValueError("doc_ingest_processor must not be None")
+        return doc_ingest_processor
 
     def create_chunks(
         self,
         text: str | dict,
+        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
     ) -> Optional[list[str]]:
-        doc_chunks = self.create_chunks_with_provider(text=text)
+        doc_ingest_processor = self.get_doc_ingest_processor_instance(
+            doc_ingest_processor_name=doc_ingest_processor_name,
+            doc_index_ingest_processor_instance=doc_index_ingest_processor_instance,
+        )
+        doc_chunks = doc_ingest_processor.create_chunks_with_provider(text=text)
         if not doc_chunks:
             self.log.info(f"{text[:10]} produced no chunks")
             return None
@@ -41,16 +71,41 @@ class IngestProcessingService(IngestProcessingBase):
 
         return doc_chunks
 
+    def preprocess_text(
+        self,
+        text: str,
+        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
+    ) -> str:
+        doc_ingest_processor = self.get_doc_ingest_processor_instance(
+            doc_ingest_processor_name=doc_ingest_processor_name,
+            doc_index_ingest_processor_instance=doc_index_ingest_processor_instance,
+        )
+        return doc_ingest_processor.preprocess_text_with_provider(text=text)
+
     def process_documents_from_context_index_source(
         self,
         ingest_docs: list[IngestDoc],
+        source: doc_index_models.SourceModel,
     ) -> tuple[list[IngestDoc], list[str]]:
-        self.check_for_source
+        doc_index_ingest_processor_instance: IngestProcessingBase = (
+            self.init_provider_instance_from_doc_index(domain_or_source=source)
+        )
         preprocessed_docs = []
         for doc in ingest_docs:
-            preprocessed_docs.append(self.preprocess_document(doc))
+            if isinstance(doc.precleaned_content, dict):
+                raise ValueError("IngestDoc precleaned_content must be a string here.")
+            doc.cleaned_content = self.preprocess_text(
+                text=doc.precleaned_content,
+                doc_index_ingest_processor_instance=doc_index_ingest_processor_instance,
+            )
+            doc.cleaned_content_token_count = text_utils.tiktoken_len(doc.cleaned_content)
+            doc.hashed_cleaned_content = text_utils.hash_content(doc.cleaned_content)
+            preprocessed_docs.append(doc)
 
-        self.get_existing_docs_from_context_index_source(preprocessed_docs)
+        self.get_existing_docs_from_context_index_source(
+            ingest_docs=preprocessed_docs, source=source
+        )
         if not (docs_requiring_update := self.check_for_docs_requiring_update(preprocessed_docs)):
             self.log.info(f"No new data found for {self.source.name}")
             return [], []
@@ -61,12 +116,19 @@ class IngestProcessingService(IngestProcessingBase):
             self.log.info(f"Processing and chunking {doc.title}")
             if doc.cleaned_content is None:
                 raise ValueError("doc.cleaned_content must not be None")
-            text_chunks = self.create_chunks(text=doc.cleaned_content)
+            text_chunks = self.create_chunks(
+                text=doc.cleaned_content,
+                doc_index_ingest_processor_instance=doc_index_ingest_processor_instance,
+            )
             if not text_chunks:
                 self.log.info(f"🔴 Skipping doc because text_chunks is None")
                 continue
             doc_db_ids_requiring_deletion.extend(self.clear_and_get_existing_doc_db_chunks(doc))
-            upsert_docs.append(self.create_document_and_chunk_models(text_chunks, doc))
+            upsert_docs.append(
+                self.create_document_and_chunk_models(
+                    text_chunks=text_chunks, ingest_doc=doc, source=source
+                )
+            )
 
         self.doc_index.session.commit()
         self.log.info(f"Min: {min(self.docs_token_counts)}")
@@ -87,23 +149,26 @@ class IngestProcessingService(IngestProcessingBase):
         return doc_db_ids
 
     def create_document_and_chunk_models(
-        self, text_chunks: list[str], ingest_doc: IngestDoc
+        self,
+        text_chunks: list[str],
+        ingest_doc: IngestDoc,
+        source: doc_index_models.SourceModel,
     ) -> IngestDoc:
         if not ingest_doc.existing_document_model:
-            ingest_doc.existing_document_model = DocumentModel(
-                source_id=self.source.id,
+            ingest_doc.existing_document_model = doc_index_models.DocumentModel(
+                source_id=source.id,
                 cleaned_content=ingest_doc.cleaned_content,
                 hashed_cleaned_content=ingest_doc.hashed_cleaned_content,
                 title=ingest_doc.title,
                 uri=ingest_doc.uri,
-                batch_update_enabled=self.source.batch_update_enabled,
+                batch_update_enabled=source.batch_update_enabled,
                 source_type=ingest_doc.source_type,
                 date_published=ingest_doc.date_published,
             )
         for chunk in text_chunks:
             self.log.info(f"{ingest_doc.title} has {len(text_chunks)} chunks")
             ingest_doc.existing_document_model.context_chunks.append(
-                ChunkModel(
+                doc_index_models.ChunkModel(
                     chunked_content=chunk,
                 )
             )
@@ -133,10 +198,11 @@ class IngestProcessingService(IngestProcessingBase):
     def get_existing_docs_from_context_index_source(
         self,
         ingest_docs: list[IngestDoc],
+        source: doc_index_models.SourceModel,
     ):
         existing_document_models = []
         for doc in ingest_docs:
-            for document_model in self.source.documents:
+            for document_model in source.documents:
                 if doc.uri == document_model.uri:
                     doc.existing_document_id = document_model.id
                     doc.existing_document_model = document_model
@@ -145,9 +211,9 @@ class IngestProcessingService(IngestProcessingBase):
             self.log.info(f"Found {len(existing_document_models)} existing_document_models")
 
     @classmethod
-    def create_service_ui_components(
+    def create_doc_index_ui_components(
         cls,
-        parent_instance: DomainModel | SourceModel,
+        parent_instance: doc_index_models.DomainModel | doc_index_models.SourceModel,
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}

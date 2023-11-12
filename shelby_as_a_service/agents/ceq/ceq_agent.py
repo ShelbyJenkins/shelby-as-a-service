@@ -4,9 +4,9 @@ from typing import Annotated, Any, Generator, Literal, Optional, Type, Union, ge
 
 import gradio as gr
 import services.llm as llm
+from agents.agent_base import AgentBase
+from context_index.doc_index.doc_retrieval import DocRetrieval
 from pydantic import BaseModel, Field
-from services.agents.agent_base import AgentBase
-from services.context_index.doc_index.doc_retrieval import DocRetrieval
 from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_service import LLMService
 
@@ -124,7 +124,9 @@ class CEQAgent(AgentBase):
             prompt=prompt,
             llm_provider_name=llm_provider_name,
             llm_model_name=llm_model_name,
-            model_token_utilization=model_token_utilization,
+            model_token_utilization=model_token_utilization
+            if model_token_utilization is not None
+            else self.config.model_token_utilization,
             stream=stream,
         ):
             if previous_response is not None:
@@ -214,7 +216,7 @@ class CEQAgent(AgentBase):
 
         return markdown_string
 
-    def create_settings_ui(self):
+    def create_main_chat_ui(self):
         components = {}
 
         with gr.Tab(label=self.doc_retrieval.CLASS_UI_NAME):
@@ -223,6 +225,14 @@ class CEQAgent(AgentBase):
                 value="all",
                 label="Topics to Search",
                 multiselect=True,
+                min_width=0,
+            )
+            components["model_token_utilization"] = gr.Slider(
+                value=self.config.model_token_utilization,
+                label="Percent of Model Context Size to Use",
+                minimum=0.0,
+                maximum=1.0,
+                step=0.05,
                 min_width=0,
             )
             components["context_to_response_ratio"] = gr.Slider(

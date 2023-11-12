@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type
 
-from services.agents import AVAILABLE_AGENT_NAMES, AVAILABLE_AGENT_UI_NAMES, AVAILABLE_AGENTS
+from agents import AVAILABLE_AGENT_NAMES, AVAILABLE_AGENT_UI_NAMES, AVAILABLE_AGENTS
 from services.service_base import ServiceBase
 
 

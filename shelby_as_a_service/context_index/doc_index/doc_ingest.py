@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from services.context_index.doc_index.doc_index_model import DomainModel, SourceModel
+import context_index.doc_index as doc_index_models
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 from services.service_base import ServiceBase
@@ -19,8 +19,8 @@ class DocIngest(ServiceBase):
     @classmethod
     def ingest_docs_from_context_index_source_or_domain(
         cls,
-        source: Optional[SourceModel] = None,
-        domain: Optional[DomainModel] = None,
+        source: Optional[doc_index_models.SourceModel] = None,
+        domain: Optional[doc_index_models.DomainModel] = None,
     ):
         if source:
             sources = [source]
@@ -58,11 +58,9 @@ class DocIngest(ServiceBase):
                         break
 
     @classmethod
-    def ingest_source(cls, source: SourceModel) -> bool:
+    def ingest_source(cls, source: doc_index_models.SourceModel) -> bool:
         if (
-            ingest_docs := DocLoadingService.load_service_from_context_index(
-                domain_or_source=source
-            ).load_docs_from_context_index_source()
+            ingest_docs := DocLoadingService().load_docs_from_context_index_source(source=source)
         ) is None:
             cls.log.info(f"🔴 No documents found for {source.name}")
             return True
@@ -70,10 +68,8 @@ class DocIngest(ServiceBase):
         (
             upsert_docs,
             doc_db_ids_requiring_deletion,
-        ) = IngestProcessingService.load_service_from_context_index(
-            domain_or_source=source
-        ).process_documents_from_context_index_source(
-            ingest_docs=ingest_docs
+        ) = IngestProcessingService().process_documents_from_context_index_source(
+            ingest_docs=ingest_docs, source=source
         )
 
         if not upsert_docs:
@@ -81,12 +77,11 @@ class DocIngest(ServiceBase):
             cls.doc_index.session.rollback()
             return True
 
-        doc_db_service = DatabaseService.load_service_from_context_index(domain_or_source=source)
+        doc_db_service = DatabaseService()
         doc_db_service.upsert_documents_from_context_index_source(
-            upsert_docs=upsert_docs,
+            upsert_docs=upsert_docs, source=source
         )
         doc_db_service.clear_existing_entries_by_id(
-            source_name=source.name,
             domain_name=source.domain_model.name,
             doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
         )

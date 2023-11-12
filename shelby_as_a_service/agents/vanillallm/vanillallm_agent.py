@@ -3,8 +3,8 @@ from typing import Annotated, Any, Generator, Literal, Optional, Type, get_args
 
 import gradio as gr
 import services.llm as llm
+from agents.agent_base import AgentBase
 from pydantic import BaseModel, Field
-from services.agents.agent_base import AgentBase
 from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_service import LLMService
 
@@ -51,7 +51,23 @@ class VanillaLLM(AgentBase):
             prompt=prompt,
             llm_provider_name=llm_provider_name,
             llm_model_name=llm_model_name,
-            model_token_utilization=model_token_utilization,
+            model_token_utilization=model_token_utilization
+            if model_token_utilization is not None
+            else self.config.model_token_utilization,
             stream=stream,
         ):
             yield response["response_content_string"]
+
+    def create_main_chat_ui(self):
+        components = {}
+        components["model_token_utilization"] = gr.Slider(
+            value=self.config.model_token_utilization,
+            label="Percent of Model Context Size to Use",
+            minimum=0.0,
+            maximum=1.0,
+            step=0.05,
+            min_width=0,
+        )
+
+        with gr.Tab(label=self.llm_service.CLASS_UI_NAME):
+            self.llm_service.create_settings_ui()

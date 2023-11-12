@@ -1,8 +1,8 @@
-from typing import Any, Optional, Type, Union
+from typing import Any, Optional, Type
 
+import context_index.doc_index as doc_index_models
 import services.database as database
-from services.context_index.doc_index.context_docs import IngestDoc
-from services.context_index.doc_index.doc_index_model import ChunkModel, DomainModel, SourceModel
+from context_index.doc_index.context_docs import IngestDoc
 from services.database.database_base import DatabaseBase
 from services.embedding.embedding_service import EmbeddingService
 from services.gradio_interface.gradio_base import GradioBase
@@ -15,24 +15,159 @@ class DatabaseService(DatabaseBase):
     AVAILABLE_PROVIDERS: list[Type] = database.AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = database.AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = database.AVAILABLE_PROVIDERS_NAMES
+    list_of_doc_db_provider_instances: list[DatabaseBase] = []
+    current_doc_db_provider: DatabaseBase
 
-    @classmethod
-    def load_service_from_context_index(
-        cls, domain_or_source: DomainModel | SourceModel
-    ) -> "DatabaseService":
-        instance: DatabaseService = cls.init_instance_from_doc_index(
-            domain_or_source=domain_or_source
+    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        self.list_of_doc_db_provider_instances = self.list_of_required_class_instances
+        doc_db_provider_name = kwargs.get("doc_db_provider_name", None)
+        if doc_db_provider_name:
+            self.current_doc_db_provider = self.get_requested_class_instance(
+                requested_class=doc_db_provider_name,
+                available_classes=self.list_of_doc_db_provider_instances,
+            )
+
+    def get_doc_db_instance(
+        self,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_db_instance: Optional[DatabaseBase] = None,
+    ) -> DatabaseBase:
+        if doc_db_provider_name and doc_index_db_instance:
+            raise ValueError(
+                "Must provide either doc_db_provider_name or doc_index_db_instance, not both."
+            )
+        if doc_db_provider_name:
+            doc_db = self.get_requested_class_instance(
+                requested_class=doc_db_provider_name,
+                available_classes=self.list_of_doc_db_provider_instances,
+            )
+        elif doc_index_db_instance:
+            doc_db = doc_index_db_instance
+        else:
+            doc_db = self.current_doc_db_provider
+        if doc_db is None:
+            raise ValueError("doc_db must not be None")
+        return doc_db
+
+    def query_by_terms(
+        self,
+        domain_name: str,
+        search_terms: list[str] | str,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_db_instance: Optional[DatabaseBase] = None,
+    ) -> list[dict]:
+        doc_db = self.get_doc_db_instance(
+            doc_db_provider_name=doc_db_provider_name,
+            doc_index_db_instance=doc_index_db_instance,
         )
-        setattr(instance, "domain_name", instance.domain.name)
-        return instance
+        if isinstance(search_terms, str):
+            search_terms = [search_terms]
+        retrieved_docs = []
+        for term in search_terms:
+            docs = doc_db.query_by_terms_with_provider(search_terms=term, domain_name=domain_name)
+            if docs:
+                retrieved_docs.extend(docs)
+            else:
+                self.log.info(f"No documents found for {term}")
+        return retrieved_docs
 
-    def upsert_documents_from_context_index_source(self, upsert_docs: list[IngestDoc]):
-        self.check_for_source
-        current_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
-            source_name=self.source.name
+    def fetch_by_ids(
+        self,
+        domain_name: str,
+        ids: list[int] | int,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_db_instance: Optional[DatabaseBase] = None,
+    ) -> list[dict]:
+        doc_db = self.get_doc_db_instance(
+            doc_db_provider_name=doc_db_provider_name,
+            doc_index_db_instance=doc_index_db_instance,
+        )
+        if isinstance(ids, int):
+            ids = [ids]
+
+        docs = doc_db.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
+        if not docs:
+            self.log.info(f"No documents found for {id}")
+        return docs
+
+    def upsert(
+        self,
+        entries_to_upsert: list[dict[str, Any]],
+        domain_name: str,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_db_instance: Optional[DatabaseBase] = None,
+    ):
+        doc_db = self.get_doc_db_instance(
+            doc_db_provider_name=doc_db_provider_name,
+            doc_index_db_instance=doc_index_db_instance,
+        )
+        current_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
+            domain_name=domain_name
+        )
+        self.log.info(f"Upserting {len(entries_to_upsert)} entries to {self.CLASS_NAME}")
+
+        response = doc_db.upsert_with_provider(
+            entries_to_upsert=entries_to_upsert, domain_name=domain_name
+        )
+
+        post_upsert_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
+            domain_name=domain_name
+        )
+        if post_upsert_entry_count - current_entry_count != len(entries_to_upsert):
+            raise ValueError(
+                f"Upserted {len(entries_to_upsert)} entries but expected to upsert {post_upsert_entry_count - current_entry_count}.\n Response: {response}"
+            )
+        self.log.info(
+            f"Successfully upserted {len(entries_to_upsert)} entries to {self.CLASS_NAME}.\n Response: {response}"
+        )
+
+    def clear_existing_entries_by_id(
+        self,
+        domain_name: str,
+        doc_db_ids_requiring_deletion: list[str],
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_index_db_instance: Optional[DatabaseBase] = None,
+    ):
+        doc_db = self.get_doc_db_instance(
+            doc_db_provider_name=doc_db_provider_name,
+            doc_index_db_instance=doc_index_db_instance,
+        )
+        existing_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
+            domain_name=domain_name
+        )
+
+        response = doc_db.clear_existing_entries_by_id_with_provider(
+            doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
+            domain_name=domain_name,
+        )
+        post_delete_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
+            domain_name=domain_name
+        )
+        if existing_entry_count - post_delete_entry_count != len(doc_db_ids_requiring_deletion):
+            raise ValueError(
+                f"Deleted {len(doc_db_ids_requiring_deletion)} entries but expected to delete {existing_entry_count - post_delete_entry_count}.\n Response: {response}"
+            )
+        else:
+            self.log.info(
+                f"Deleted {len(doc_db_ids_requiring_deletion)} entries from {self.CLASS_NAME}.\n Response: {response}"
+            )
+
+    def upsert_documents_from_context_index_source(
+        self, upsert_docs: list[IngestDoc], source: doc_index_models.SourceModel
+    ):
+        doc_index_db_instance: DatabaseBase = self.init_provider_instance_from_doc_index(
+            domain_or_source=source
+        )
+
+        current_entry_count = (
+            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+                domain_name=source.domain_model.name
+            )
         )
         current_entry_count += 1
-        chunks_to_upsert: list[ChunkModel] = []
+        chunks_to_upsert: list[doc_index_models.ChunkModel] = []
+        chunk: doc_index_models.ChunkModel
         for doc in upsert_docs:
             if not doc.existing_document_model:
                 raise ValueError(f"No existing_document_model for doc {doc.title}")
@@ -45,97 +180,29 @@ class DatabaseService(DatabaseBase):
 
         entries_to_upsert = []
         if self.DOC_DB_REQUIRES_EMBEDDINGS:
-            EmbeddingService.load_service_from_context_index(
-                domain_or_source=self.source
-            ).get_document_embeddings_for_chunks_to_upsert(chunks_to_upsert=chunks_to_upsert)
+            EmbeddingService().get_document_embeddings_for_chunks_to_upsert(
+                chunks_to_upsert=chunks_to_upsert, doc_index_db_model=source.enabled_doc_db
+            )
             for chunk in chunks_to_upsert:
                 metadata = chunk.prepare_upsert_metadata()
                 entries_to_upsert.append(
-                    self.prepare_upsert_for_vectorstore_with_provider(
+                    doc_index_db_instance.prepare_upsert_for_vectorstore_with_provider(
                         id=chunk.chunk_doc_db_id, values=chunk.chunk_embedding, metadata=metadata
                     )
                 )
         else:
             raise NotImplementedError
 
-        self.upsert(entries_to_upsert=entries_to_upsert, domain_name=self.domain_name)
-
-    def clear_existing_entries_by_id(
-        self,
-        domain_name: str,
-        doc_db_ids_requiring_deletion: list[str],
-        source_name: Optional[str] = None,
-    ):
-        existing_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
-            source_name=source_name, domain_name=domain_name
+        self.upsert(
+            entries_to_upsert=entries_to_upsert,
+            domain_name=source.domain_model.name,
+            doc_index_db_instance=doc_index_db_instance,
         )
-
-        response = self.clear_existing_entries_by_id_with_provider(
-            doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
-            domain_name=domain_name,
-        )
-        post_delete_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
-            source_name=source_name, domain_name=domain_name
-        )
-        if existing_entry_count - post_delete_entry_count != len(doc_db_ids_requiring_deletion):
-            raise ValueError(
-                f"Deleted {len(doc_db_ids_requiring_deletion)} entries but expected to delete {existing_entry_count - post_delete_entry_count}.\n Response: {response}"
-            )
-        else:
-            self.log.info(
-                f"Deleted {len(doc_db_ids_requiring_deletion)} entries from {self.CLASS_NAME}.\n Response: {response}"
-            )
-
-    def upsert(
-        self,
-        domain_name: str,
-        entries_to_upsert: list[dict[str, Any]],
-    ):
-        current_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
-            source_name=self.source.name
-        )
-        self.log.info(f"Upserting {len(entries_to_upsert)} entries to {self.CLASS_NAME}")
-
-        response = self.upsert_with_provider(
-            entries_to_upsert=entries_to_upsert, domain_name=domain_name
-        )
-
-        post_upsert_entry_count = self.get_index_domain_or_source_entry_count_with_provider(
-            source_name=self.source.name
-        )
-        if post_upsert_entry_count - current_entry_count != len(entries_to_upsert):
-            raise ValueError(
-                f"Upserted {len(entries_to_upsert)} entries but expected to upsert {post_upsert_entry_count - current_entry_count}.\n Response: {response}"
-            )
-        self.log.info(
-            f"Successfully upserted {len(entries_to_upsert)} entries to {self.CLASS_NAME}.\n Response: {response}"
-        )
-
-    def query_by_terms(self, domain_name: str, search_terms: list[str] | str) -> list[dict]:
-        if isinstance(search_terms, str):
-            search_terms = [search_terms]
-        retrieved_docs = []
-        for term in search_terms:
-            docs = self.query_by_terms_with_provider(search_terms=term, domain_name=domain_name)
-            if docs:
-                retrieved_docs.extend(docs)
-            else:
-                self.log.info(f"No documents found for {term}")
-        return retrieved_docs
-
-    def fetch_by_ids(self, domain_name: str, ids: list[int] | int) -> list[dict]:
-        if isinstance(ids, int):
-            ids = [ids]
-
-        docs = self.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
-        if not docs:
-            self.log.info(f"No documents found for {id}")
-        return docs
 
     @classmethod
-    def create_service_ui_components(
+    def create_doc_index_ui_components(
         cls,
-        parent_instance: DomainModel | SourceModel,
+        parent_instance: doc_index_models.DomainModel | doc_index_models.SourceModel,
         groups_rendered: bool = True,
     ):
         provider_configs_dict = {}
@@ -145,11 +212,11 @@ class DatabaseService(DatabaseBase):
             config = provider.config
             provider_configs_dict[name] = config
 
-        enabled_doc_db_name = parent_instance.enabled_doc_db.name
+        enabled_doc_db_provider_name = parent_instance.enabled_doc_db.name
 
         provider_select_dd, service_providers_dict = GradioBase.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
-            enabled_provider_name=enabled_doc_db_name,
+            enabled_provider_name=enabled_doc_db_provider_name,
             required_classes=cls.AVAILABLE_PROVIDERS,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,

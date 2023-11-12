@@ -6,6 +6,7 @@ import gradio as gr
 import openai
 import services.text_processing.text_utils as text_utils
 from pydantic import BaseModel, Field
+from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_base import LLMBase
 from typing_extensions import Annotated
 
@@ -79,7 +80,7 @@ class OpenAILLM(LLMBase):
     def create_chat(
         self,
         prompt,
-        llm_model_instance,
+        llm_model_instance: ModelConfig,
         max_tokens=None,
         logit_bias=None,
         stream=None,
@@ -95,12 +96,12 @@ class OpenAILLM(LLMBase):
             response = openai.ChatCompletion.create(
                 api_key=self.secrets["openai_api_key"],
                 messages=prompt,
-                model=llm_model.MODEL_NAME,
-                frequency_penalty=llm_model.frequency_penalty,
+                model=llm_model_instance.MODEL_NAME,
+                frequency_penalty=llm_model_instance.frequency_penalty,
                 max_tokens=max_tokens,
-                presence_penalty=llm_model.presence_penalty,
-                temperature=llm_model.temperature,
-                top_p=llm_model.top_p,
+                presence_penalty=llm_model_instance.presence_penalty,
+                temperature=llm_model_instance.temperature,
+                top_p=llm_model_instance.top_p,
                 logit_bias=logit_bias,
             )
             (
@@ -108,14 +109,14 @@ class OpenAILLM(LLMBase):
                 total_prompt_tokens,
                 total_completion_tokens,
                 total_token_count,
-            ) = self._check_response(response, llm_model)
+            ) = self._check_response(response, llm_model_instance)
 
             response = {
                 "response_content_string": prompt_response,
                 "total_prompt_tokens": total_prompt_tokens,
                 "total_completion_tokens": total_completion_tokens,
                 "total_token_count": total_token_count,
-                "model_name": llm_model.MODEL_NAME,
+                "model_name": llm_model_instance.MODEL_NAME,
             }
             yield response
             return response
@@ -273,7 +274,7 @@ class OpenAILLM(LLMBase):
                 )
 
             models_list.append(model_settings)
-            GradioHelpers.create_settings_event_listener(model, model_compoments)
+            GradioBase.create_settings_event_listener(model, model_compoments)
 
         model_dropdown.change(
             fn=self.set_current_model,

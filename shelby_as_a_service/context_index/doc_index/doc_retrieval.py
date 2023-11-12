@@ -48,7 +48,7 @@ class DocRetrieval(ServiceBase):
         Args:
             query (str): The query to retrieve documents for.
             retrieve_n_docs (int, optional): The number of documents to retrieve from the database. Defaults to None.
-            docs_max_count (int, optional): The maximum number of documents to return from the. Defaults to None.
+            docs_max_count (int, optional): The maximum number of documents to return from the doc_db. Defaults to None.
             enabled_domains (list[str], optional): The data domains to retrieve documents from. Defaults to None.
             topic_constraint_enabled (bool, optional): Whether to enable topic constraints. Defaults to None.
             keyword_generator_enabled (bool, optional): Whether to enable keyword generation. Defaults to None.

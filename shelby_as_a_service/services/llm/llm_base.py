@@ -45,3 +45,6 @@ class LLMBase(ABC, ServiceBase):
         stream=None,
     ):
         raise NotImplementedError
+
+    def create_settings_ui(self):
+        pass

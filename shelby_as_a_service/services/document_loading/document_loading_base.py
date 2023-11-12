@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, Union
 
 from langchain.schema import Document
-from services.context_index.doc_index.context_docs import IngestDoc
-from services.context_index.doc_index.doc_index_model import DomainModel, SourceModel
 from services.service_base import ServiceBase
 
 

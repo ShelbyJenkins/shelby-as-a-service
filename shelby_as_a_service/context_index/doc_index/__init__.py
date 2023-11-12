@@ -1,12 +1,14 @@
 from typing import Literal, Type
 
-from services.context_index.doc_index.doc_index_model import (
+from context_index.doc_index.doc_index_models import (
+    ChunkModel,
     DocDBModel,
     DocEmbeddingModel,
     DocIndexModel,
     DocIndexTemplateModel,
     DocIngestProcessorModel,
     DocLoaderModel,
+    DocumentModel,
     DomainModel,
     SourceModel,
 )
@@ -20,6 +22,8 @@ DOC_INDEX_MODEL_NAMES = Literal[
     DomainModel.class_name,
     SourceModel.class_name,
     DocEmbeddingModel.class_name,
+    ChunkModel.class_name,
+    DocumentModel.class_name,
 ]
 DOC_INDEX_MODELS: list[Type] = [
     DocDBModel,
@@ -30,4 +34,6 @@ DOC_INDEX_MODELS: list[Type] = [
     DomainModel,
     SourceModel,
     DocEmbeddingModel,
+    ChunkModel,
+    DocumentModel,
 ]

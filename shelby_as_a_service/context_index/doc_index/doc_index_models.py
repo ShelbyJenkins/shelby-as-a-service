@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, get_args
 
-from services.context_index.index_base import Base
+from context_index.index_base import Base
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, PickleType, String
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column, relationship

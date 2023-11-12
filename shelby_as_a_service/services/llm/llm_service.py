@@ -1,5 +1,6 @@
 from typing import Any, Dict, Generator, Optional, Type
 
+import gradio as gr
 import services.llm as llm
 import services.text_processing.prompts.prompt_template_service as prompts
 import services.text_processing.text_utils as text_utils
@@ -10,21 +11,21 @@ class LLMService(LLMBase):
     CLASS_NAME: str = "llm_service"
     CLASS_UI_NAME: str = "LLM Settings"
     REQUIRED_CLASSES: list[Type] = llm.AVAILABLE_PROVIDERS
-    AVAILABLE_PROVIDERS_UI_NAMES: list[str] = llm.AVAILABLE_PROVIDERS_UI_NAMES
+    AVAILABLE_PROVIDERS_UI_NAMES: list = llm.AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_NAMES = llm.AVAILABLE_PROVIDERS_NAMES
 
-    openai_llm: llm.OpenAILLM
-    list_of_llm_provider_instances: list[llm.OpenAILLM] = []
-    current_llm_provider: llm.OpenAILLM
+    list_of_llm_provider_instances: list[LLMBase] = []
+    current_llm_provider: LLMBase
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.list_of_llm_provider_instances = self.list_of_required_class_instances
         llm_provider_name = kwargs.get("llm_provider_name", None)
-        self.current_llm_provider = self.get_requested_class_instance(
-            requested_class=llm_provider_name,
-            available_classes=self.list_of_llm_provider_instances,
-        )
+        if llm_provider_name:
+            self.current_llm_provider = self.get_requested_class_instance(
+                requested_class=llm_provider_name,
+                available_classes=self.list_of_llm_provider_instances,
+            )
 
     def create_chat(
         self,
@@ -116,28 +117,18 @@ class LLMService(LLMBase):
         else:
             raise ValueError(f"llm_provider_name {llm_provider_name} not found.")
 
-    @classmethod
-    def create_settings_ui(cls):
+    def create_settings_ui(self):
         components = {}
 
-        # components["model_token_utilization"] = gr.Slider(
-        #     value=cls.config.model_token_utilization,
-        #     label="Percent of Model Context Size to Use",
-        #     minimum=0.0,
-        #     maximum=1.0,
-        #     step=0.05,
-        #     min_width=0,
-        # )
+        components["llm_provider"] = gr.Dropdown(
+            value=self.current_llm_provider.CLASS_UI_NAME,
+            choices=llm.AVAILABLE_PROVIDERS_NAMES,
+            label="LLM Provider",
+            container=True,
+        )
 
-        # components["llm_provider"] = gr.Dropdown(
-        #     value=cls.current_llm_provider.CLASS_UI_NAME,
-        #     choices=cls.list_of_class_ui_names,
-        #     label="LLM Provider",
-        #     container=True,
-        # )
-
-        # for provider_instance in cls.list_of_required_class_instances:
-        #     provider_instance.create_settings_ui()
+        for provider_instance in self.list_of_llm_provider_instances:
+            provider_instance.create_settings_ui()
 
         # GradioBase.create_settings_event_listener(cls.config, components)
 

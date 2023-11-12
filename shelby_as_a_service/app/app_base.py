@@ -79,7 +79,7 @@ class AppBase:
 
         AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
         cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.config.app_name, "index")
-        from services.context_index.doc_index.doc_index import DocIndex
+        from context_index.doc_index.doc_index import DocIndex
 
         AppBase.doc_index: DocIndex = DocIndex()
 

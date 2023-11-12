@@ -3,7 +3,6 @@ from typing import Any, Iterator, Literal, Optional, Type, Union, get_args
 import gradio as gr
 import services.text_processing.text_utils as text_utils
 from pydantic import BaseModel
-from services.context_index.doc_index.context_docs import IngestDoc
 from services.text_processing.dfs_text_splitter import DFSTextSplitter
 from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 
@@ -33,14 +32,8 @@ class IngestCEQ(IngestProcessingBase):
             overlap_percent=self.config.text_splitter_overlap_percent,
         )
 
-    def preprocess_document(self, doc: IngestDoc) -> IngestDoc:
-        if isinstance(doc.precleaned_content, dict):
-            raise ValueError("IngestDoc precleaned_content must be a string here.")
-        doc.cleaned_content = text_utils.clean_text_content(doc.precleaned_content)
-        doc.cleaned_content_token_count = text_utils.tiktoken_len(doc.cleaned_content)
-        doc.hashed_cleaned_content = text_utils.hash_content(doc.cleaned_content)
-
-        return doc
+    def preprocess_text_with_provider(self, text: str) -> str:
+        return text_utils.clean_text_content(text)
 
     def create_chunks_with_provider(self, text: str) -> Optional[list[str]]:
         if text_utils.tiktoken_len(text) < self.config.preprocessor_min_length:

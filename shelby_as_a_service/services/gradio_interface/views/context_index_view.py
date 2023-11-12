@@ -1,8 +1,8 @@
 from typing import Any, Literal, Optional, Type, get_args
 
+import context_index.doc_index as doc_index_models
 import gradio as gr
-import services.context_index.doc_index as doc_index_models
-from services.context_index.doc_index.doc_index import DocIndex
+from context_index.doc_index.doc_index import DocIndex
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 from services.gradio_interface.gradio_base import GradioBase
@@ -265,7 +265,7 @@ class DocIndexView(GradioBase):
             (
                 doc_loaders_dd,
                 doc_loader_components_dict,
-            ) = DocLoadingService.create_service_ui_components(
+            ) = DocLoadingService.create_doc_index_ui_components(
                 parent_instance=parent_instance,
                 groups_rendered=False,
             )
@@ -276,7 +276,7 @@ class DocIndexView(GradioBase):
             (
                 doc_ingest_proc_dd,
                 doc_ingest_processor_components_dict,
-            ) = IngestProcessingService.create_service_ui_components(
+            ) = IngestProcessingService.create_doc_index_ui_components(
                 parent_instance=parent_instance,
                 groups_rendered=False,
             )
@@ -287,7 +287,7 @@ class DocIndexView(GradioBase):
             (
                 doc_dbs_dd,
                 doc_dbs_components_dict,
-            ) = DatabaseService.create_service_ui_components(
+            ) = DatabaseService.create_doc_index_ui_components(
                 parent_instance=parent_instance,
                 groups_rendered=False,
             )
@@ -324,7 +324,7 @@ class DocIndexView(GradioBase):
         (
             _,
             doc_loader_components_dict,
-        ) = DocLoadingService.create_service_ui_components(
+        ) = DocLoadingService.create_doc_index_ui_components(
             parent_instance=parent_instance,
             groups_rendered=True,
         )
@@ -332,7 +332,7 @@ class DocIndexView(GradioBase):
         (
             _,
             doc_ingest_processor_components_dict,
-        ) = IngestProcessingService.create_service_ui_components(
+        ) = IngestProcessingService.create_doc_index_ui_components(
             parent_instance=parent_instance,
             groups_rendered=False,
         )
@@ -340,7 +340,7 @@ class DocIndexView(GradioBase):
         (
             _,
             doc_dbs_components_dict,
-        ) = DatabaseService.create_service_ui_components(
+        ) = DatabaseService.create_doc_index_ui_components(
             parent_instance=parent_instance,
             groups_rendered=True,
         )

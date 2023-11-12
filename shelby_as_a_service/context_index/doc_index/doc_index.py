@@ -1,9 +1,9 @@
 import logging
 from typing import Any, Optional, Type
 
-import services.context_index.doc_index as doc_index_models
-from services.context_index.doc_index.doc_index_templates import DocIndexTemplates
-from services.context_index.index_base import IndexBase
+import context_index.doc_index as doc_index_models
+from context_index.doc_index.doc_index_templates import DocIndexTemplates
+from context_index.index_base import IndexBase
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 from services.embedding.embedding_service import EmbeddingService
@@ -59,7 +59,7 @@ class DocIndex(IndexBase, ServiceBase):
     @staticmethod
     def commit_context_index():
         DocIndex.session = DocIndex.commit_session(DocIndex.session)
-        DocIndex.session.add(DocIndex.doc_index_model_instance)
+        DocIndex.session.add(instance=DocIndex.doc_index_model_instance)
 
     @property
     def domain_names(self) -> list:  # Can't type this due to Gradio issue
@@ -383,7 +383,7 @@ class DocIndex(IndexBase, ServiceBase):
                 raise Exception(
                     f"Unexpected error: model_instance should be of type {doc_index_model_name}."
                 )
-            list_of_current_providers.append(model_instance)
+            list_of_current_providers.append(model_instance)  # type: ignore
 
             if isinstance(model_instance, doc_index_models.DocDBModel):
                 self.populate_service_providers(

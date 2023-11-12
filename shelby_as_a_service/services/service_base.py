@@ -1,18 +1,9 @@
 import logging
-import os
 from typing import Any, Optional, Type
 
+import context_index.doc_index as doc_index_models
 from app.app_base import AppBase
 from pydantic import BaseModel
-from services.context_index.doc_index.doc_index_model import (
-    DocDBModel,
-    DocEmbeddingModel,
-    DocIndexModel,
-    DocIngestProcessorModel,
-    DocLoaderModel,
-    DomainModel,
-    SourceModel,
-)
 
 
 class ServiceBase(AppBase):
@@ -22,9 +13,10 @@ class ServiceBase(AppBase):
     AVAILABLE_PROVIDERS: list[Type["ServiceBase"]]
     log: logging.Logger
     ClassConfigModel: Type[BaseModel]
+    ModelConfig: Type[BaseModel]
     config: BaseModel
-    source: SourceModel
-    domain: DomainModel
+    source: doc_index_models.SourceModel
+    domain: doc_index_models.DomainModel
     list_of_class_names: list[str]
     list_of_class_ui_names: list[str]
     list_of_required_class_instances: list[Type]
@@ -35,6 +27,14 @@ class ServiceBase(AppBase):
         class_config = config_file_dict.get(self.CLASS_NAME, {})
         if getattr(self, "ClassConfigModel", None):
             merged_config = {**kwargs, **class_config}
+
+            available_models = None
+            if model_definitions := getattr(self, "MODEL_DEFINITIONS", None):
+                available_models = self.create_model_instances(
+                    model_definitions, merged_config, **kwargs
+                )
+
+            merged_config["available_models"] = available_models
             self.config = self.ClassConfigModel(**merged_config)
 
         self.set_secrets()
@@ -92,39 +92,38 @@ class ServiceBase(AppBase):
         )
 
     @classmethod
-    def init_instance_from_doc_index(
+    def init_provider_instance_from_doc_index(
         cls,
-        domain_or_source: SourceModel | DomainModel,
-        doc_db: Optional[DocDBModel] = None,
+        domain_or_source: Optional[
+            doc_index_models.SourceModel | doc_index_models.DomainModel
+        ] = None,
+        doc_index_db_model: Optional[doc_index_models.DocDBModel] = None,
     ) -> Any:
-        context_index_provider: DocLoaderModel | DocIngestProcessorModel | DocEmbeddingModel | DocDBModel
+        context_index_provider: doc_index_models.DocLoaderModel | doc_index_models.DocIngestProcessorModel | doc_index_models.DocEmbeddingModel | doc_index_models.DocDBModel
         provider_key = cls.DOC_INDEX_KEY
-        if doc_db:
-            context_index_provider = getattr(doc_db, provider_key)
-        else:
+        if doc_index_db_model:
+            context_index_provider = getattr(doc_index_db_model, provider_key)
+        elif domain_or_source:
             context_index_provider = getattr(domain_or_source, provider_key)
+        else:
+            raise ValueError("Must provide either doc_index_db_model or domain_or_source")
         provider_config = context_index_provider.config
         provider_name = context_index_provider.name
 
-        if isinstance(domain_or_source, DomainModel):
-            source = None
-            domain = domain_or_source
-        elif isinstance(domain_or_source, SourceModel):
-            source = domain_or_source
-            domain = source.domain_model
-        else:
-            raise ValueError(
-                f"Must provide either SourceModel or DomainModel, not {type(domain_or_source)}"
-            )
-
         for available_class in cls.AVAILABLE_PROVIDERS:
             if available_class.CLASS_NAME == provider_name:
-                instance = available_class(config=provider_config)
-                setattr(instance, "source", source)
-                setattr(instance, "domain", domain)
+                return available_class(config=provider_config)
         raise ValueError(f"Requested class {provider_name} not found in {cls.AVAILABLE_PROVIDERS}")
 
-    @property
-    def check_for_source(self):
-        if getattr(self, "source") == None:
-            raise ValueError(f"Must provide SourceModel for {self.__class__.__name__}.")
+    def create_model_instances(self, model_definitions, module_config_file_dict={}, **kwargs):
+        available_models = {}
+        list_of_available_model_names = []
+        for model_name, definition in model_definitions.items():
+            model_config_file_dict = module_config_file_dict.get(model_name, {})
+            new_model_instance = self.ModelConfig(**{**model_config_file_dict, **definition})
+            list_of_available_model_names.append(model_name)
+            available_models[model_name] = new_model_instance
+
+        if models_type := getattr(self, "MODELS_TYPE", None):
+            setattr(self, models_type, list_of_available_model_names)
+        return available_models

@@ -1,7 +1,7 @@
 from typing import Literal
 
-from services.agents.ceq.ceq_agent import CEQAgent
-from services.agents.vanillallm.vanillallm_agent import VanillaLLM
+from agents.ceq.ceq_agent import CEQAgent
+from agents.vanillallm.vanillallm_agent import VanillaLLM
 
 AVAILABLE_AGENT_NAMES = Literal[
     CEQAgent.class_name,

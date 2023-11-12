@@ -2,14 +2,14 @@ from datetime import datetime
 from typing import Any, Optional
 
 import services.text_processing.text_utils as text_utils
-from langchain.schema import Document
-from pydantic import BaseModel
-from services.context_index.doc_index.doc_index_model import (
+from context_index.doc_index.doc_index_models import (
     ChunkModel,
     DocumentModel,
     DomainModel,
     SourceModel,
 )
+from langchain.schema import Document
+from pydantic import BaseModel
 
 
 class RetrievalDoc(BaseModel):

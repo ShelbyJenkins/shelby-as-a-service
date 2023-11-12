@@ -12,11 +12,9 @@ class EmbeddingBase(ABC, ServiceBase):
     MODEL_DEFINITIONS: dict[str, Any]
     DOC_INDEX_KEY: str = "enabled_doc_embedder"
 
-    @abstractmethod
     def get_embedding_of_text(self, text: str, model_name: Optional[str] = None) -> list[float]:
         raise NotImplementedError
 
-    @abstractmethod
     def get_embeddings_from_list_of_texts(
         self, texts: list[str], model_name: Optional[str] = None
     ) -> list[list[float]]:
