@@ -9,7 +9,7 @@ from services.text_processing.ingest_processing.ingest_processing_base import In
 
 class IngestCEQ(IngestProcessingBase):
     class_name = Literal["ceq_ingest_processor"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Context Enhanced Query Ingest Processor"
     AVAILABLE_TEXT_SPLITTERS: list[str] = ["dfs_text_splitter"]
 

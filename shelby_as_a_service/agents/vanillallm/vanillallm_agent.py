@@ -11,15 +11,14 @@ from services.llm.llm_service import LLMService
 
 class VanillaLLM(AgentBase):
     class_name = Literal["vanillallm_agent"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME = "VanillaLLM Agent"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/vanillallm/vanillallm_prompt_templates.yaml"
     REQUIRED_CLASSES: list[Type] = [LLMService]
 
     class ClassConfigModel(BaseModel):
-        agent_select_status_message: str = "EZPZ"
+        current_llm_provider_name: str = "openai_llm"
         model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
-        llm_provider_name: str = "openai_llm"
 
         class Config:
             extra = "ignore"
@@ -36,11 +35,16 @@ class VanillaLLM(AgentBase):
     def create_chat(
         self,
         chat_in: str,
-        llm_provider_name: llm.AVAILABLE_PROVIDERS_NAMES,
-        llm_model_name: str,
+        llm_provider_name: Optional[str] = None,
+        llm_model_name: Optional[str] = None,
         model_token_utilization: Optional[float] = None,
         stream: Optional[bool] = None,
     ):
+        if llm_provider_name is None:
+            llm_provider_name = self.config.current_llm_provider_name
+        if model_token_utilization is None:
+            model_token_utilization = self.config.model_token_utilization
+
         prompt = self.create_prompt(
             query=chat_in,
             llm_provider_name=llm_provider_name,
@@ -68,6 +72,6 @@ class VanillaLLM(AgentBase):
             step=0.05,
             min_width=0,
         )
-
+        GradioBase.create_settings_event_listener(self.config, components)
         with gr.Tab(label=self.llm_service.CLASS_UI_NAME):
             self.llm_service.create_settings_ui()

@@ -10,10 +10,11 @@ class ServiceBase(AppBase):
     CLASS_NAME: str
     DOC_INDEX_KEY: str
     CLASS_UI_NAME: str
-    AVAILABLE_PROVIDERS: list[Type["ServiceBase"]]
+    REQUIRED_CLASSES: list[Type["ServiceBase"]]
     log: logging.Logger
     ClassConfigModel: Type[BaseModel]
     ModelConfig: Type[BaseModel]
+    MODEL_DEFINITIONS: dict[str, Any]
     config: BaseModel
     source: doc_index_models.SourceModel
     domain: doc_index_models.DomainModel
@@ -33,8 +34,8 @@ class ServiceBase(AppBase):
                 available_models = self.create_model_instances(
                     model_definitions, merged_config, **kwargs
                 )
+                merged_config["available_models"] = available_models
 
-            merged_config["available_models"] = available_models
             self.config = self.ClassConfigModel(**merged_config)
 
         self.set_secrets()
@@ -81,14 +82,14 @@ class ServiceBase(AppBase):
     def init_requested_class_instance(
         cls, requested_class_name: str, requested_class_config: dict[str, Any] = {}, **kwargs
     ) -> Any:
-        for available_class in cls.AVAILABLE_PROVIDERS:
+        for available_class in cls.REQUIRED_CLASSES:
             if (
                 available_class.CLASS_NAME == requested_class_name
                 or available_class.CLASS_UI_NAME == requested_class_name
             ):
                 return available_class(config=requested_class_config, **kwargs)
         raise ValueError(
-            f"Requested class {requested_class_name} not found in {cls.AVAILABLE_PROVIDERS}"
+            f"Requested class {requested_class_name} not found in {cls.REQUIRED_CLASSES}"
         )
 
     @classmethod
@@ -110,10 +111,10 @@ class ServiceBase(AppBase):
         provider_config = context_index_provider.config
         provider_name = context_index_provider.name
 
-        for available_class in cls.AVAILABLE_PROVIDERS:
+        for available_class in cls.REQUIRED_CLASSES:
             if available_class.CLASS_NAME == provider_name:
                 return available_class(config=provider_config)
-        raise ValueError(f"Requested class {provider_name} not found in {cls.AVAILABLE_PROVIDERS}")
+        raise ValueError(f"Requested class {provider_name} not found in {cls.REQUIRED_CLASSES}")
 
     def create_model_instances(self, model_definitions, module_config_file_dict={}, **kwargs):
         available_models = {}
@@ -127,3 +128,12 @@ class ServiceBase(AppBase):
         if models_type := getattr(self, "MODELS_TYPE", None):
             setattr(self, models_type, list_of_available_model_names)
         return available_models
+
+    @staticmethod
+    def get_model_instance(requested_model_name: str, provider: "ServiceBase") -> Any:
+        for model_name, model in provider.MODEL_DEFINITIONS.items():
+            if model_name == requested_model_name:
+                model_instance = provider.ModelConfig(**model)
+                return model_instance
+
+        raise ValueError(f"Requested model {requested_model_name} not found.")

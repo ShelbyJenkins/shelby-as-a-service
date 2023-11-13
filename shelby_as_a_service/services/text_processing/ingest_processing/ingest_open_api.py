@@ -14,7 +14,7 @@ from services.text_processing.ingest_processing.ingest_processing_base import In
 
 class OpenAPIMinifier(IngestProcessingBase):
     class_name = Literal["open_api_minifier"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Open API Minifier"
     # Saves tokens be abbreviating in a way understood by the LLM
     # Must be lowercase

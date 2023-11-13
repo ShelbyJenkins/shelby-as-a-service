@@ -1,8 +1,39 @@
 import os
-from typing import Dict
+from typing import Literal, Optional
 
 import services.text_processing.text_utils as text_utils
 import yaml
+
+
+def create_logit_bias(
+    number_of_options: int,
+    number_of_decisions: int,
+    llm_model_name: str,
+    separator: Optional[Literal["\n", ",", " "]] = None,
+) -> tuple[dict[str, int], int]:
+    if number_of_options == 0 or number_of_decisions == 0:
+        raise ValueError(
+            f"Both number_of_options '{number_of_options}' and number_of_decisions '{number_of_options}' should be greater than 0."
+        )
+    logit_bias_weight = 100
+    # 0-number_of_options
+    logit_bias = {str(k): logit_bias_weight for k in range(15, 15 + number_of_options + 1)}
+
+    if number_of_decisions > 1:
+        # separator
+        if not separator:
+            separator = "\n"
+        if len(seperator_token := text_utils.get_tokens(separator, llm_model_name)) > 1:
+            raise ValueError(f"separator_token '{seperator_token}' should be a single token.")
+        logit_bias[str(seperator_token[0])] = logit_bias_weight
+
+    highest_option_tokens = text_utils.get_tokens(str(number_of_options), llm_model_name)
+    if number_of_decisions == 1:
+        max_tokens = len(highest_option_tokens)
+    else:
+        max_tokens = ((len(highest_option_tokens) + 1) * number_of_decisions) - 1
+
+    return logit_bias, max_tokens
 
 
 def create_openai_prompt(query, prompt_template_path, context_docs=None) -> list[dict[str, str]]:

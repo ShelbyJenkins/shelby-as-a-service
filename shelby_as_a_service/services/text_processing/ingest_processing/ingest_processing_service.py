@@ -12,9 +12,9 @@ from services.text_processing.text_utils import tiktoken_len
 class IngestProcessingService(IngestProcessingBase):
     CLASS_NAME: str = "doc_ingest_processor_service"
     CLASS_UI_NAME: str = "Document Ingest Processor Service"
-    AVAILABLE_PROVIDERS: list[Type] = ingest_processing.AVAILABLE_PROVIDERS
+    REQUIRED_CLASSES: list[Type] = ingest_processing.AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = ingest_processing.AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = ingest_processing.AVAILABLE_PROVIDERS_NAMES
+    AVAILABLE_PROVIDERS_TYPINGS = ingest_processing.AVAILABLE_PROVIDERS_TYPINGS
     successfully_chunked_counter: int = 0
     docs_token_counts: list[int] = []
     list_of_doc_ingest_processor_provider_instances: list[IngestProcessingBase] = []
@@ -32,7 +32,7 @@ class IngestProcessingService(IngestProcessingBase):
 
     def get_doc_ingest_processor_instance(
         self,
-        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
     ) -> IngestProcessingBase:
         if doc_ingest_processor_name and doc_index_ingest_processor_instance:
@@ -55,7 +55,7 @@ class IngestProcessingService(IngestProcessingBase):
     def create_chunks(
         self,
         text: str | dict,
-        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
     ) -> Optional[list[str]]:
         doc_ingest_processor = self.get_doc_ingest_processor_instance(
@@ -74,7 +74,7 @@ class IngestProcessingService(IngestProcessingBase):
     def preprocess_text(
         self,
         text: str,
-        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
     ) -> str:
         doc_ingest_processor = self.get_doc_ingest_processor_instance(
@@ -228,7 +228,7 @@ class IngestProcessingService(IngestProcessingBase):
         provider_select_dd, service_providers_dict = GradioBase.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=text_processing_provider_name,
-            required_classes=cls.AVAILABLE_PROVIDERS,
+            required_classes=cls.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 class DocIngestProcessorModel(Base):
     class_name = Literal["doc_ingest_processors"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -27,7 +27,7 @@ class DocIngestProcessorModel(Base):
 
 class DocLoaderModel(Base):
     class_name = Literal["doc_loaders"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -43,7 +43,7 @@ class DocLoaderModel(Base):
 
 class DocEmbeddingModel(Base):
     class_name = Literal["doc_embedders"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
@@ -56,7 +56,7 @@ class DocEmbeddingModel(Base):
 
 class DocDBModel(Base):
     class_name = Literal["doc_dbs"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
     context_id: Mapped[int] = mapped_column(
@@ -84,7 +84,7 @@ class DocDBModel(Base):
 
 class DocIndexTemplateModel(Base):
     class_name = Literal["documents"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     __tablename__ = "doc_index_templates"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -109,7 +109,7 @@ class DocIndexTemplateModel(Base):
 
 class ChunkModel(Base):
     class_name = Literal["documents"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     __tablename__ = "chunks"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -138,7 +138,7 @@ class ChunkModel(Base):
 
 class DocumentModel(Base):
     class_name = Literal["documents"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
@@ -174,7 +174,7 @@ class DocumentModel(Base):
 
 class SourceModel(Base):
     class_name = Literal["sources"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -226,7 +226,7 @@ class SourceModel(Base):
 
 class DomainModel(Base):
     class_name = Literal["domains"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -293,7 +293,7 @@ class DomainModel(Base):
 
 class DocIndexModel(Base):
     class_name = Literal["doc_index_model"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
 

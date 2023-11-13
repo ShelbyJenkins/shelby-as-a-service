@@ -17,7 +17,7 @@ from services.service_base import ServiceBase
 
 class DiscordSprite(ServiceBase):
     class_name = Literal["discord_sprite"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Discord Sprite"
     REQUIRED_SECRETS: list[str] = ["discord_bot_token"]
 

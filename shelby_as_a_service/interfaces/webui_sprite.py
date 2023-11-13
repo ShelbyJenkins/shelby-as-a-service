@@ -9,7 +9,7 @@ from services.service_base import ServiceBase
 
 class WebUISprite(ServiceBase):
     class_name = Literal["webui_sprite"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "webui_sprite"
     REQUIRED_CLASSES: list[Type] = [GradioService]
 

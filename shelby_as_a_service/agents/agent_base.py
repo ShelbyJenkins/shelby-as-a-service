@@ -6,11 +6,11 @@ from services.service_base import ServiceBase
 
 
 class AgentBase(ServiceBase):
+    @staticmethod
     def create_prompt(
-        self,
         query,
         prompt_template_path: str,
-        llm_provider_name: llm.AVAILABLE_PROVIDERS_NAMES,
+        llm_provider_name: llm.AVAILABLE_PROVIDERS_TYPINGS,
         context_docs: Optional[list[dict]] = None,
     ) -> list[dict[str, str]]:
         if llm_provider_name == llm.OpenAILLM.CLASS_NAME:

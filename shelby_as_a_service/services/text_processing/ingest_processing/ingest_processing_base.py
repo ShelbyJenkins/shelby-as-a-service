@@ -35,7 +35,7 @@ class IngestProcessingBase(ABC, ServiceBase):
     #     provider_select_dd, service_providers_dict = GradioBase.abstract_service_ui_components(
     #         service_name=cls.CLASS_NAME,
     #         enabled_provider_name=text_processing_provider_name,
-    #         required_classes=cls.AVAILABLE_PROVIDERS,
+    #         required_classes=cls.REQUIRED_CLASSES,
     #         provider_configs_dict=provider_configs_dict,
     #         groups_rendered=groups_rendered,
     #     )

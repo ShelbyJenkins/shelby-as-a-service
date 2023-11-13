@@ -17,7 +17,7 @@ from slack_bolt.app.async_app import AsyncApp
 
 class SlackSprite:
     class_name = Literal["slack_sprite"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Slack Sprite"
     slack_enabled_teams: list[str] = field(default_factory=list)
     slack_welcome_message: str = "ima tell you about the {}."

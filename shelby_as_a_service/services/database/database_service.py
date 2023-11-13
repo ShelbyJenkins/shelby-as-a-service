@@ -12,9 +12,9 @@ class DatabaseService(DatabaseBase):
     CLASS_NAME: str = "database_service"
 
     CLASS_UI_NAME: str = "Document Databases"
-    AVAILABLE_PROVIDERS: list[Type] = database.AVAILABLE_PROVIDERS
+    REQUIRED_CLASSES: list[Type] = database.AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = database.AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = database.AVAILABLE_PROVIDERS_NAMES
+    AVAILABLE_PROVIDERS_TYPINGS = database.AVAILABLE_PROVIDERS_TYPINGS
     list_of_doc_db_provider_instances: list[DatabaseBase] = []
     current_doc_db_provider: DatabaseBase
 
@@ -30,7 +30,7 @@ class DatabaseService(DatabaseBase):
 
     def get_doc_db_instance(
         self,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ) -> DatabaseBase:
         if doc_db_provider_name and doc_index_db_instance:
@@ -54,7 +54,7 @@ class DatabaseService(DatabaseBase):
         self,
         domain_name: str,
         search_terms: list[str] | str,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ) -> list[dict]:
         doc_db = self.get_doc_db_instance(
@@ -76,7 +76,7 @@ class DatabaseService(DatabaseBase):
         self,
         domain_name: str,
         ids: list[int] | int,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ) -> list[dict]:
         doc_db = self.get_doc_db_instance(
@@ -95,7 +95,7 @@ class DatabaseService(DatabaseBase):
         self,
         entries_to_upsert: list[dict[str, Any]],
         domain_name: str,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ):
         doc_db = self.get_doc_db_instance(
@@ -126,7 +126,7 @@ class DatabaseService(DatabaseBase):
         self,
         domain_name: str,
         doc_db_ids_requiring_deletion: list[str],
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ):
         doc_db = self.get_doc_db_instance(
@@ -217,7 +217,7 @@ class DatabaseService(DatabaseBase):
         provider_select_dd, service_providers_dict = GradioBase.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=enabled_doc_db_provider_name,
-            required_classes=cls.AVAILABLE_PROVIDERS,
+            required_classes=cls.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )

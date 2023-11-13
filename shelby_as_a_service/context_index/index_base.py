@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
 
 class IndexBase(AppBase):
     class_name = Literal["index"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Local Index - SQLite"
     _session_factory: typing.Callable[[], Session]
     session: Session

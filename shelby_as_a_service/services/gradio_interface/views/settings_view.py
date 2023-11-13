@@ -8,7 +8,7 @@ from services.gradio_interface.gradio_base import GradioBase
 
 class SettingsView(GradioBase):
     class_name = Literal["settings_view"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "⚙️"
     SETTINGS_UI_COL = 4
     PRIMARY_UI_COL = 6

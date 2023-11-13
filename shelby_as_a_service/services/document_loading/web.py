@@ -15,7 +15,7 @@ from services.document_loading.document_loading_base import DocLoadingBase
 
 class GenericWebScraper(DocLoadingBase):
     class_name = Literal["generic_web_scraper"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generic Web Scraper"
 
     class ClassConfigModel(BaseModel):
@@ -49,7 +49,7 @@ class GenericWebScraper(DocLoadingBase):
 
 class GenericRecursiveWebScraper(DocLoadingBase):
     class_name = Literal["generic_recursive_web_scraper"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generic Resursive Web Scraper"
 
     class ClassConfigModel(BaseModel):

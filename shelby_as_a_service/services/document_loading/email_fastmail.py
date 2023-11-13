@@ -15,7 +15,7 @@ class EmailFastmail(DocLoadingBase):
     From: https://github.com/fastmail/JMAP-Samples/blob/main/python3/tiny_jmap_library.py"""
 
     class_name = Literal["email_fastmail"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Email: Fastmail"
     # For intialization
     REQUIRED_SECRETS: list[str] = [

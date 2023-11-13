@@ -103,8 +103,8 @@ class AppBase:
         import interfaces as interfaces
 
         AppBase.AVAILABLE_SPRITES: list[Type] = interfaces.AVAILABLE_SPRITES
-        AppBase.AVAILABLE_SPRITE_NAMES = interfaces.AVAILABLE_SPRITE_NAMES
-        AppBase.AVAILABLE_SPRITE_UI_NAMES: list[str] = interfaces.AVAILABLE_SPRITE_UI_NAMES
+        AppBase.AVAILABLE_SPRITES_TYPINGS = interfaces.AVAILABLE_SPRITES_TYPINGS
+        AppBase.AVAILABLE_SPRITES_UI_NAMES: list[str] = interfaces.AVAILABLE_SPRITES_UI_NAMES
         for sprite in AppBase.AVAILABLE_SPRITES:
             if sprite.CLASS_NAME in AppBase.config.enabled_sprites:
                 # ConfigManager.add_extensions_to_sprite(

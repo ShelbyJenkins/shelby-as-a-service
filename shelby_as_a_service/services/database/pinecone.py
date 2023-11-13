@@ -10,7 +10,7 @@ from services.database.database_base import DatabaseBase
 
 class PineconeDatabase(DatabaseBase):
     class_name = Literal["pinecone_database"]
-    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_NAME: str = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "Pinecone Database"
     REQUIRED_SECRETS: list[str] = ["pinecone_api_key"]
     DOC_DB_REQUIRES_EMBEDDINGS: bool = True

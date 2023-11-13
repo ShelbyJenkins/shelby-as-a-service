@@ -5,6 +5,7 @@ from typing import Any, Optional, Type
 
 import gradio as gr
 from app.config_manager import ConfigManager
+from pydantic import BaseModel
 from services.service_base import ServiceBase
 
 
@@ -12,8 +13,8 @@ class GradioBase(ServiceBase):
     async def check_for_updates(self):
         while True:
             await asyncio.sleep(5)  # non-blocking sleep
-            if self.update_settings_file:
-                self.update_settings_file = False
+            if ServiceBase.update_settings_file:
+                ServiceBase.update_settings_file = False
                 ConfigManager.update_config_file_from_loaded_models()
 
     @staticmethod
@@ -99,9 +100,9 @@ class GradioBase(ServiceBase):
                     output.append(component)
         return output
 
-    @classmethod
+    @staticmethod
     # This updates the config model with the values from the UI
-    def create_settings_event_listener(cls, config_model, components):
+    def create_settings_event_listener(config_model: BaseModel, components):
         def update_config_classes(config_model, components, *values):
             ui_state = {k: v for k, v in zip(components.keys(), values)}
             current_values = config_model.model_dump()
@@ -110,7 +111,7 @@ class GradioBase(ServiceBase):
                 if hasattr(config_model, key):
                     setattr(config_model, key, value)
 
-            cls.update_settings_file = True
+            ServiceBase.update_settings_file = True
 
         components_to_monitor = []
         for _, component in components.items():

@@ -38,7 +38,7 @@ class DocIndex(IndexBase, ServiceBase):
             DocIndex.doc_index_model_instance = doc_index_model_instance
             self.populate_service_providers(
                 target_instance=DocIndex.doc_index_model_instance,
-                doc_index_model_name=doc_index_models.DocDBModel.CLASS_NAME,
+                doc_index_model_name=doc_index_models.DocDBModel.CLASS_NAME,  # type: ignore
             )
             self.add_default_doc_index_templates_to_index()
         else:
@@ -48,7 +48,7 @@ class DocIndex(IndexBase, ServiceBase):
 
             self.populate_service_providers(
                 target_instance=DocIndex.doc_index_model_instance,
-                doc_index_model_name=doc_index_models.DocDBModel.CLASS_NAME,
+                doc_index_model_name=doc_index_models.DocDBModel.CLASS_NAME,  # type: ignore
             )
             self.add_default_doc_index_templates_to_index()
 
@@ -64,6 +64,10 @@ class DocIndex(IndexBase, ServiceBase):
     @property
     def domain_names(self) -> list:  # Can't type this due to Gradio issue
         return [domain.name for domain in DocIndex.doc_index_model_instance.domains]
+
+    @property
+    def source_names_in_doc_index(self) -> list:
+        return [name[0] for name in DocIndex.session.query(doc_index_models.SourceModel.name).all()]
 
     @property
     def index(self) -> doc_index_models.DocIndexModel:
@@ -95,22 +99,22 @@ class DocIndex(IndexBase, ServiceBase):
     ):
         match doc_index_model_name:
             case doc_index_models.DocDBModel.CLASS_NAME:
-                available_classes = DatabaseService.AVAILABLE_PROVIDERS
+                available_classes = DatabaseService.REQUIRED_CLASSES
                 doc_index_model = doc_index_models.DocDBModel
                 if not provider_name:
                     provider_name = doc_index_models.DocDBModel.DEFAULT_PROVIDER_NAME
             case doc_index_models.DocLoaderModel.CLASS_NAME:
-                available_classes = DocLoadingService.AVAILABLE_PROVIDERS
+                available_classes = DocLoadingService.REQUIRED_CLASSES
                 doc_index_model = doc_index_models.DocLoaderModel
                 if not provider_name:
                     provider_name = doc_index_models.DocLoaderModel.DEFAULT_PROVIDER_NAME
             case doc_index_models.DocIngestProcessorModel.CLASS_NAME:
-                available_classes = IngestProcessingService.AVAILABLE_PROVIDERS
+                available_classes = IngestProcessingService.REQUIRED_CLASSES
                 doc_index_model = doc_index_models.DocIngestProcessorModel
                 if not provider_name:
                     provider_name = doc_index_models.DocIngestProcessorModel.DEFAULT_PROVIDER_NAME
             case doc_index_models.DocEmbeddingModel.CLASS_NAME:
-                available_classes = EmbeddingService.AVAILABLE_PROVIDERS
+                available_classes = EmbeddingService.REQUIRED_CLASSES
                 doc_index_model = doc_index_models.DocEmbeddingModel
                 if not provider_name:
                     provider_name = doc_index_models.DocEmbeddingModel.DEFAULT_PROVIDER_NAME
@@ -158,6 +162,7 @@ class DocIndex(IndexBase, ServiceBase):
                 )
         if provider_model is None:
             raise ValueError(f"provider_model {provider_model} not found")
+        return provider_model
 
     def set_current_domain_or_source_provider_instance(
         self,
@@ -206,15 +211,15 @@ class DocIndex(IndexBase, ServiceBase):
         if parent_domain:
             domain_or_source = doc_index_models.SourceModel
             current_domain_or_source = parent_domain.current_source
+            existing_names = self.source_names_in_doc_index
         else:
             domain_or_source = doc_index_models.DomainModel
             current_domain_or_source = self.index.current_domain
+            existing_names = self.domain_names
 
         if not new_name:
             new_name = domain_or_source.DEFAULT_NAME
-        new_name = check_and_handle_name_collision(
-            existing_names=self.domain_names, new_name=new_name
-        )
+        new_name = check_and_handle_name_collision(existing_names=existing_names, new_name=new_name)
         if not new_description:
             new_description = domain_or_source.DEFAULT_DESCRIPTION
         new_instance = domain_or_source(name=new_name, description=new_description)
@@ -342,7 +347,7 @@ class DocIndex(IndexBase, ServiceBase):
         if isinstance(target_instance, doc_index_models.DocIndexModel):
             if doc_index_model_name == doc_index_models.DocDBModel.CLASS_NAME:
                 list_of_current_providers = target_instance.doc_dbs
-                available_providers = DatabaseService.AVAILABLE_PROVIDERS
+                available_providers = DatabaseService.REQUIRED_CLASSES
                 model_type = doc_index_models.DocDBModel
             else:
                 raise Exception(
@@ -351,7 +356,7 @@ class DocIndex(IndexBase, ServiceBase):
         elif isinstance(target_instance, doc_index_models.DocDBModel):
             if doc_index_model_name == doc_index_models.DocEmbeddingModel.CLASS_NAME:
                 list_of_current_providers = target_instance.doc_embedders
-                available_providers = EmbeddingService.AVAILABLE_PROVIDERS
+                available_providers = EmbeddingService.REQUIRED_CLASSES
                 model_type = doc_index_models.DocEmbeddingModel
             else:
                 raise Exception(
@@ -360,11 +365,11 @@ class DocIndex(IndexBase, ServiceBase):
         else:
             if doc_index_model_name == doc_index_models.DocLoaderModel.CLASS_NAME:
                 list_of_current_providers = target_instance.doc_loaders
-                available_providers = DocLoadingService.AVAILABLE_PROVIDERS
+                available_providers = DocLoadingService.REQUIRED_CLASSES
                 model_type = doc_index_models.DocLoaderModel
             elif doc_index_model_name == doc_index_models.DocIngestProcessorModel.CLASS_NAME:
                 list_of_current_providers = target_instance.doc_ingest_processors
-                available_providers = IngestProcessingService.AVAILABLE_PROVIDERS
+                available_providers = IngestProcessingService.REQUIRED_CLASSES
                 model_type = doc_index_models.DocIngestProcessorModel
             else:
                 raise Exception(f"Unexpected error: {doc_index_model_name} not found.")

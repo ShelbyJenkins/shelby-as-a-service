@@ -8,6 +8,11 @@ import tiktoken
 from langchain.schema import Document
 
 
+def get_tokens(text: str, encoding_model="text-embedding-ada-002") -> list[int]:
+    tokenizer = tiktoken.encoding_for_model(encoding_model)
+    return tokenizer.encode(text, disallowed_special=())
+
+
 def tiktoken_len(text: str, encoding_model="text-embedding-ada-002") -> int:
     tokenizer = tiktoken.encoding_for_model(encoding_model)
     tokens = tokenizer.encode(text, disallowed_special=())

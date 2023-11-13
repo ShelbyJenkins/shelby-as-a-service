@@ -25,7 +25,7 @@ class CEQAgent(AgentBase):
     """
 
     class_name = Literal["ceq_agent"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "CEQ"
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/ceq/ceq_prompt_templates.yaml"
     DATA_DOMAIN_NONE_FOUND_MESSAGE: str = (
@@ -42,7 +42,7 @@ class CEQAgent(AgentBase):
             context_to_response_ratio (float): The ratio of context tokens to response tokens to use for generating the response.
         """
 
-        llm_provider_name: str = "openai_llm"
+        current_llm_provider_name: str = "openai_llm"
         model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
         enabled_domains: list[str] = ["all"]
         context_to_response_ratio: Annotated[float, Field(ge=0, le=1.0)] = 0.5
@@ -63,10 +63,11 @@ class CEQAgent(AgentBase):
     def create_chat(
         self,
         chat_in,
-        llm_provider_name: llm.AVAILABLE_PROVIDERS_NAMES,
-        llm_model_name: str,
+        llm_provider_name: Optional[str] = None,
+        llm_model_name: Optional[str] = None,
         model_token_utilization: Optional[float] = None,
         context_to_response_ratio: Optional[float] = None,
+        enabled_domains: Optional[list[str]] = None,
         stream: Optional[bool] = None,
         sprite_name: Optional[str] = "webui_sprite",
     ) -> Union[Generator[str, None, None], dict[str, str]]:
@@ -86,6 +87,15 @@ class CEQAgent(AgentBase):
         Yields:
             str: The generated response to the user input.
         """
+        if llm_provider_name is None:
+            llm_provider_name = self.config.current_llm_provider_name
+        if model_token_utilization is None:
+            model_token_utilization = self.config.model_token_utilization
+        if context_to_response_ratio is None:
+            context_to_response_ratio = self.config.context_to_response_ratio
+        if enabled_domains is None:
+            enabled_domains = self.config.enabled_domains
+
         prompt = self.create_prompt(
             query=chat_in,
             llm_provider_name=llm_provider_name,
@@ -248,4 +258,4 @@ class CEQAgent(AgentBase):
         with gr.Tab(label=self.llm_service.CLASS_UI_NAME):
             self.llm_service.create_settings_ui()
 
-        # GradioService.create_settings_event_listener(self.config, components)
+        GradioBase.create_settings_event_listener(self.config, components)

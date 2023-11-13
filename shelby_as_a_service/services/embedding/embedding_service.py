@@ -11,7 +11,7 @@ class EmbeddingService(EmbeddingBase):
     CLASS_UI_NAME: str = "Embedding Service"
     REQUIRED_CLASSES: list[Type] = embedding.AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = embedding.AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = embedding.AVAILABLE_PROVIDERS_NAMES
+    AVAILABLE_PROVIDERS_TYPINGS = embedding.AVAILABLE_PROVIDERS_TYPINGS
     list_of_embedding_provider_instances: list[EmbeddingBase] = []
     current_embedding_provider: EmbeddingBase
 
@@ -27,7 +27,7 @@ class EmbeddingService(EmbeddingBase):
 
     def get_embedding_instance(
         self,
-        embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_NAMES] = None,
+        embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_TYPINGS] = None,
         embedding_instance: Optional[EmbeddingBase] = None,
     ) -> EmbeddingBase:
         if embedding_provider_name and embedding_instance:
@@ -51,7 +51,7 @@ class EmbeddingService(EmbeddingBase):
         self,
         text: str,
         model_name: Optional[str] = None,
-        embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_NAMES] = None,
+        embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_TYPINGS] = None,
         embedding_instance: Optional[EmbeddingBase] = None,
     ) -> list[float]:
         embedding = self.get_embedding_instance(
@@ -68,7 +68,7 @@ class EmbeddingService(EmbeddingBase):
         self,
         texts: list[str],
         model_name: Optional[str] = None,
-        embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_NAMES] = None,
+        embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_TYPINGS] = None,
         embedding_instance: Optional[EmbeddingBase] = None,
     ) -> list[list[float]]:
         embedding = self.get_embedding_instance(

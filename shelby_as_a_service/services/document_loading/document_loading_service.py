@@ -12,9 +12,9 @@ from services.gradio_interface.gradio_base import GradioBase
 class DocLoadingService(DocLoadingBase):
     CLASS_NAME: str = "doc_loader_service"
     CLASS_UI_NAME: str = "Document Loading Service"
-    AVAILABLE_PROVIDERS: list[Type] = document_loading.AVAILABLE_PROVIDERS
+    REQUIRED_CLASSES: list[Type] = document_loading.AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = document_loading.AVAILABLE_PROVIDERS_UI_NAMES
-    AVAILABLE_PROVIDERS_NAMES = document_loading.AVAILABLE_PROVIDERS_NAMES
+    AVAILABLE_PROVIDERS_TYPINGS = document_loading.AVAILABLE_PROVIDERS_TYPINGS
     list_of_doc_loader_provider_instances: list[DocLoadingBase] = []
     current_doc_loader_provider: DocLoadingBase
 
@@ -30,7 +30,7 @@ class DocLoadingService(DocLoadingBase):
 
     def get_doc_loader_instance(
         self,
-        doc_loader_provider_name: Optional[document_loading.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_loader_provider_name: Optional[document_loading.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_loader_instance: Optional[DocLoadingBase] = None,
     ) -> DocLoadingBase:
         if doc_loader_provider_name and doc_index_loader_instance:
@@ -74,7 +74,7 @@ class DocLoadingService(DocLoadingBase):
     def load_docs(
         self,
         uri: str,
-        doc_loader_provider_name: Optional[document_loading.AVAILABLE_PROVIDERS_NAMES] = None,
+        doc_loader_provider_name: Optional[document_loading.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_loader_instance: Optional[DocLoadingBase] = None,
     ) -> Optional[list[Document]]:
         doc_loader = self.get_doc_loader_instance(
@@ -106,7 +106,7 @@ class DocLoadingService(DocLoadingBase):
         provider_select_dd, service_providers_dict = GradioBase.abstract_service_ui_components(
             service_name=cls.CLASS_NAME,
             enabled_provider_name=enabled_doc_loader_name,
-            required_classes=cls.AVAILABLE_PROVIDERS,
+            required_classes=cls.REQUIRED_CLASSES,
             provider_configs_dict=provider_configs_dict,
             groups_rendered=groups_rendered,
         )

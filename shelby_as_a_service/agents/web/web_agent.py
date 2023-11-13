@@ -22,9 +22,6 @@ class WebAgent(ServiceBase):
     REQUIRED_CLASSES: list[Type] = [LLMService, IngestAgent]
 
     class ClassConfigModel(BaseModel):
-        agent_select_status_message: str = (
-            "Load a URL Data Tab, and we'll access it and use it to generate a response."
-        )
         llm_provider: str = "openai_llm"
         llm_model: str = "gpt-4"
         database_provider: str = "local_file_database"

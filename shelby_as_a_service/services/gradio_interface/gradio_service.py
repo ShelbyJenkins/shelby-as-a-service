@@ -16,7 +16,7 @@ class GradioService(GradioBase):
     CLASS_NAME: str = "gradio_ui"
     CLASS_UI_NAME: str = "gradio_ui"
     REQUIRED_CLASSES: list[Type] = views.AVAILABLE_VIEWS
-    AVAILABLE_VIEWS_NAMES = views.AVAILABLE_VIEWS_NAMES
+    AVAILABLE_VIEWS_TYPINGS = views.AVAILABLE_VIEWS_TYPINGS
     AVAILABLE_VIEWS_UI_NAMES: list[str] = views.AVAILABLE_VIEWS_UI_NAMES
     SETTINGS_UI_COL = 2
     PRIMARY_UI_COL = 8
@@ -34,7 +34,7 @@ class GradioService(GradioBase):
     doc_index_view: "views.DocIndexView"
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        # ConfigManager.add_extension_views_to_gradio_ui(self, self.list_of_extension_configs)
+        ConfigManager.add_extension_views_to_gradio_ui(self, self.list_of_extension_configs)
         super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.list_of_view_instances = self.list_of_required_class_instances
 
@@ -71,7 +71,7 @@ class GradioService(GradioBase):
 
             threading.Thread(target=asyncio.run, args=(self.check_for_updates(),)).start()
 
-            webui_client.queue()
+            # webui_client.queue()
             # webui_client.launch(prevent_thread_lock=True, show_error=True)
             try:
                 webui_client.launch(show_error=True)

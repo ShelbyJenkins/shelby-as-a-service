@@ -10,13 +10,13 @@ from services.gradio_interface.gradio_base import GradioBase
 
 class MainChatView(GradioBase):
     class_name = Literal["main_chat_view"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Chat"
     SETTINGS_UI_COL = 2
     PRIMARY_UI_COL = 8
     REQUIRED_CLASSES: list[Type] = agents.AVAILABLE_AGENTS
-    AVAILABLE_AGENT_NAMES = agents.AVAILABLE_AGENT_NAMES
-    AVAILABLE_AGENT_UI_NAMES: list[str] = agents.AVAILABLE_AGENT_UI_NAMES
+    AVAILABLE_AGENTS_TYPINGS = agents.AVAILABLE_AGENTS_TYPINGS
+    AVAILABLE_AGENTS_UI_NAMES: list[str] = agents.AVAILABLE_AGENTS_UI_NAMES
 
     class ClassConfigModel(BaseModel):
         current_agent_name: str = "vanillallm_agent"
@@ -164,7 +164,6 @@ class MainChatView(GradioBase):
 
         with gr.Column():
             agent_settings_list = []
-            self.config.current_agent_ui_name
             for agent_instance in self.list_of_agent_instances:
                 with gr.Tab(label=agent_instance.CLASS_UI_NAME) as agent_settings:
                     agent_instance.create_main_chat_ui()
@@ -192,7 +191,7 @@ class MainChatView(GradioBase):
 
         create_nav_events(agent_settings_list)
 
-        self.create_settings_event_listener(self.config, components)
+        GradioBase.create_settings_event_listener(self.config, components)
 
     def create_event_handlers(self, components):
         def get_spend():

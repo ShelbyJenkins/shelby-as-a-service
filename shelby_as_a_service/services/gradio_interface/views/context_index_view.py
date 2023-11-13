@@ -13,7 +13,7 @@ from services.text_processing.ingest_processing.ingest_processing_service import
 
 class DocIndexView(GradioBase):
     class_name = Literal["context_index_view"]
-    CLASS_NAME: class_name = get_args(class_name)[0]
+    CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Context Index"
     SETTINGS_UI_COL = 4
     PRIMARY_UI_COL = 6
@@ -334,7 +334,7 @@ class DocIndexView(GradioBase):
             doc_ingest_processor_components_dict,
         ) = IngestProcessingService.create_doc_index_ui_components(
             parent_instance=parent_instance,
-            groups_rendered=False,
+            groups_rendered=True,
         )
         services_components["doc_ingest_procs"] = doc_ingest_processor_components_dict
         (
@@ -377,6 +377,8 @@ class DocIndexView(GradioBase):
 
             output.append(gr.Textbox(placeholder=parent_instance.name))
             output.append(gr.Textbox(placeholder=parent_instance.description))
+            if domain_or_source is doc_index_models.SourceModel:
+                output.append(gr.Textbox(value=parent_instance.source_uri))
             output.append(gr.Checkbox(value=parent_instance.batch_update_enabled))
 
             return output
@@ -451,6 +453,7 @@ class DocIndexView(GradioBase):
             fn=lambda: update_domain_or_source_dd(doc_index_models.DomainModel),
             outputs=[self.domains_dd],
         )
+
         self.source_tab_dict["buttons"]["make_new_button"].click(
             fn=lambda *x: create_new_domain_or_source(
                 domain_or_source=doc_index_models.SourceModel,
@@ -462,6 +465,7 @@ class DocIndexView(GradioBase):
             fn=lambda: update_domain_or_source_dd(doc_index_models.SourceModel),
             outputs=[self.sources_dd],
         )
+
         self.domain_tab_dict["buttons"]["save_changes_button"].click(
             fn=lambda *x: save_domain_or_source_config_settings(
                 domain_or_source_config_values=x,

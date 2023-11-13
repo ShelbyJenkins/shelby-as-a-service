@@ -10,12 +10,12 @@ from services.embedding.embedding_base import EmbeddingBase
 
 class OpenAIEmbedding(EmbeddingBase):
     class_name = Literal["openai_embedding"]
-    CLASS_NAME: class_name = typing.get_args(class_name)[0]
+    CLASS_NAME: str = typing.get_args(class_name)[0]
     CLASS_UI_NAME: str = "OpenAI Embedding"
     REQUIRED_SECRETS: list[str] = ["openai_api_key"]
 
     MODELS_TYPE: str = "embedding_models"
-    OPENAI_TIMEOUT_SECONDS: float = 180
+    OPENAI_TIMEOUT_SECONDS: float = 60
 
     class ModelConfig(BaseModel):
         MODEL_NAME: str
@@ -48,10 +48,10 @@ class OpenAIEmbedding(EmbeddingBase):
 
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
-            openai_api_key=self.secrets["openai_api_key"],
+            api_key=self.secrets["openai_api_key"],
             model=self.model_instance.MODEL_NAME,
-            request_timeout=self.OPENAI_TIMEOUT_SECONDS,
-        )  # type: ignore
+            request_timeout=self.OPENAI_TIMEOUT_SECONDS,  # type: ignore
+        )
 
         text_embedding = embedding_retriever.embed_query(text)
 
@@ -67,10 +67,10 @@ class OpenAIEmbedding(EmbeddingBase):
 
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
-            openai_api_key=self.secrets["openai_api_key"],
+            api_key=self.secrets["openai_api_key"],
             model=self.model_instance.MODEL_NAME,
-            request_timeout=self.OPENAI_TIMEOUT_SECONDS,
-        )  # type: ignore
+            request_timeout=self.OPENAI_TIMEOUT_SECONDS,  # type: ignore
+        )
 
         text_embeddings = embedding_retriever.embed_documents(texts)
         # self._calculate_cost(query, model)
