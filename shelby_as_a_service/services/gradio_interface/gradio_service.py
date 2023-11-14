@@ -8,7 +8,7 @@ import gradio as gr
 import services.gradio_interface.views as views
 from app.config_manager import ConfigManager
 from pydantic import BaseModel
-from services.gradio_interface.gradio_base import GradioBase
+from services.gradio_interface.gradio_base import GradioBase, GradioLogCaptureHandler
 from services.gradio_interface.gradio_themes import AtYourServiceTheme
 
 
@@ -71,7 +71,7 @@ class GradioService(GradioBase):
 
             threading.Thread(target=asyncio.run, args=(self.check_for_updates(),)).start()
 
-            # webui_client.queue()
+            webui_client.queue()
             # webui_client.launch(prevent_thread_lock=True, show_error=True)
             try:
                 webui_client.launch(show_error=True)

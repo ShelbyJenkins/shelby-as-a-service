@@ -40,7 +40,7 @@ class AppBase:
 
     config: ClassConfigModel
 
-    log: logging.Logger
+    log: "LoggerWrapper"
 
     enabled_sprite_instances: list[Type] = []
     list_of_extension_configs: list[Any]
@@ -73,7 +73,7 @@ class AppBase:
         config_file_dict = ConfigManager.load_app(app_name)
         AppBase.config = AppBase.ClassConfigModel(**config_file_dict.get("app", {}))
         AppBase._get_logger(logger_name=app_name)
-        AppBase.log.info(f"Setting up app instance: {app_name}...")
+        AppBase.log.info(f"Setting up shelby_as_a_service app instance with name: {app_name}...")
 
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
@@ -154,11 +154,12 @@ class AppBase:
                 filename=log_file_path,
                 filemode="a",
                 encoding="utf-8",
-                level=logging.DEBUG,
+                level=logging.ERROR,
                 format="%(levelname)s: %(asctime)s %(message)s",
                 datefmt="%Y/%m/%d %I:%M:%S %p",
             )
-            AppBase.log = logging.getLogger(__name__)
+
+            AppBase.log = LoggerWrapper(logger_name)
 
     @classmethod
     def run_sprites(cls):
@@ -188,3 +189,31 @@ class AppBase:
                     AppBase.secrets[required_secret] = env_secret
                 else:
                     print(f"Secret: {required_secret} is None!")
+
+
+class LoggerWrapper:
+    def __init__(self, class_name: str):
+        self.log = logging.getLogger()
+        self.log.setLevel(logging.INFO)
+        self.class_name = class_name
+
+    def addHandler(self, handler):
+        self.log.addHandler(handler)
+
+    def removeHandler(self, handler):
+        self.log.removeHandler(handler)
+
+    def info(self, msg, *args, **kwargs):
+        self.log.info(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+
+    def debug(self, msg, *args, **kwargs):
+        self.log.debug(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        self.log.warning(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+
+    def error(self, msg, *args, **kwargs):
+        self.log.error(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+
+    def critical(self, msg, *args, **kwargs):
+        self.log.critical(f"In Class {self.class_name}: {msg}", *args, **kwargs)

@@ -1,3 +1,4 @@
+import time
 from typing import Any, Literal, Optional, Type, get_args
 
 import context_index.doc_index as doc_index_models
@@ -31,14 +32,34 @@ class DocIndexView(GradioBase):
 
     def create_primary_ui(self):
         with gr.Column(elem_classes="primary_ui_col"):
-            self.uic["chat_tab_out_text"] = gr.Textbox(
+            uic = {}
+            uic["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
                 placeholder=f"Welcome to {DocIndexView.CLASS_UI_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
+                lines=50,
+                autoscroll=True,
             )
+
+        self.source_tab_dict["buttons"]["ingest_button"].click(
+            api_name="ingest_button",
+            fn=self.get_logs_and_send_to_interface,
+            outputs=[uic["chat_tab_out_text"]],
+            trigger_mode="once",
+        )
+        self.source_tab_dict["buttons"]["ingest_button"].click(
+            api_name="doc_ingest",
+            fn=lambda: (
+                time.sleep(2),
+                DocIngest.ingest_docs_from_context_index_source_or_domain(
+                    source=self.doc_index.source,
+                ),
+            )[1],
+            trigger_mode="once",
+        )
 
         # self.create_event_handlers()
 
@@ -56,12 +77,12 @@ class DocIndexView(GradioBase):
                 # self.create_management_tab_event_handlers(ui_components, save_button)
 
     def quick_add(self):
-        self.uic["ingest_button"] = gr.Button(
-            value="Ingest",
-            variant="primary",
-            elem_classes="chat_tab_button",
-            min_width=0,
-        )
+        # self.uic["ingest_button"] = gr.Button(
+        #     value="Ingest",
+        #     variant="primary",
+        #     elem_classes="chat_tab_button",
+        #     min_width=0,
+        # )
         self.uic["url_textbox"] = gr.Textbox(
             placeholder="Web URL or Local Filepath (or drag and drop)",
             lines=1,
@@ -499,16 +520,11 @@ class DocIndexView(GradioBase):
             inputs=set(self.source_tab_dict["domain_or_source_config"].values()),
         )
 
-        self.domain_tab_dict["buttons"]["ingest_button"].click(
-            fn=lambda: DocIngest.ingest_docs_from_context_index_source_or_domain(
-                domain=self.doc_index.domain,
-            )
-        )
-        self.source_tab_dict["buttons"]["ingest_button"].click(
-            fn=lambda: DocIngest.ingest_docs_from_context_index_source_or_domain(
-                source=self.doc_index.source,
-            )
-        )
+        # self.domain_tab_dict["buttons"]["ingest_button"].click(
+        #     fn=lambda: DocIngest.ingest_docs_from_context_index_source_or_domain(
+        #         domain=self.doc_index.domain,
+        #     )
+        # )
 
         def create_new_domain_or_source(
             domain_or_source: Type[doc_index_models.DomainModel]

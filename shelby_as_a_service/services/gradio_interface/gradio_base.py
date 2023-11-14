@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from typing import Any, Optional, Type
 
 import gradio as gr
@@ -9,7 +11,24 @@ from pydantic import BaseModel
 from services.service_base import ServiceBase
 
 
+class GradioLogCaptureHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.captured_logs = []
+        log_format = "%(levelname)s: %(asctime)s %(message)s"
+        date_format = "%H:%M:%S"
+        formatter = logging.Formatter(log_format, date_format)
+
+        # Set the formatter for this handler
+        self.setFormatter(formatter)
+
+    def emit(self, record):
+        self.captured_logs.append(self.format(record))
+
+
 class GradioBase(ServiceBase):
+    log: logging.Logger
+
     async def check_for_updates(self):
         while True:
             await asyncio.sleep(5)  # non-blocking sleep
@@ -125,6 +144,24 @@ class GradioBase(ServiceBase):
                 fn=lambda *x: update_config_classes(config_model, components, *x),
                 inputs=components_to_monitor,
             )
+
+    @classmethod
+    def get_logs_and_send_to_interface(cls):
+        handler = GradioLogCaptureHandler()
+        cls.log.addHandler(handler)
+        new_logs = []
+        try:
+            while True:
+                while handler.captured_logs:
+                    new_logs.append(handler.captured_logs.pop(0))
+                    yield "\n".join(new_logs)
+                    if "end_log" in new_logs:
+                        return
+
+                # Wait for a short period before checking for new logs
+                time.sleep(0.1)
+        finally:
+            cls.log.removeHandler(handler)
 
     # def _save_load_new_secrets(self, *secrets_components):
     #     for i, component in enumerate(self.global_components_["secrets"]):

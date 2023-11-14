@@ -14,7 +14,7 @@ class DocIngest(ServiceBase):
     CLASS_NAME: str = "doc_ingest"
     CLASS_UI_NAME: str = "doc_ingest"
 
-    update_frequency: int = 1  # In days
+    update_frequency: int = 1  # In hours
 
     @classmethod
     def ingest_docs_from_context_index_source_or_domain(
@@ -22,6 +22,7 @@ class DocIngest(ServiceBase):
         source: Optional[doc_index_models.SourceModel] = None,
         domain: Optional[doc_index_models.DomainModel] = None,
     ):
+        cls.log = cls.logger_wrapper(DocIngest.__name__)
         if source:
             sources = [source]
         elif domain:
@@ -56,6 +57,7 @@ class DocIngest(ServiceBase):
                     else:
                         cls.log.info(f"An error occurred: {error} after {i} tries. Skipping.")
                         break
+        cls.log.info("end_log")
 
     @classmethod
     def ingest_source(cls, source: doc_index_models.SourceModel) -> bool:

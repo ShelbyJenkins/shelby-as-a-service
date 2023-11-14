@@ -2,7 +2,7 @@ import logging
 from typing import Any, Optional, Type
 
 import context_index.doc_index as doc_index_models
-from app.app_base import AppBase
+from app.app_base import AppBase, LoggerWrapper
 from pydantic import BaseModel
 
 
@@ -11,7 +11,7 @@ class ServiceBase(AppBase):
     DOC_INDEX_KEY: str
     CLASS_UI_NAME: str
     REQUIRED_CLASSES: list[Type["ServiceBase"]]
-    log: logging.Logger
+    logger_wrapper = LoggerWrapper
     ClassConfigModel: Type[BaseModel]
     ModelConfig: Type[BaseModel]
     MODEL_DEFINITIONS: dict[str, Any]
@@ -23,7 +23,7 @@ class ServiceBase(AppBase):
     list_of_required_class_instances: list[Type]
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs) -> None:
-        self.log = logging.getLogger(self.__class__.__name__)
+        self.log = self.logger_wrapper(self.__class__.__name__)
 
         class_config = config_file_dict.get(self.CLASS_NAME, {})
         if getattr(self, "ClassConfigModel", None):
