@@ -58,16 +58,16 @@ class DocLoadingService(DocLoadingBase):
             domain_or_source=source
         )
         docs = self.load_docs(
-            uri=self.source.source_uri,
+            uri=source.source_uri,
             doc_index_loader_instance=doc_index_loader_instance,
         )
         if not docs:
-            self.log.info(f"No documents found for {self.source.name} @ {self.source.source_uri}")
+            self.log.info(f"No documents found for {source.name} @ {source.source_uri}")
             return None
         ingest_docs = []
         for doc in docs:
             ingest_docs.append(
-                IngestDoc.create_ingest_doc_from_langchain_document(doc=doc, source=self.source)
+                IngestDoc.create_ingest_doc_from_langchain_document(doc=doc, source=source)
             )
         return ingest_docs
 

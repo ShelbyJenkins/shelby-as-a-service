@@ -56,6 +56,7 @@ class DocIndex(IndexBase, ServiceBase):
 
         DocIndex.commit_context_index()
 
+    # Probably can remove this and just use commit_session
     @staticmethod
     def commit_context_index():
         DocIndex.session = DocIndex.commit_session(DocIndex.session)
@@ -281,7 +282,7 @@ class DocIndex(IndexBase, ServiceBase):
                 enabled_doc_ingest_processor_config=object_to_clone.enabled_doc_ingest_processor.config,
                 enabled_doc_loader_config=object_to_clone.enabled_doc_loader.config,
             )
-
+        DocIndex.commit_context_index()
         return new_instance
 
     def initialize_domain_or_source_config(

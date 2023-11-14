@@ -25,7 +25,7 @@ class IndexBase(AppBase):
         os.makedirs(cls.local_index_dir, exist_ok=True)
         engine = create_engine(f"sqlite:///{db_path}")
         Base.metadata.create_all(engine)
-        cls._session_factory = sessionmaker(bind=engine)
+        cls._session_factory = sessionmaker(bind=engine, expire_on_commit=False)
 
     @classmethod
     def get_session(cls) -> Session:
@@ -41,7 +41,7 @@ class IndexBase(AppBase):
             session.rollback()  # Rollback in case of error
             raise
         finally:
-            session.close()
+            # session.close()
             return cls.get_session()
 
     @staticmethod

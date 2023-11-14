@@ -44,7 +44,7 @@ class IngestDoc(BaseModel):
     cleaned_content_token_count: int = 0
     hashed_cleaned_content: Optional[str] = None
     uri: str
-    source_type: str
+    source_type: Optional[str] = None
     date_of_last_update: datetime
     date_of_creation: datetime
     date_published: datetime

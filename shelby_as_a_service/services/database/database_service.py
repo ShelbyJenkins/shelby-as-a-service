@@ -174,7 +174,7 @@ class DatabaseService(DatabaseBase):
             if not doc.existing_document_model.context_chunks:
                 raise ValueError(f"No context_chunks for doc {doc.title}")
             for i, chunk in enumerate(doc.existing_document_model.context_chunks):
-                chunk_doc_db_id = f"id-{self.source.name}-{i + current_entry_count}"
+                chunk_doc_db_id = f"id-{source.name}-{i + current_entry_count}"
                 chunk.chunk_doc_db_id = chunk_doc_db_id
                 chunks_to_upsert.append(chunk)
 

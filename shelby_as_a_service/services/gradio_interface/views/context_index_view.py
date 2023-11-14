@@ -3,6 +3,7 @@ from typing import Any, Literal, Optional, Type, get_args
 import context_index.doc_index as doc_index_models
 import gradio as gr
 from context_index.doc_index.doc_index import DocIndex
+from context_index.doc_index.doc_ingest import DocIngest
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 from services.gradio_interface.gradio_base import GradioBase
@@ -300,11 +301,11 @@ class DocIndexView(GradioBase):
                 label=f"Update {parent_instance_name_str} During Full Index Batch Update",
                 elem_id="batch_update_enabled",
             )
-            self.uic["ingest_button"] = gr.Button(
+            buttons["ingest_button"] = gr.Button(
                 value=f"Run Full {parent_instance_name_str} Ingest Pipeline",
                 variant="primary",
             )
-            self.uic["test_loader_button"] = gr.Button(
+            buttons["test_loader_button"] = gr.Button(
                 value="Test Loader",
                 variant="primary",
             )
@@ -481,6 +482,7 @@ class DocIndexView(GradioBase):
                 self.list_provider_config_components(self.domain_tab_dict["services_components"])
             ),
         )
+
         self.source_tab_dict["buttons"]["save_changes_button"].click(
             fn=lambda *x: self.save_provider_settings(
                 provider_config_components_values=x,
@@ -495,6 +497,17 @@ class DocIndexView(GradioBase):
                 parent_source=self.doc_index.source,
             ),
             inputs=set(self.source_tab_dict["domain_or_source_config"].values()),
+        )
+
+        self.domain_tab_dict["buttons"]["ingest_button"].click(
+            fn=lambda: DocIngest.ingest_docs_from_context_index_source_or_domain(
+                domain=self.doc_index.domain,
+            )
+        )
+        self.source_tab_dict["buttons"]["ingest_button"].click(
+            fn=lambda: DocIngest.ingest_docs_from_context_index_source_or_domain(
+                source=self.doc_index.source,
+            )
         )
 
         def create_new_domain_or_source(
@@ -563,6 +576,7 @@ class DocIndexView(GradioBase):
             for component, component_value in domain_or_source_config_values[0].items():
                 if hasattr(parent_instance, component.elem_id):
                     setattr(parent_instance, component.elem_id, component_value)
+            DocIndex.commit_context_index()
             gr.Info(f"Saved Changes to {self.doc_index.source.name}")
 
         def update_domain_or_source_dd(

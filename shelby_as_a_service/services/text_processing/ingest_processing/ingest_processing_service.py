@@ -169,7 +169,7 @@ class IngestProcessingService(IngestProcessingBase):
             self.log.info(f"{ingest_doc.title} has {len(text_chunks)} chunks")
             ingest_doc.existing_document_model.context_chunks.append(
                 doc_index_models.ChunkModel(
-                    chunked_content=chunk,
+                    context_chunk=chunk,
                 )
             )
             self.successfully_chunked_counter += 1

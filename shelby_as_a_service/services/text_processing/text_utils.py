@@ -2,6 +2,7 @@ import hashlib
 import os
 import re
 import string
+from typing import Optional
 from urllib.parse import urlparse
 
 import tiktoken
@@ -167,22 +168,28 @@ def extract_and_clean_title(doc, uri=None) -> str:
 
 
 def extract_uri(doc: dict | Document) -> str:
-    # Check dictionary keys
-    if isinstance(doc, dict):
-        for key in ["source", "url", "loc", "uri"]:
-            if (uri := doc.get(key)) is not None:
+    def _extract_uri(doc_or_metadata: dict | Document) -> Optional[str]:
+        # Check dictionary keys
+        if isinstance(doc_or_metadata, dict):
+            for key in ["source", "url", "loc", "uri"]:
+                uri = doc_or_metadata.get(key, None)
                 return uri
 
-    elif isinstance(doc, Document):
-        for attr in ["source", "url", "loc", "uri"]:
-            if (uri := getattr(doc, attr, None)) is not None:
+        elif isinstance(doc_or_metadata, Document):
+            for attr in ["source", "url", "loc", "uri"]:
+                uri = getattr(doc_or_metadata, attr, None)
                 return uri
+
+        return None
+
+    if metadata := getattr(doc, "metadata", None):
+        if uri := _extract_uri(metadata):
+            return uri
+    uri = _extract_uri(doc)
+    if uri:
+        return uri
     else:
-        raise ValueError(
-            f"Document must be a dictionary, or Document. Received {type(doc).__name__}"
-        )
-
-    raise ValueError(f"No uri found in document {doc}")
+        raise ValueError(f"No uri found in document {doc}")
 
 
 def hash_content(content) -> str:

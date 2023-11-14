@@ -59,7 +59,7 @@ class PineconeDatabase(DatabaseBase):
             self.log.info(f"Created index: {indexes}")
         self.pinecone_index = pinecone.Index(self.config.index_name)
 
-    def get_index_domain_or_source_entry_count(
+    def get_index_domain_or_source_entry_count_with_provider(
         self, source_name: Optional[str] = None, domain_name: Optional[str] = None
     ) -> int:
         self.log.info(f"Complete index stats: {self.pinecone_index.describe_index_stats()}\n")
