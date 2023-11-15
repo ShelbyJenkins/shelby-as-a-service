@@ -14,7 +14,6 @@ class OpenAIEmbedding(EmbeddingBase):
     CLASS_UI_NAME: str = "OpenAI Embedding"
     REQUIRED_SECRETS: list[str] = ["openai_api_key"]
 
-    MODELS_TYPE: str = "embedding_models"
     OPENAI_TIMEOUT_SECONDS: float = 60
 
     class ModelConfig(BaseModel):
@@ -31,44 +30,54 @@ class OpenAIEmbedding(EmbeddingBase):
     }
 
     class ClassConfigModel(BaseModel):
-        enabled_model_name: str = "text-embedding-ada-002"
+        current_embedding_model_name: str = "text-embedding-ada-002"
 
     config: ClassConfigModel
-    embedding_models: list
-    model_instance: "ModelConfig"
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def get_embedding_of_text_with_provider(
-        self, text: str, model_name: Optional[str] = None
+        self,
+        text: str,
+        embedding_model_instance: Optional["OpenAIEmbedding.ModelConfig"] = None,
     ) -> list[float]:
-        if model_name:
-            self.model_instance = self.get_model_instance(requested_model_name=model_name)
-
+        if embedding_model_instance is None:
+            model_instance: OpenAIEmbedding.ModelConfig = self.get_model_instance(
+                requested_model_name=self.config.current_embedding_model_name,
+                provider=self,
+            )
+        else:
+            model_instance = embedding_model_instance
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             api_key=self.secrets["openai_api_key"],
-            model=self.model_instance.MODEL_NAME,
+            model=model_instance.MODEL_NAME,
             request_timeout=self.OPENAI_TIMEOUT_SECONDS,  # type: ignore
         )
 
         text_embedding = embedding_retriever.embed_query(text)
 
-        # self._calculate_cost(text_embedding, self.model_instance)
+        # self._calculate_cost(text_embedding, embedding_model_instance)
 
         return text_embedding
 
     def get_embeddings_from_list_of_texts_with_provider(
-        self, texts: list[str], model_name: Optional[str] = None
+        self,
+        texts: list[str],
+        embedding_model_instance: Optional["OpenAIEmbedding.ModelConfig"] = None,
     ) -> list[list[float]]:
-        if model_name:
-            self.model_instance = self.get_model_instance(requested_model_name=model_name)
-
+        if embedding_model_instance is None:
+            model_instance: OpenAIEmbedding.ModelConfig = self.get_model_instance(
+                requested_model_name=self.config.current_embedding_model_name,
+                provider=self,
+            )
+        else:
+            model_instance = embedding_model_instance
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             api_key=self.secrets["openai_api_key"],
-            model=self.model_instance.MODEL_NAME,
+            model=model_instance.MODEL_NAME,
             request_timeout=self.OPENAI_TIMEOUT_SECONDS,  # type: ignore
         )
 

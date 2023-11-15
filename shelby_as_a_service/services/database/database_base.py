@@ -15,7 +15,7 @@ class DatabaseBase(ABC, ServiceBase):
         raise NotImplementedError
 
     def query_by_terms_with_provider(
-        self, search_terms: list[str] | str, domain_name: str
+        self, search_terms: list[str] | str, domain_name: str, retrieve_n_docs: Optional[int] = None
     ) -> list[dict]:
         raise NotImplementedError
 

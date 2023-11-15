@@ -33,16 +33,6 @@ class IndexBase(AppBase):
             raise Exception("Database not set up. Call setup_index first.")
         return cls._session_factory()
 
-    @classmethod
-    def commit_session(cls, session: Session) -> Session:
-        try:
-            session.commit()
-        except:
-            session.rollback()  # Rollback in case of error
-            raise
-        finally:
-            # session.close()
-            return cls.get_session()
 
     @staticmethod
     def get_index_model_instance(

@@ -16,9 +16,17 @@ class DocIngestProcessorModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
-    domain_model = relationship("DomainModel", foreign_keys=[domain_id])
+    domain_model = relationship(
+        "DomainModel",
+        foreign_keys=[domain_id],
+        back_populates="doc_ingest_processors",
+    )
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
-    source_model = relationship("SourceModel", foreign_keys=[source_id])
+    source_model = relationship(
+        "SourceModel",
+        foreign_keys=[source_id],
+        back_populates="doc_ingest_processors",
+    )
 
     DEFAULT_PROVIDER_NAME: str = "process_ingest_documents"
     name: Mapped[str] = mapped_column(String)
@@ -32,9 +40,13 @@ class DocLoaderModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
-    domain_model = relationship("DomainModel", foreign_keys=[domain_id])
+    domain_model = relationship(
+        "DomainModel", back_populates="doc_loaders", foreign_keys=[domain_id]
+    )
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
-    source_model = relationship("SourceModel", foreign_keys=[source_id])
+    source_model = relationship(
+        "SourceModel", back_populates="doc_loaders", foreign_keys=[source_id]
+    )
 
     DEFAULT_PROVIDER_NAME: str = "generic_recursive_web_scraper"
     name: Mapped[str] = mapped_column(String)
@@ -47,7 +59,9 @@ class DocEmbeddingModel(Base):
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
-    doc_db_model: Mapped["DocDBModel"] = relationship("DocDBModel", foreign_keys=[doc_db_id])
+    doc_db_model: Mapped["DocDBModel"] = relationship(
+        "DocDBModel", foreign_keys=[doc_db_id], back_populates="doc_embedders"
+    )
 
     DEFAULT_PROVIDER_NAME: str = "openai_embedding"
     name: Mapped[str] = mapped_column(String, unique=True)
@@ -67,9 +81,11 @@ class DocDBModel(Base):
     )
 
     doc_embedder_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("doc_embedders.id"), nullable=True
+        Integer, ForeignKey("doc_embedders.id"), nullable=True, unique=True
     )
-    enabled_doc_embedder = relationship("DocEmbeddingModel", foreign_keys=[doc_embedder_id])
+    enabled_doc_embedder = relationship(
+        "DocEmbeddingModel", foreign_keys=[doc_embedder_id], uselist=False, post_update=True
+    )
     doc_embedders: Mapped[list[DocEmbeddingModel]] = relationship(
         "DocEmbeddingModel",
         back_populates="doc_db_model",
@@ -92,7 +108,9 @@ class DocIndexTemplateModel(Base):
     context_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("doc_index_model.id"), nullable=True
     )
-    doc_index_model = relationship("DocIndexModel", foreign_keys=[context_id])
+    doc_index_model = relationship(
+        "DocIndexModel", foreign_keys=[context_id], back_populates="doc_index_templates"
+    )
 
     enabled_doc_loader_name: Mapped[str] = mapped_column(String)
     enabled_doc_loader_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
@@ -108,14 +126,13 @@ class DocIndexTemplateModel(Base):
 
 
 class ChunkModel(Base):
-    class_name = Literal["documents"]
+    class_name = Literal["chunks"]
     CLASS_NAME: str = get_args(class_name)[0]
     __tablename__ = CLASS_NAME
-    __tablename__ = "chunks"
     id: Mapped[int] = mapped_column(primary_key=True)
     document_id: Mapped[int] = mapped_column(Integer, ForeignKey("documents.id"), nullable=True)
     document_model: Mapped["DocumentModel"] = relationship(
-        "DocumentModel", foreign_keys=[document_id]
+        "DocumentModel", foreign_keys=[document_id], back_populates="context_chunks"
     )
 
     context_chunk: Mapped[str] = mapped_column(String, nullable=True)
@@ -131,7 +148,7 @@ class ChunkModel(Base):
             "title": self.document_model.title,
             "uri": self.document_model.uri,
             "source_type": self.document_model.source_type,
-            "date_of_creation": self.document_model.date_of_creation,
+            "date_of_creation": self.document_model.date_of_creation.strftime("%Y-%m-%d %H:%M:%S"),
         }
         return metadata
 
@@ -142,7 +159,9 @@ class DocumentModel(Base):
     __tablename__ = CLASS_NAME
     id: Mapped[int] = mapped_column(primary_key=True)
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
-    source_model: Mapped["SourceModel"] = relationship("SourceModel", foreign_keys=[source_id])
+    source_model: Mapped["SourceModel"] = relationship(
+        "SourceModel", foreign_keys=[source_id], back_populates="documents"
+    )
     domain_model: Mapped["DomainModel"] = relationship(
         "DomainModel",
         secondary="sources",
@@ -179,10 +198,16 @@ class SourceModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
-    domain_model: Mapped["DomainModel"] = relationship("DomainModel", foreign_keys=[domain_id])
+    domain_model: Mapped["DomainModel"] = relationship(
+        "DomainModel", back_populates="sources", foreign_keys=[domain_id]
+    )
 
-    doc_loader_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_loaders.id"), nullable=True)
-    enabled_doc_loader = relationship("DocLoaderModel", foreign_keys=[doc_loader_id])
+    doc_loader_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("doc_loaders.id"), nullable=True, unique=True
+    )
+    enabled_doc_loader = relationship(
+        "DocLoaderModel", foreign_keys=[doc_loader_id], uselist=False, post_update=True
+    )
     doc_loaders: Mapped[list[DocLoaderModel]] = relationship(
         "DocLoaderModel",
         back_populates="source_model",
@@ -191,10 +216,13 @@ class SourceModel(Base):
     )
 
     doc_ingest_processor_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("doc_ingest_processors.id"), nullable=True
+        Integer, ForeignKey("doc_ingest_processors.id"), nullable=True, unique=True
     )
     enabled_doc_ingest_processor = relationship(
-        "DocIngestProcessorModel", foreign_keys=[doc_ingest_processor_id]
+        "DocIngestProcessorModel",
+        foreign_keys=[doc_ingest_processor_id],
+        uselist=False,
+        post_update=True,
     )
     doc_ingest_processors: Mapped[list[DocIngestProcessorModel]] = relationship(
         "DocIngestProcessorModel",
@@ -234,11 +262,17 @@ class DomainModel(Base):
         Integer, ForeignKey("doc_index_model.id"), nullable=True
     )
     doc_index_model: Mapped["DocIndexModel"] = relationship(
-        "DocIndexModel", foreign_keys=[context_id]
+        "DocIndexModel",
+        back_populates="domains",
+        foreign_keys=[context_id],
     )
 
-    current_source_id: Mapped[int] = mapped_column(Integer, ForeignKey("sources.id"), nullable=True)
-    current_source = relationship("SourceModel", foreign_keys=[current_source_id])
+    current_source_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sources.id"), nullable=True, unique=True
+    )
+    current_source = relationship(
+        "SourceModel", foreign_keys=[current_source_id], uselist=False, post_update=True
+    )
     sources: Mapped[list[SourceModel]] = relationship(
         "SourceModel",
         back_populates="domain_model",
@@ -251,10 +285,13 @@ class DomainModel(Base):
         return [source.name for source in self.sources]
 
     doc_ingest_processor_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("doc_ingest_processors.id"), nullable=True
+        Integer, ForeignKey("doc_ingest_processors.id"), nullable=True, unique=True
     )
     enabled_doc_ingest_processor = relationship(
-        "DocIngestProcessorModel", foreign_keys=[doc_ingest_processor_id]
+        "DocIngestProcessorModel",
+        foreign_keys=[doc_ingest_processor_id],
+        uselist=False,
+        post_update=True,
     )
     doc_ingest_processors: Mapped[list[DocIngestProcessorModel]] = relationship(
         "DocIngestProcessorModel",
@@ -263,8 +300,12 @@ class DomainModel(Base):
         foreign_keys=[DocIngestProcessorModel.domain_id],
     )
 
-    doc_loader_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_loaders.id"), nullable=True)
-    enabled_doc_loader = relationship("DocLoaderModel", foreign_keys=[doc_loader_id])
+    doc_loader_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("doc_loaders.id"), nullable=True, unique=True
+    )
+    enabled_doc_loader = relationship(
+        "DocLoaderModel", foreign_keys=[doc_loader_id], uselist=False, post_update=True
+    )
     doc_loaders: Mapped[list[DocLoaderModel]] = relationship(
         "DocLoaderModel",
         back_populates="domain_model",
@@ -298,7 +339,7 @@ class DocIndexModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     current_domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
-    current_domain = relationship("DomainModel", foreign_keys=[current_domain_id])
+    current_domain = relationship("DomainModel", foreign_keys=[current_domain_id], post_update=True)
     domains: Mapped[list[DomainModel]] = relationship(
         "DomainModel",
         back_populates="doc_index_model",

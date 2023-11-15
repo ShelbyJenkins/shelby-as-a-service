@@ -14,15 +14,22 @@ class EmbeddingService(EmbeddingBase):
     AVAILABLE_PROVIDERS_TYPINGS = embedding.AVAILABLE_PROVIDERS_TYPINGS
     list_of_embedding_provider_instances: list[EmbeddingBase] = []
     current_embedding_provider: EmbeddingBase
+    current_embedding_model = None
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.list_of_embedding_provider_instances = self.list_of_required_class_instances
         embedding_provider_name = kwargs.get("embedding_provider_name", None)
+        embedding_model_name = kwargs.get("embedding_model_name", None)
         if embedding_provider_name:
             self.current_embedding_provider = self.get_requested_class_instance(
                 requested_class=embedding_provider_name,
                 available_classes=self.list_of_embedding_provider_instances,
+            )
+        if embedding_model_name:
+            self.current_embedding_model = self.get_model_instance(
+                requested_model_name=embedding_model_name,
+                provider=self.current_embedding_provider,
             )
 
     def get_embedding_instance(
@@ -50,16 +57,27 @@ class EmbeddingService(EmbeddingBase):
     def get_embedding_of_text(
         self,
         text: str,
-        model_name: Optional[str] = None,
+        embedding_model_name: Optional[str] = None,
         embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_TYPINGS] = None,
         embedding_instance: Optional[EmbeddingBase] = None,
     ) -> list[float]:
-        embedding = self.get_embedding_instance(
+        embedding_instance = self.get_embedding_instance(
             embedding_provider_name=embedding_provider_name,
             embedding_instance=embedding_instance,
         )
+        if self.current_embedding_model is None:
+            if embedding_model_name is None:
+                raise ValueError("Must provide embedding_model_name")
+            embedding_model_instance = self.get_model_instance(
+                requested_model_name=embedding_model_name,
+                provider=embedding_instance,
+            )
+        else:
+            embedding_model_instance = self.current_embedding_model
 
-        text_embedding = embedding.get_embedding_of_text(text=text, model_name=model_name)
+        text_embedding = embedding_instance.get_embedding_of_text_with_provider(
+            text=text, embedding_model_instance=embedding_model_instance
+        )
         if text_embedding is None:
             raise ValueError("No embedding returned")
         return text_embedding
@@ -67,16 +85,26 @@ class EmbeddingService(EmbeddingBase):
     def get_embeddings_from_list_of_texts(
         self,
         texts: list[str],
-        model_name: Optional[str] = None,
+        embedding_model_name: Optional[str] = None,
         embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_TYPINGS] = None,
         embedding_instance: Optional[EmbeddingBase] = None,
     ) -> list[list[float]]:
-        embedding = self.get_embedding_instance(
+        embedding_instance = self.get_embedding_instance(
             embedding_provider_name=embedding_provider_name,
             embedding_instance=embedding_instance,
         )
-        text_embeddings = embedding.get_embeddings_from_list_of_texts(
-            texts=texts, model_name=model_name
+        if self.current_embedding_model is None:
+            if embedding_model_name is None:
+                raise ValueError("Must provide embedding_model_name")
+            embedding_model_instance = self.get_model_instance(
+                requested_model_name=embedding_model_name,
+                provider=embedding_instance,
+            )
+        else:
+            embedding_model_instance = self.current_embedding_model
+
+        text_embeddings = embedding_instance.get_embeddings_from_list_of_texts_with_provider(
+            texts=texts, embedding_model_instance=embedding_model_instance
         )
         if text_embeddings is None:
             raise ValueError("No embeddings returned")

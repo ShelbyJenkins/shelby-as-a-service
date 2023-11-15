@@ -62,20 +62,36 @@ class PineconeDatabase(DatabaseBase):
     def get_index_domain_or_source_entry_count_with_provider(
         self, source_name: Optional[str] = None, domain_name: Optional[str] = None
     ) -> int:
-        self.log.info(f"Complete index stats: {self.pinecone_index.describe_index_stats()}\n")
+        # self.log.info(f"Complete index stats: {self.pinecone_index.describe_index_stats()}\n")
         if source_name:
             index_resource_stats = self.pinecone_index.describe_index_stats(
                 filter={"source_name": {"$eq": source_name}}
             )
+            total = index_resource_stats.get("total_vector_count", None)
+            if not total:
+                raise ValueError(f"'total_vector_count' not found.")
+            return total
         elif domain_name:
             index_resource_stats = self.pinecone_index.describe_index_stats(
                 filter={"domain_name": {"$eq": domain_name}}
             )
+            namespaces = index_resource_stats.get("namespaces", {})
+            if not isinstance(namespaces, dict):
+                raise ValueError(f"'namespaces' not found.")
+            domain = namespaces.get(domain_name, {})
+            if not isinstance(domain, dict):
+                raise ValueError(f"Domain {domain_name} not found.")
+            vector_count = domain.get("vector_count", None)
+            if not vector_count:
+                self.log.info(f"Domain {domain_name} not found. Using total_vector_count.")
+                total = index_resource_stats.get("total_vector_count", None)
+                if not total:
+                    raise ValueError(f"'total_vector_count' not found.")
+                return total
+            return vector_count
+
         else:
             raise ValueError("Must provide either source_name or domain_name")
-        return (
-            index_resource_stats.get("namespaces", {}).get(domain_name, {}).get("vector_count", 0)
-        )
 
     def clear_existing_source(self, source_name: str, domain_name: str) -> Any:
         return self.pinecone_index.delete(
@@ -84,14 +100,14 @@ class PineconeDatabase(DatabaseBase):
             filter={"source_name": {"$eq": source_name}},
         )
 
-    def clear_existing_entries_by_id(self, ids: list[str], domain_name: str) -> Any:
+    def clear_existing_entries_by_id_with_provider(self, ids: list[str], domain_name: str) -> Any:
         return self.pinecone_index.delete(
             namespace=domain_name,
             delete_all=False,
             ids=ids,
         )
 
-    def prepare_upsert_for_vectorstore(
+    def prepare_upsert_for_vectorstore_with_provider(
         self,
         id: str,
         values: Optional[list[float]],
@@ -105,7 +121,7 @@ class PineconeDatabase(DatabaseBase):
             "metadata": metadata,
         }
 
-    def upsert(
+    def upsert_with_provider(
         self,
         entries_to_upsert: list[dict[str, Any]],
         domain_name: str,
@@ -117,53 +133,41 @@ class PineconeDatabase(DatabaseBase):
             show_progress=True,
         )
 
-    def query_by_terms(
+    def query_by_terms_with_provider(
         self,
         search_terms,
-        domain_name,
+        domain_name: str,
+        retrieve_n_docs: Optional[int] = None,
     ) -> list[dict]:
-        def _query_namespace(search_terms, top_k, namespace, filter=None):
-            response = self.pinecone_index.query(
-                top_k=self.config.retrieve_n_docs,
-                include_values=False,
-                namespace=namespace,
-                include_metadata=True,
-                filter=filter,  # type: ignore
-                vector=search_terms,
-            )
-
-            returned_documents = []
-
-            for m in response.matches:
-                response = {
-                    "content": m.metadata["content"],
-                    "title": m.metadata["title"],
-                    "url": m.metadata["url"],
-                    "doc_type": m.metadata["doc_type"],
-                    "score": m.score,
-                    "id": m.id,
-                }
-                returned_documents.append(response)
-
-            return returned_documents
-
         filter = None  # Need to implement
-
-        if domain_name:
-            namespace = domain_name
-            returned_documents = _query_namespace(search_terms, top_k, namespace, filter)
-        # If we don't have a namespace, just search all available namespaces
+        if retrieve_n_docs is None:
+            top_k = self.config.retrieve_n_docs
         else:
-            pass
-            # returned_documents = []
-            # for data_domain in self.index.index_data_domains:
-            #     if namespace := getattr(data_domain, "domain_name", None):
-            #         returned_documents.extend(
-            #             _query_namespace(search_terms, top_k, namespace, filter)
-            #         )
+            top_k = retrieve_n_docs
+
+        response = self.pinecone_index.query(
+            top_k=top_k,
+            include_values=False,
+            namespace=domain_name,
+            include_metadata=True,
+            filter=filter,  # type: ignore
+            vector=search_terms,
+        )
+
+        returned_documents = []
+
+        for m in response.matches:
+            response = {
+                "content": m.metadata["content"],
+                "title": m.metadata["title"],
+                "url": m.metadata["url"],
+                "doc_type": m.metadata["doc_type"],
+                "score": m.score,
+                "id": m.id,
+            }
+            returned_documents.append(response)
 
         return returned_documents
-
         #     soft_filter = {
         #         "doc_type": {"$eq": "soft"},
         #         "domain_name": {"$in": domain_names},

@@ -1,8 +1,9 @@
 from typing import Any, Optional, Type
 
+import context_index.doc_index as doc_index_models
 import gradio as gr
 from pydantic import BaseModel
-from services.embedding.embedding_service import EmbeddingService
+from services.database.database_service import DatabaseService
 from services.gradio_interface.gradio_base import GradioBase
 from services.service_base import ServiceBase
 from services.text_processing.process_retrieval import process_retrieved_docs
@@ -12,7 +13,7 @@ class DocRetrieval(ServiceBase):
     CLASS_NAME: str = "doc_retrieval"
     CLASS_UI_NAME: str = "doc_retrieval"
 
-    REQUIRED_CLASSES: list[Type] = [EmbeddingService]
+    REQUIRED_CLASSES: list[Type] = [DatabaseService]
 
     class ClassConfigModel(BaseModel):
         doc_max_tokens: float = 1400
@@ -25,7 +26,6 @@ class DocRetrieval(ServiceBase):
     list_of_class_names: list
     list_of_class_ui_names: list
     list_of_required_class_instances: list[Any]
-    embedding_service: EmbeddingService
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
@@ -83,63 +83,50 @@ class DocRetrieval(ServiceBase):
             #     )
             pass
 
-        query_embedding = self.embedding_service.get_query_embedding(query=query)
-
         docs_max_count = (
             docs_max_count if docs_max_count is not None else self.config.docs_max_count
         )
         retrieve_n_docs = retrieve_n_docs if retrieve_n_docs is not None else 4
 
-        returned_documents_list: list[Any] = []
-        counter = 0
-        while len(returned_documents_list) < docs_max_count:
-            returned_documents_list = self._retrieve_docs(
-                search_terms=query_embedding,
-                retrieve_n_docs=retrieve_n_docs,
-                enabled_domains=enabled_domains,
-            )
-
-            returned_documents_list = process_retrieved_docs(
-                retrieved_documents=returned_documents_list,
-                doc_max_tokens=doc_max_tokens
-                if doc_max_tokens is not None
-                else self.config.doc_max_tokens,
-                max_total_tokens=max_total_tokens if max_total_tokens is not None else 0,
-                docs_max_count=docs_max_count
-                if docs_max_count is not None
-                else self.config.docs_max_count,
-            )
-            if (
-                self.config.doc_relevancy_check_enabled
-                if doc_relevancy_check_enabled is None
-                else doc_relevancy_check_enabled
-            ):
-                # parsed_documents = ActionAgent.doc_relevancy_check(query, parsed_documents)
-                pass
-            if returned_documents_list is None:
-                returned_documents_list = []
-            counter += 1
-            retrieve_n_docs += 1
-
-            if counter > 1:
-                break
-
-        if returned_documents_list is None or len(returned_documents_list) < 1:
-            raise ValueError(
-                "No supporting documents found. Currently we don't support queries without supporting context."
-            )
-        return returned_documents_list
-
-    def _retrieve_docs(self, search_terms, retrieve_n_docs, enabled_domains) -> list[Any]:
         returned_documents_list = []
         for domain_name in enabled_domains:
-            returned_documents = self.database_service.query_index(
-                search_terms=search_terms,
+            # get database provider from domain here
+            # we will have to set sources to use the same doc dbs as their domain
+            # or search each sources doc_db for the query
+            returned_documents = DatabaseService().query_by_terms(
+                search_terms=query,
                 retrieve_n_docs=retrieve_n_docs,
                 domain_name=domain_name,
             )
 
             returned_documents_list.extend(returned_documents)
+
+        returned_documents_list = process_retrieved_docs(
+            retrieved_documents=returned_documents_list,
+            doc_max_tokens=doc_max_tokens
+            if doc_max_tokens is not None
+            else self.config.doc_max_tokens,
+            max_total_tokens=max_total_tokens if max_total_tokens is not None else 0,
+            docs_max_count=docs_max_count
+            if docs_max_count is not None
+            else self.config.docs_max_count,
+        )
+
+        if (
+            self.config.doc_relevancy_check_enabled
+            if doc_relevancy_check_enabled is None
+            else doc_relevancy_check_enabled
+        ):
+            # parsed_documents = ActionAgent.doc_relevancy_check(query, parsed_documents)
+            pass
+
+        if returned_documents_list is None:
+            returned_documents_list = []
+
+        if returned_documents_list is None or len(returned_documents_list) < 1:
+            raise ValueError(
+                "No supporting documents found. Currently we don't support queries without supporting context."
+            )
         return returned_documents_list
 
     def create_settings_ui(self):

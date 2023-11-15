@@ -231,7 +231,7 @@ class CEQAgent(AgentBase):
 
         with gr.Tab(label=self.doc_retrieval.CLASS_UI_NAME):
             components["enabled_domains"] = gr.Dropdown(
-                choices=["tatum", "None", "all", "Custom"],
+                choices=["all"].extend(self.doc_index.domain_names),
                 value="all",
                 label="Topics to Search",
                 multiselect=True,

@@ -40,8 +40,7 @@ class DocIndexView(GradioBase):
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
-                lines=50,
-                autoscroll=True,
+                lines=30,
             )
 
         self.source_tab_dict["buttons"]["ingest_button"].click(
@@ -50,6 +49,7 @@ class DocIndexView(GradioBase):
             outputs=[uic["chat_tab_out_text"]],
             trigger_mode="once",
         )
+        gr.Textbox.change
         self.source_tab_dict["buttons"]["ingest_button"].click(
             api_name="doc_ingest",
             fn=lambda: (
@@ -58,7 +58,6 @@ class DocIndexView(GradioBase):
                     source=self.doc_index.source,
                 ),
             )[1],
-            trigger_mode="once",
         )
 
         # self.create_event_handlers()
@@ -579,7 +578,6 @@ class DocIndexView(GradioBase):
                 )
 
             set_current(new_instance)
-            DocIndex.commit_context_index()
 
         def save_domain_or_source_config_settings(
             domain_or_source_config_values,
@@ -592,7 +590,7 @@ class DocIndexView(GradioBase):
             for component, component_value in domain_or_source_config_values[0].items():
                 if hasattr(parent_instance, component.elem_id):
                     setattr(parent_instance, component.elem_id, component_value)
-            DocIndex.commit_context_index()
+            DocIndex.commit_session
             gr.Info(f"Saved Changes to {self.doc_index.source.name}")
 
         def update_domain_or_source_dd(
@@ -673,7 +671,7 @@ class DocIndexView(GradioBase):
             ):
                 provider_model.config[component.elem_id] = component_value
 
-        DocIndex.commit_context_index()
+        DocIndex.commit_session
 
     def create_management_tab_event_handlers(self, ui_components, save_button):
         for name, component_dict in ui_components.items():

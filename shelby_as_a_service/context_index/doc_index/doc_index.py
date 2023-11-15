@@ -54,13 +54,24 @@ class DocIndex(IndexBase, ServiceBase):
 
             self.create_domain_or_source()
 
-        DocIndex.commit_context_index()
+        self.commit_session
 
-    # Probably can remove this and just use commit_session
-    @staticmethod
-    def commit_context_index():
-        DocIndex.session = DocIndex.commit_session(DocIndex.session)
+    @property
+    def close_session(self):
+        DocIndex.session.close()
+
+    @property
+    def open_session(self):
+        DocIndex.session = DocIndex.get_session()
         DocIndex.session.add(instance=DocIndex.doc_index_model_instance)
+
+    @property
+    def commit_session(self):
+        try:
+            DocIndex.session.commit()
+        except:
+            DocIndex.session.rollback()  # Rollback in case of error
+            raise
 
     @property
     def domain_names(self) -> list:  # Can't type this due to Gradio issue
@@ -213,13 +224,18 @@ class DocIndex(IndexBase, ServiceBase):
             domain_or_source = doc_index_models.SourceModel
             current_domain_or_source = parent_domain.current_source
             existing_names = self.source_names_in_doc_index
+            list_of_domains_or_sources = self.domain.sources
         else:
             domain_or_source = doc_index_models.DomainModel
             current_domain_or_source = self.index.current_domain
             existing_names = self.domain_names
+            list_of_domains_or_sources = self.index.domains
 
         if not new_name:
-            new_name = domain_or_source.DEFAULT_NAME
+            if clone_name:
+                new_name = clone_name
+            else:
+                new_name = domain_or_source.DEFAULT_NAME
         new_name = check_and_handle_name_collision(existing_names=existing_names, new_name=new_name)
         if not new_description:
             new_description = domain_or_source.DEFAULT_DESCRIPTION
@@ -261,7 +277,7 @@ class DocIndex(IndexBase, ServiceBase):
 
         else:  # In this case, we are cloning an existing domain or source
             object_to_clone = self.get_index_model_instance(
-                list_of_instances=self.index.domains,
+                list_of_instances=list_of_domains_or_sources,
                 id=clone_id,
                 name=clone_name,
             )
@@ -282,7 +298,7 @@ class DocIndex(IndexBase, ServiceBase):
                 enabled_doc_ingest_processor_config=object_to_clone.enabled_doc_ingest_processor.config,
                 enabled_doc_loader_config=object_to_clone.enabled_doc_loader.config,
             )
-        DocIndex.commit_context_index()
+        self.commit_session
         return new_instance
 
     def initialize_domain_or_source_config(

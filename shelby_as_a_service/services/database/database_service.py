@@ -54,6 +54,7 @@ class DatabaseService(DatabaseBase):
         self,
         domain_name: str,
         search_terms: list[str] | str,
+        retrieve_n_docs: Optional[int] = None,
         doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ) -> list[dict]:
@@ -65,7 +66,9 @@ class DatabaseService(DatabaseBase):
             search_terms = [search_terms]
         retrieved_docs = []
         for term in search_terms:
-            docs = doc_db.query_by_terms_with_provider(search_terms=term, domain_name=domain_name)
+            docs = doc_db.query_by_terms_with_provider(
+                search_terms=term, retrieve_n_docs=retrieve_n_docs, domain_name=domain_name
+            )
             if docs:
                 retrieved_docs.extend(docs)
             else:
@@ -105,7 +108,7 @@ class DatabaseService(DatabaseBase):
         current_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
             domain_name=domain_name
         )
-        self.log.info(f"Upserting {len(entries_to_upsert)} entries to {self.CLASS_NAME}")
+        self.log.info(f"Upserting {len(entries_to_upsert)} entries to {doc_db.CLASS_NAME}")
 
         response = doc_db.upsert_with_provider(
             entries_to_upsert=entries_to_upsert, domain_name=domain_name
@@ -179,8 +182,13 @@ class DatabaseService(DatabaseBase):
                 chunks_to_upsert.append(chunk)
 
         entries_to_upsert = []
-        if self.DOC_DB_REQUIRES_EMBEDDINGS:
-            EmbeddingService().get_document_embeddings_for_chunks_to_upsert(
+        if doc_index_db_instance.DOC_DB_REQUIRES_EMBEDDINGS:
+            EmbeddingService(
+                embedding_provider_name=source.enabled_doc_db.enabled_doc_embedder.name,
+                embedding_model_name=source.enabled_doc_db.enabled_doc_embedder.config.get(
+                    "current_embedding_model_name"
+                ),
+            ).get_document_embeddings_for_chunks_to_upsert(
                 chunks_to_upsert=chunks_to_upsert, doc_index_db_model=source.enabled_doc_db
             )
             for chunk in chunks_to_upsert:

@@ -12,18 +12,12 @@ class EmbeddingBase(ABC, ServiceBase):
     MODEL_DEFINITIONS: dict[str, Any]
     DOC_INDEX_KEY: str = "enabled_doc_embedder"
 
-    def get_embedding_of_text(self, text: str, model_name: Optional[str] = None) -> list[float]:
+    def get_embedding_of_text_with_provider(
+        self, text: str, embedding_model_instance
+    ) -> list[float]:
         raise NotImplementedError
 
-    def get_embeddings_from_list_of_texts(
-        self, texts: list[str], model_name: Optional[str] = None
+    def get_embeddings_from_list_of_texts_with_provider(
+        self, texts: list[str], embedding_model_instance
     ) -> list[list[float]]:
         raise NotImplementedError
-
-    def get_model_instance(self, requested_model_name: str) -> Any:
-        for model_name, model in self.MODEL_DEFINITIONS.items():
-            if model_name == requested_model_name:
-                model_instance = self.ModelConfig(**model)
-                return model_instance
-
-        raise ValueError(f"Requested model {requested_model_name} not found.")

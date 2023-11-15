@@ -44,7 +44,7 @@ class IngestDoc(BaseModel):
     cleaned_content_token_count: int = 0
     hashed_cleaned_content: Optional[str] = None
     uri: str
-    source_type: Optional[str] = None
+    source_type: str = ""
     date_of_last_update: datetime
     date_of_creation: datetime
     date_published: datetime
@@ -70,7 +70,7 @@ class IngestDoc(BaseModel):
             precleaned_content=precleaned_content,
             precleaned_content_token_count=text_utils.tiktoken_len(precleaned_content),
             uri=text_utils.extract_uri(doc),
-            source_type=source.source_type,
+            # source_type=source.source_type,
             date_of_last_update=datetime.now(),
             date_of_creation=datetime.now(),
             date_published=datetime.now(),

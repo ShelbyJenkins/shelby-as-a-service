@@ -7,6 +7,7 @@ from context_index.doc_index.context_docs import IngestDoc
 from services.gradio_interface.gradio_base import GradioBase
 from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 from services.text_processing.text_utils import tiktoken_len
+from sqlalchemy.orm import Session
 
 
 class IngestProcessingService(IngestProcessingBase):
@@ -87,6 +88,7 @@ class IngestProcessingService(IngestProcessingBase):
         self,
         ingest_docs: list[IngestDoc],
         source: doc_index_models.SourceModel,
+        session: Session,
     ) -> tuple[list[IngestDoc], list[str]]:
         doc_index_ingest_processor_instance: IngestProcessingBase = (
             self.init_provider_instance_from_doc_index(domain_or_source=source)
@@ -107,7 +109,7 @@ class IngestProcessingService(IngestProcessingBase):
             ingest_docs=preprocessed_docs, source=source
         )
         if not (docs_requiring_update := self.check_for_docs_requiring_update(preprocessed_docs)):
-            self.log.info(f"No new data found for {self.source.name}")
+            self.log.info(f"No new data found for {source.name}")
             return [], []
 
         doc_db_ids_requiring_deletion: list[str] = []
@@ -123,29 +125,39 @@ class IngestProcessingService(IngestProcessingBase):
             if not text_chunks:
                 self.log.info(f"🔴 Skipping doc because text_chunks is None")
                 continue
-            doc_db_ids_requiring_deletion.extend(self.clear_and_get_existing_doc_db_chunks(doc))
+            doc_db_ids_requiring_deletion.extend(
+                self.clear_and_get_existing_doc_db_chunks(ingest_doc=doc, session=session)
+            )
             upsert_docs.append(
                 self.create_document_and_chunk_models(
-                    text_chunks=text_chunks, ingest_doc=doc, source=source
+                    text_chunks=text_chunks, ingest_doc=doc, source=source, session=session
                 )
             )
+        if not upsert_docs:
+            self.log.info(f"🔴 No new or post-processed documents for {source.name}")
 
-        self.doc_index.session.commit()
-        self.log.info(f"Min: {min(self.docs_token_counts)}")
-        self.log.info(f"Avg: {int(sum(self.docs_token_counts) / len(self.docs_token_counts))}")
-        self.log.info(f"Max: {max(self.docs_token_counts)}")
-        self.log.info(f"Total tokens: {int(sum(self.docs_token_counts))}")
-        self.log.info(f"Total documents processed: {len(upsert_docs)}")
-        self.log.info(f"Total document chunks: {self.successfully_chunked_counter}")
+        self.log.info(
+            f"🟢 Total documents processed: {len(upsert_docs)}\n"
+            f"Total document chunks: {self.successfully_chunked_counter}\n"
+            f"Total tokens: {int(sum(self.docs_token_counts))}\n"
+            f"Min chunk tokens: {min(self.docs_token_counts)}\n"
+            f"Avg chunk tokens: {int(sum(self.docs_token_counts) / len(self.docs_token_counts))}\n"
+            f"Max chunk tokens: {max(self.docs_token_counts)}"
+        )
+
         return upsert_docs, doc_db_ids_requiring_deletion
 
-    def clear_and_get_existing_doc_db_chunks(self, ingest_doc: IngestDoc) -> list[str]:
+    def clear_and_get_existing_doc_db_chunks(
+        self, ingest_doc: IngestDoc, session: Session
+    ) -> list[str]:
         doc_db_ids = []
         if not ingest_doc.existing_document_model:
             return []
         for chunk in ingest_doc.existing_document_model.context_chunks:
             doc_db_ids.append(chunk.id)
-            self.doc_index.session.delete(chunk)
+            session.flush()
+            session.delete(chunk)
+            session.flush()
         return doc_db_ids
 
     def create_document_and_chunk_models(
@@ -153,6 +165,7 @@ class IngestProcessingService(IngestProcessingBase):
         text_chunks: list[str],
         ingest_doc: IngestDoc,
         source: doc_index_models.SourceModel,
+        session: Session,
     ) -> IngestDoc:
         if not ingest_doc.existing_document_model:
             ingest_doc.existing_document_model = doc_index_models.DocumentModel(
@@ -165,19 +178,22 @@ class IngestProcessingService(IngestProcessingBase):
                 source_type=ingest_doc.source_type,
                 date_published=ingest_doc.date_published,
             )
+            session.flush()
+            source.documents.append(ingest_doc.existing_document_model)
+            session.flush()
         for chunk in text_chunks:
-            self.log.info(f"{ingest_doc.title} has {len(text_chunks)} chunks")
             ingest_doc.existing_document_model.context_chunks.append(
                 doc_index_models.ChunkModel(
                     context_chunk=chunk,
                 )
             )
             self.successfully_chunked_counter += 1
-            doc_token_count = [tiktoken_len(chunk) for chunk in text_chunks]
-            self.log.info(
-                f"🟢 Doc split into {len(text_chunks)} of averge length {int(sum(doc_token_count) / len(text_chunks))}"
-            )
-            self.docs_token_counts.extend(doc_token_count)
+            session.flush()
+        doc_token_count = [tiktoken_len(chunk) for chunk in text_chunks]
+        self.docs_token_counts.extend(doc_token_count)
+        self.log.info(
+            f"🟢 Doc split into {len(text_chunks)} of averge length {int(sum(doc_token_count) / len(text_chunks))}"
+        )
 
         return ingest_doc
 
@@ -192,7 +208,7 @@ class IngestProcessingService(IngestProcessingBase):
             if doc.hashed_cleaned_content != doc.existing_document_model.hashed_cleaned_content:
                 docs_requiring_update.append(doc)
 
-        self.log.info(f"Found {len(docs_requiring_update)} docs_requiring_update")
+        self.log.info(f"{len(docs_requiring_update)} document requires update.")
         return docs_requiring_update
 
     def get_existing_docs_from_context_index_source(
@@ -208,7 +224,9 @@ class IngestProcessingService(IngestProcessingBase):
                     doc.existing_document_model = document_model
                     existing_document_models.append(document_model)
                     break
-            self.log.info(f"Found {len(existing_document_models)} existing_document_models")
+            self.log.info(
+                f"Found {len(existing_document_models)} existing documents for this source."
+            )
 
     @classmethod
     def create_doc_index_ui_components(

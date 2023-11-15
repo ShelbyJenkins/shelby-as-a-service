@@ -8,6 +8,7 @@ from services.service_base import ServiceBase
 from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
 )
+from sqlalchemy.orm import Session, object_session
 
 
 class DocIngest(ServiceBase):
@@ -30,62 +31,73 @@ class DocIngest(ServiceBase):
         else:
             raise ValueError("Must provide either source or domain")
 
-        cls.doc_index.commit_context_index()
+        cls.doc_index.commit_session
+        cls.doc_index.close_session
 
         for source in sources:
-            last_successful_update = getattr(source, "date_of_last_successful_update", "Never")
+            session = cls.doc_index.get_session()
+            session.add(source)
+            last_successful_update = getattr(source, "date_of_last_successful_update")
+            if last_successful_update is None:
+                last_successful_update = "Never"
             cls.log.info(
-                f"Now ingesting: {source.name} @ {source.source_uri} last successfully updated: {last_successful_update}"
+                f"Now ingesting source: {source.name}\n From uri: {source.source_uri}\n Last successfully updated: {last_successful_update}"
             )
             if isinstance(last_successful_update, datetime) and (
                 datetime.utcnow() - last_successful_update
-            ) > timedelta(hours=cls.update_frequency):
+            ) > timedelta(minutes=cls.update_frequency):
                 cls.log.info(
                     f"Skipping {source.name} because it was updated less than {cls.update_frequency} hours ago."
                 )
                 continue
-            retry_count = 3
+
+            retry_count = 2
             for i in range(retry_count):
+                if object_session(source) is None:
+                    session = cls.doc_index.get_session()
+                    session.add(source)
                 try:
-                    if cls.ingest_source(source=source):
+                    if cls.ingest_source(source=source, session=session):
+                        session.commit()
                         break
                 except Exception as error:
                     cls.log.info(f"An error occurred: {error}")
-                    cls.doc_index.session.rollback()
-                    if i < retry_count:
-                        continue
-                    else:
-                        cls.log.info(f"An error occurred: {error} after {i} tries. Skipping.")
-                        break
+                    session.rollback()
+                    cls.log.info(f"Retrying source. Attempt {i + 1} out of {retry_count}.")
+                    if i == retry_count - 1:
+                        cls.log.info(f"Skippng source after {i + 1} retries.")
+                finally:
+                    session.close()
+
         cls.log.info("end_log")
+        cls.doc_index.open_session
+        return
 
     @classmethod
-    def ingest_source(cls, source: doc_index_models.SourceModel) -> bool:
+    def ingest_source(cls, source: doc_index_models.SourceModel, session: Session) -> bool:
         if (
             ingest_docs := DocLoadingService().load_docs_from_context_index_source(source=source)
         ) is None:
-            cls.log.info(f"🔴 No documents found for {source.name}")
-            return True
+            raise ValueError(f"Could not load docs from {source.name}")
 
         (
             upsert_docs,
             doc_db_ids_requiring_deletion,
         ) = IngestProcessingService().process_documents_from_context_index_source(
-            ingest_docs=ingest_docs, source=source
+            ingest_docs=ingest_docs, source=source, session=session
         )
 
         if not upsert_docs:
-            cls.log.info(f"🔴 No new or post-processed documents for {source.name}")
-            cls.doc_index.session.rollback()
-            return True
+            raise ValueError(f"Could not process docs from {source.name}")
 
         doc_db_service = DatabaseService()
         doc_db_service.upsert_documents_from_context_index_source(
             upsert_docs=upsert_docs, source=source
         )
-        doc_db_service.clear_existing_entries_by_id(
-            domain_name=source.domain_model.name,
-            doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
-        )
-        cls.doc_index.commit_context_index()
+        if doc_db_ids_requiring_deletion:
+            doc_db_service.clear_existing_entries_by_id(
+                domain_name=source.domain_model.name,
+                doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
+            )
+
         return True

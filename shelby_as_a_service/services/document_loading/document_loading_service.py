@@ -83,9 +83,11 @@ class DocLoadingService(DocLoadingBase):
         )
         docs = doc_loader.load_docs_with_provider(uri)
         if not docs:
-            self.log.info(f"No documents loaded from DocLoadingService: {self.__class__.__name__}")
+            self.log.info(
+                f"🔴 No documents loaded from DocLoadingService: {self.__class__.__name__}"
+            )
             return None
-        self.log.info(f"Total documents loaded from DocLoadingService: {len(docs)}")
+        self.log.info(f"🟢 Total documents loaded from DocLoadingService: {len(docs)}")
         return docs
 
     @classmethod
