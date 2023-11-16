@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional
 
 import gradio as gr
 import pinecone
+from pinecone import FetchResponse
 from pydantic import BaseModel
 from services.database.database_base import DatabaseBase
 
@@ -36,6 +37,7 @@ class PineconeDatabase(DatabaseBase):
     existing_entry_count: int
     domain_name: str
     source_name: Optional[str] = None
+    pinecone_index: Optional[pinecone.Index] = None
 
     def __init__(
         self,
@@ -44,6 +46,9 @@ class PineconeDatabase(DatabaseBase):
     ):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
+    def init_provider(self) -> pinecone.Index:
+        if self.pinecone_index is not None:
+            return self.pinecone_index
         if (api_key := self.secrets.get("pinecone_api_key")) is None:
             raise ValueError("Pinecone API Key not found.")
         pinecone.init(
@@ -58,13 +63,15 @@ class PineconeDatabase(DatabaseBase):
             indexes = pinecone.list_indexes()
             self.log.info(f"Created index: {indexes}")
         self.pinecone_index = pinecone.Index(self.config.index_name)
+        return self.pinecone_index
 
     def get_index_domain_or_source_entry_count_with_provider(
         self, source_name: Optional[str] = None, domain_name: Optional[str] = None
     ) -> int:
-        # self.log.info(f"Complete index stats: {self.pinecone_index.describe_index_stats()}\n")
+        pinecone_index = self.init_provider()
+        # self.log.info(f"Complete index stats: {pinecone_index.describe_index_stats()}\n")
         if source_name:
-            index_resource_stats = self.pinecone_index.describe_index_stats(
+            index_resource_stats = pinecone_index.describe_index_stats(
                 filter={"source_name": {"$eq": source_name}}
             )
             total = index_resource_stats.get("total_vector_count", None)
@@ -72,7 +79,7 @@ class PineconeDatabase(DatabaseBase):
                 raise ValueError(f"'total_vector_count' not found.")
             return total
         elif domain_name:
-            index_resource_stats = self.pinecone_index.describe_index_stats(
+            index_resource_stats = pinecone_index.describe_index_stats(
                 filter={"domain_name": {"$eq": domain_name}}
             )
             namespaces = index_resource_stats.get("namespaces", {})
@@ -94,18 +101,24 @@ class PineconeDatabase(DatabaseBase):
             raise ValueError("Must provide either source_name or domain_name")
 
     def clear_existing_source(self, source_name: str, domain_name: str) -> Any:
-        return self.pinecone_index.delete(
+        return pinecone_index.delete(
             namespace=domain_name,
             delete_all=False,
             filter={"source_name": {"$eq": source_name}},
         )
 
-    def clear_existing_entries_by_id_with_provider(self, ids: list[str], domain_name: str) -> Any:
-        return self.pinecone_index.delete(
+    def clear_existing_entries_by_id_with_provider(
+        self, doc_db_ids_requiring_deletion: list[str], domain_name: str
+    ) -> bool:
+        pinecone_index = self.init_provider()
+        response = pinecone_index.delete(
             namespace=domain_name,
             delete_all=False,
-            ids=ids,
+            ids=doc_db_ids_requiring_deletion,
         )
+        if response != {}:
+            raise ValueError(f"Failed to delete ids due to error: {response}")
+        return True
 
     def prepare_upsert_for_vectorstore_with_provider(
         self,
@@ -126,7 +139,8 @@ class PineconeDatabase(DatabaseBase):
         entries_to_upsert: list[dict[str, Any]],
         domain_name: str,
     ) -> Any:
-        return self.pinecone_index.upsert(
+        pinecone_index = self.init_provider()
+        return pinecone_index.upsert(
             vectors=entries_to_upsert,
             namespace=domain_name,
             batch_size=self.config.upsert_batch_size,
@@ -139,13 +153,14 @@ class PineconeDatabase(DatabaseBase):
         domain_name: str,
         retrieve_n_docs: Optional[int] = None,
     ) -> list[dict]:
+        pinecone_index = self.init_provider()
         filter = None  # Need to implement
         if retrieve_n_docs is None:
             top_k = self.config.retrieve_n_docs
         else:
             top_k = retrieve_n_docs
 
-        response = self.pinecone_index.query(
+        response = pinecone_index.query(
             top_k=top_k,
             include_values=False,
             namespace=domain_name,
@@ -187,7 +202,7 @@ class PineconeDatabase(DatabaseBase):
         #         "doc_type": {"$eq": "hard"},
         #         "domain_name": {"$eq": domain_name},
         #     }
-        # hard_query_response = self.pinecone_index.query(
+        # hard_query_response = pinecone_index.query(
         #     top_k=retrieve_n_docs,
         #     include_values=False,
         #     namespace=AppBase.config.app_name,
@@ -209,58 +224,62 @@ class PineconeDatabase(DatabaseBase):
         #     }
         #     returned_documents.append(response)
 
-    def fetch_by_ids(
+    def fetch_by_ids_with_provider(
         self,
-        ids: list[int],
-    ):
-        namespace = kwargs.get("namespace", None)
-        fetch_response = self.pinecone_index.fetch(
-            namespace=namespace,
+        ids: list[str],
+        domain_name: str,
+    ) -> dict[str, Any] | None:
+        pinecone_index = self.init_provider()
+        fetch_response: FetchResponse = pinecone_index.fetch(
+            namespace=domain_name,
             ids=ids,
         )
-        return fetch_response
+        if (vectors := fetch_response.get("vectors", None)) is None:
+            self.log.info(f"Vectors not found in fetch response: {fetch_response}")
+            return None
+        return vectors
 
-    def delete_index(self):
-        print(f"Deleting index {self.index_name}")
-        stats = self.pinecone_index.describe_index_stats()
-        print(stats)
-        pinecone.delete_index(self.index_name)
-        print(self.pinecone_index.describe_index_stats())
+    # def delete_index(self):
+    #     print(f"Deleting index {self.index_name}")
+    #     stats = pinecone_index.describe_index_stats()
+    #     print(stats)
+    #     pinecone.delete_index(self.index_name)
+    #     print(pinecone_index.describe_index_stats())
 
-    def clear_index(self):
-        print("Deleting all vectors in index.")
-        stats = self.pinecone_index.describe_index_stats()
-        print(stats)
-        for key in stats["namespaces"]:
-            self.pinecone_index.delete(deleteAll="true", namespace=key)
-        print(self.pinecone_index.describe_index_stats())
+    # def clear_index(self):
+    #     print("Deleting all vectors in index.")
+    #     stats = pinecone_index.describe_index_stats()
+    #     print(stats)
+    #     for key in stats["namespaces"]:
+    #         pinecone_index.delete(deleteAll="true", namespace=key)
+    #     print(pinecone_index.describe_index_stats())
 
-    def clear_namespace(self):
-        print(f"Clearing namespace aka deployment: {self.app_name}")
-        self.pinecone_index.delete(deleteAll="true", namespace=self.app_name)
-        print(self.pinecone_index.describe_index_stats())
+    # def clear_namespace(self):
+    #     print(f"Clearing namespace aka deployment: {self.app_name}")
+    #     pinecone_index.delete(deleteAll="true", namespace=self.app_name)
+    #     print(pinecone_index.describe_index_stats())
 
-    def create_index(self):
-        metadata_config = {"indexed": self.config.index_indexed_metadata}
-        # Prepare log message
-        log_message = (
-            f"Creating new index with the following configuration:\n"
-            f" - Index Name: {self.index_name}\n"
-            f" - Dimension: {self.config.index_vectorstore_dimension}\n"
-            f" - Metric: {self.config.index_vectorstore_metric}\n"
-            f" - Pod Type: {self.config.index_vectorstore_pod_type}\n"
-            f" - Metadata Config: {metadata_config}"
-        )
-        # Log the message
-        print(log_message)
+    # def create_index(self):
+    #     metadata_config = {"indexed": self.config.index_indexed_metadata}
+    #     # Prepare log message
+    #     log_message = (
+    #         f"Creating new index with the following configuration:\n"
+    #         f" - Index Name: {self.index_name}\n"
+    #         f" - Dimension: {self.config.index_vectorstore_dimension}\n"
+    #         f" - Metric: {self.config.index_vectorstore_metric}\n"
+    #         f" - Pod Type: {self.config.index_vectorstore_pod_type}\n"
+    #         f" - Metadata Config: {metadata_config}"
+    #     )
+    #     # Log the message
+    #     print(log_message)
 
-        pinecone.create_index(
-            name=self.index_name,
-            dimension=self.config.index_vectorstore_dimension,
-            metric=self.config.index_vectorstore_metric,
-            pod_type=self.config.index_vectorstore_pod_type,
-            metadata_config=metadata_config,
-        )
+    #     pinecone.create_index(
+    #         name=self.index_name,
+    #         dimension=self.config.index_vectorstore_dimension,
+    #         metric=self.config.index_vectorstore_metric,
+    #         pod_type=self.config.index_vectorstore_pod_type,
+    #         metadata_config=metadata_config,
+    #     )
 
     def create_provider_management_settings_ui(self):
         ui_components = {}

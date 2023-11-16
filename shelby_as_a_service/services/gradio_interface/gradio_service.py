@@ -5,19 +5,19 @@ import threading
 from typing import Any, Optional, Type
 
 import gradio as gr
-import services.gradio_interface.views as views
+import services.gradio_interface.views as gradio_interface
 from app.config_manager import ConfigManager
 from pydantic import BaseModel
-from services.gradio_interface.gradio_base import GradioBase, GradioLogCaptureHandler
+from services.gradio_interface.gradio_base import GradioBase
 from services.gradio_interface.gradio_themes import AtYourServiceTheme
 
 
 class GradioService(GradioBase):
     CLASS_NAME: str = "gradio_ui"
     CLASS_UI_NAME: str = "gradio_ui"
-    REQUIRED_CLASSES: list[Type] = views.AVAILABLE_VIEWS
-    AVAILABLE_VIEWS_TYPINGS = views.AVAILABLE_VIEWS_TYPINGS
-    AVAILABLE_VIEWS_UI_NAMES: list[str] = views.AVAILABLE_VIEWS_UI_NAMES
+    REQUIRED_CLASSES: list[Type] = gradio_interface.AVAILABLE_VIEWS
+    AVAILABLE_VIEWS_TYPINGS = gradio_interface.AVAILABLE_VIEWS_TYPINGS
+    AVAILABLE_VIEWS_UI_NAMES: list[str] = gradio_interface.AVAILABLE_VIEWS_UI_NAMES
     SETTINGS_UI_COL = 2
     PRIMARY_UI_COL = 8
 
@@ -28,10 +28,14 @@ class GradioService(GradioBase):
             extra = "ignore"
 
     config: ClassConfigModel
-    list_of_view_instances: list[views.MainChatView | views.SettingsView | views.DocIndexView] = []
-    main_chat_view: "views.MainChatView"
-    settings_view: "views.SettingsView"
-    doc_index_view: "views.DocIndexView"
+    list_of_view_instances: list[
+        gradio_interface.MainChatView
+        | gradio_interface.SettingsView
+        | gradio_interface.DocIndexView
+    ] = []
+    main_chat_view: "gradio_interface.MainChatView"
+    settings_view: "gradio_interface.SettingsView"
+    doc_index_view: "gradio_interface.DocIndexView"
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         ConfigManager.add_extension_views_to_gradio_ui(self, self.list_of_extension_configs)
@@ -51,14 +55,17 @@ class GradioService(GradioBase):
                     elem_id="settings_ui_col", scale=self.SETTINGS_UI_COL
                 ) as settings_ui_col:
                     with gr.Tabs(selected=self.config.current_ui_view_name):
-                        for view_class in self.list_of_view_instances:
-                            all_setting_ui_tabs.append(self.settings_ui_creator(view_class))
+                        for view_instance in self.list_of_view_instances:
+                            all_setting_ui_tabs.append(self.settings_ui_creator(view_instance))
 
                 with gr.Column(
                     elem_id="primary_ui_col", scale=self.PRIMARY_UI_COL
                 ) as primary_ui_col:
-                    for view_class in self.list_of_view_instances:
-                        all_primary_ui_rows.append(self.primary_ui_creator(view_class))
+                    for view_instance in self.list_of_view_instances:
+                        all_primary_ui_rows.append(self.primary_ui_creator(view_instance))
+
+            for view_instance in self.list_of_view_instances:
+                view_instance.set_view_event_handlers()
 
             self.create_nav_events(
                 all_setting_ui_tabs, all_primary_ui_rows, settings_ui_col, primary_ui_col
@@ -74,7 +81,7 @@ class GradioService(GradioBase):
             webui_client.queue()
             # webui_client.launch(prevent_thread_lock=True, show_error=True)
             try:
-                webui_client.launch(show_error=True)
+                webui_client.launch(show_error=True, show_api=False)
             except Warning as w:
                 self.log.warning(w)
                 gr.Warning(message=str(w))
@@ -109,7 +116,7 @@ class GradioService(GradioBase):
     def create_nav_events(
         self, all_setting_ui_tabs, all_primary_ui_rows, settings_ui_col, primary_ui_col
     ):
-        outputs = []
+        outputs: list = []
         outputs += all_primary_ui_rows
         outputs.append(settings_ui_col)
         outputs.append(primary_ui_col)

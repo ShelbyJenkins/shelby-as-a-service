@@ -18,60 +18,74 @@ class DocIngest(ServiceBase):
     update_frequency: int = 1  # In hours
 
     @classmethod
-    def ingest_docs_from_context_index_source_or_domain(
-        cls,
-        source: Optional[doc_index_models.SourceModel] = None,
-        domain: Optional[doc_index_models.DomainModel] = None,
+    def ingest_docs_from_doc_index_domains(
+        cls, domains: doc_index_models.DomainModel | list[doc_index_models.DomainModel]
     ):
         cls.log = cls.logger_wrapper(DocIngest.__name__)
-        if source:
-            sources = [source]
-        elif domain:
-            sources = domain.sources
-        else:
-            raise ValueError("Must provide either source or domain")
+        if not isinstance(domains, list):
+            domains = [domains]
+        cls.doc_index.open_doc_index_write_session(domains)
+        for domain in domains:
+            cls.doc_index.open_doc_index_write_session(domain)
+            cls.log.info(f"Starting ingest for domain: {domain.name}")
+            cls.ingest_docs_from_doc_index_sources(domain.sources)
 
-        cls.doc_index.commit_session
-        cls.doc_index.close_session
+        cls.doc_index.close_doc_index_write_session
 
+        return
+
+    @classmethod
+    def ingest_docs_from_doc_index_sources(
+        cls, sources: doc_index_models.SourceModel | list[doc_index_models.SourceModel]
+    ):
+        cls.log = cls.logger_wrapper(DocIngest.__name__)
+
+        if not isinstance(sources, list):
+            sources = [sources]
+
+        cls.doc_index.open_doc_index_write_session(sources)
+        cls.ingest_sources(sources)
+
+        cls.log.info("end_log")
+        cls.doc_index.close_doc_index_write_session
+        return
+
+    @classmethod
+    def ingest_sources(cls, sources: list[doc_index_models.SourceModel]):
         for source in sources:
-            session = cls.doc_index.get_session()
-            session.add(source)
+            session = cls.doc_index.open_doc_index_write_session(sources)
             last_successful_update = getattr(source, "date_of_last_successful_update")
             if last_successful_update is None:
                 last_successful_update = "Never"
             cls.log.info(
-                f"Now ingesting source: {source.name}\n From uri: {source.source_uri}\n Last successfully updated: {last_successful_update}"
+                f"\nNow ingesting source: {source.name}\n From uri: {source.source_uri}\n Last successfully updated: {last_successful_update}"
             )
-            if isinstance(last_successful_update, datetime) and (
-                datetime.utcnow() - last_successful_update
-            ) > timedelta(minutes=cls.update_frequency):
-                cls.log.info(
-                    f"Skipping {source.name} because it was updated less than {cls.update_frequency} hours ago."
-                )
-                continue
+            if isinstance(last_successful_update, datetime):
+                if (datetime.utcnow() - last_successful_update) < timedelta(
+                    minutes=cls.update_frequency
+                ):
+                    cls.log.info(
+                        f"Skipping {source.name} because it was updated less than {cls.update_frequency} hours ago."
+                    )
+                    cls.doc_index.close_doc_index_write_session
+                    continue
 
             retry_count = 2
             for i in range(retry_count):
-                if object_session(source) is None:
-                    session = cls.doc_index.get_session()
-                    session.add(source)
                 try:
                     if cls.ingest_source(source=source, session=session):
+                        source.date_of_last_successful_update = datetime.utcnow()
                         session.commit()
+                        cls.doc_index.close_doc_index_write_session
                         break
                 except Exception as error:
                     cls.log.info(f"An error occurred: {error}")
                     session.rollback()
                     cls.log.info(f"Retrying source. Attempt {i + 1} out of {retry_count}.")
-                    if i == retry_count - 1:
+                    if i > retry_count - 1:
                         cls.log.info(f"Skippng source after {i + 1} retries.")
                 finally:
-                    session.close()
-
-        cls.log.info("end_log")
-        cls.doc_index.open_session
-        return
+                    cls.doc_index.close_doc_index_write_session
 
     @classmethod
     def ingest_source(cls, source: doc_index_models.SourceModel, session: Session) -> bool:

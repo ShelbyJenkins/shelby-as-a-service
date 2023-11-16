@@ -40,6 +40,9 @@ class MainChatView(GradioBase):
             available_classes=self.list_of_agent_instances,
         )
 
+    def set_view_event_handlers(self):
+        pass
+
     def run_chat(self, chat_in):
         self.log.info(f"Running query: {chat_in}")
 

@@ -24,6 +24,9 @@ class SettingsView(GradioBase):
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
+    def set_view_event_handlers(self):
+        pass
+
     def create_primary_ui(self):
         components = {}
 

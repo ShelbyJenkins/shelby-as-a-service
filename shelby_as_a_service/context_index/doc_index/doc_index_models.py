@@ -138,6 +138,7 @@ class ChunkModel(Base):
     context_chunk: Mapped[str] = mapped_column(String, nullable=True)
     chunk_embedding: Mapped[list[float]] = mapped_column(PickleType, nullable=True)
     chunk_doc_db_id: Mapped[str] = mapped_column(String, nullable=True)
+    chunk_doc_db_name: Mapped[str] = mapped_column(String, nullable=True)
 
     def prepare_upsert_metadata(self) -> dict:
         metadata = {

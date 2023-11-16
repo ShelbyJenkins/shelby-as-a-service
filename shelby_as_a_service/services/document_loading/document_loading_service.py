@@ -1,7 +1,6 @@
 from typing import Any, Optional, Type, Union
 
 import context_index.doc_index as doc_index_models
-import gradio as gr
 import services.document_loading as document_loading
 from context_index.doc_index.context_docs import IngestDoc
 from langchain.schema import Document

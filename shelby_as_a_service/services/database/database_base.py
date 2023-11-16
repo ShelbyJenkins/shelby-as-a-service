@@ -19,7 +19,11 @@ class DatabaseBase(ABC, ServiceBase):
     ) -> list[dict]:
         raise NotImplementedError
 
-    def fetch_by_ids_with_provider(self, ids: list[int] | int, domain_name: str) -> list[dict]:
+    def fetch_by_ids_with_provider(
+        self,
+        ids: list[str],
+        domain_name: str,
+    ) -> dict[str, Any] | None:
         raise NotImplementedError
 
     def prepare_upsert_for_vectorstore_with_provider(

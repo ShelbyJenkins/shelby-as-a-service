@@ -184,7 +184,7 @@ class IngestProcessingService(IngestProcessingBase):
         for chunk in text_chunks:
             ingest_doc.existing_document_model.context_chunks.append(
                 doc_index_models.ChunkModel(
-                    context_chunk=chunk,
+                    context_chunk=chunk, chunk_doc_db_name=source.enabled_doc_db.name
                 )
             )
             self.successfully_chunked_counter += 1

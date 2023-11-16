@@ -78,20 +78,20 @@ class DatabaseService(DatabaseBase):
     def fetch_by_ids(
         self,
         domain_name: str,
-        ids: list[int] | int,
+        ids: list[str] | str,
         doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
-    ) -> list[dict]:
+    ) -> dict[str, Any] | None:
         doc_db = self.get_doc_db_instance(
             doc_db_provider_name=doc_db_provider_name,
             doc_index_db_instance=doc_index_db_instance,
         )
-        if isinstance(ids, int):
+        if isinstance(ids, str):
             ids = [ids]
 
         docs = doc_db.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
         if not docs:
-            self.log.info(f"No documents found for {id}")
+            self.log.info(f"No documents found.")
         return docs
 
     def upsert(
@@ -128,10 +128,10 @@ class DatabaseService(DatabaseBase):
     def clear_existing_entries_by_id(
         self,
         domain_name: str,
-        doc_db_ids_requiring_deletion: list[str],
+        doc_db_ids_requiring_deletion: list[str] | str,
         doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
-    ):
+    ) -> bool:
         doc_db = self.get_doc_db_instance(
             doc_db_provider_name=doc_db_provider_name,
             doc_index_db_instance=doc_index_db_instance,
@@ -139,6 +139,8 @@ class DatabaseService(DatabaseBase):
         existing_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
             domain_name=domain_name
         )
+        if not isinstance(doc_db_ids_requiring_deletion, list):
+            doc_db_ids_requiring_deletion = [doc_db_ids_requiring_deletion]
 
         response = doc_db.clear_existing_entries_by_id_with_provider(
             doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
@@ -153,8 +155,9 @@ class DatabaseService(DatabaseBase):
             )
         else:
             self.log.info(
-                f"Deleted {len(doc_db_ids_requiring_deletion)} entries from {self.CLASS_NAME}.\n Response: {response}"
+                f"Deleted {len(doc_db_ids_requiring_deletion)} entries from {self.CLASS_NAME}."
             )
+        return response
 
     def upsert_documents_from_context_index_source(
         self, upsert_docs: list[IngestDoc], source: doc_index_models.SourceModel
