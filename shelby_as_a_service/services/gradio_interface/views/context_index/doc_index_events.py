@@ -108,8 +108,8 @@ def domains_event_handlers(
         api_name="clear_domain_or_source",
         fn=lambda: (
             time.sleep(0.5),
-            GradioBase.doc_index.clear_domain(
-                domain=GradioBase.doc_index.domain,
+            GradioBase.doc_index.manage.clear_domains(
+                domains=GradioBase.doc_index.domain,
             ),
         )[1],
     )
@@ -177,8 +177,8 @@ def sources_event_handlers(
         api_name="clear_domain_or_source",
         fn=lambda: (
             time.sleep(0.5),
-            GradioBase.doc_index.clear_source(
-                source=GradioBase.doc_index.source,
+            GradioBase.doc_index.manage.clear_sources(
+                sources=GradioBase.doc_index.source,
             ),
         )[1],
     )

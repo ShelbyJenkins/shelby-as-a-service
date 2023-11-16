@@ -4,6 +4,7 @@ from typing import Any, Optional, Type
 import context_index.doc_index as doc_index_models
 from context_index.doc_index.doc_index_base import DocIndexBase
 from context_index.doc_index.doc_index_templates import DocIndexTemplates
+from context_index.doc_index.docs.manage_docs import ManageDocs
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 from services.embedding.embedding_service import EmbeddingService
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 class DocIndex(DocIndexBase):
     log: logging.Logger
     context_template: doc_index_models.DocIndexTemplateModel
+    manage: Type[ManageDocs] = ManageDocs
 
     def __init__(self) -> None:
         self.log = logging.getLogger(__name__)
@@ -56,7 +58,9 @@ class DocIndex(DocIndexBase):
     def delete_source(self):
         pass
 
-    def delete_domain(self):
+    def delete_domain(
+        self,
+    ):
         pass
 
     def set_current_domain_or_source_provider_instance(
