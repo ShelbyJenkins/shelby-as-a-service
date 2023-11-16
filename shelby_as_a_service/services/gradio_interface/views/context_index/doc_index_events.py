@@ -4,7 +4,7 @@ from typing import Any, Literal, Optional, Type, get_args
 import context_index.doc_index as doc_index_models
 import gradio as gr
 from context_index.doc_index.doc_index import DocIndex
-from context_index.doc_index.doc_ingest import DocIngest
+from context_index.doc_index.docs.doc_ingest import DocIngest
 from gradio.components import Component
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type
 
-from context_index.doc_index.context_docs import IngestDoc
+from context_index.doc_index.docs.context_docs import IngestDoc
 from services.service_base import ServiceBase
 
 

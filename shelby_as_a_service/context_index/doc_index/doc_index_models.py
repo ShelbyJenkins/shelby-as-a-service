@@ -84,13 +84,18 @@ class DocDBModel(Base):
         Integer, ForeignKey("doc_embedders.id"), nullable=True, unique=True
     )
     enabled_doc_embedder = relationship(
-        "DocEmbeddingModel", foreign_keys=[doc_embedder_id], uselist=False, post_update=True
+        "DocEmbeddingModel",
+        foreign_keys=[doc_embedder_id],
+        uselist=False,
+        post_update=True,
+        lazy="selectin",
     )
     doc_embedders: Mapped[list[DocEmbeddingModel]] = relationship(
         "DocEmbeddingModel",
         back_populates="doc_db_model",
         cascade="all, delete-orphan",
         foreign_keys=[DocEmbeddingModel.doc_db_id],
+        lazy="selectin",
     )
 
     DEFAULT_PROVIDER_NAME: str = "pinecone_database"
@@ -119,7 +124,10 @@ class DocIndexTemplateModel(Base):
     enabled_doc_ingest_processor_config: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON))  # type: ignore
 
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
-    enabled_doc_db = relationship("DocDBModel")
+    enabled_doc_db = relationship(
+        "DocDBModel",
+        lazy="selectin",
+    )
 
     batch_update_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     name: Mapped[str] = mapped_column(String)
@@ -176,6 +184,7 @@ class DocumentModel(Base):
         back_populates="document_model",
         cascade="all, delete-orphan",
         foreign_keys=[ChunkModel.document_id],
+        lazy="selectin",
     )
     cleaned_content: Mapped[str] = mapped_column(String, nullable=True)
     hashed_cleaned_content: Mapped[str] = mapped_column(String, nullable=True)
@@ -207,13 +216,18 @@ class SourceModel(Base):
         Integer, ForeignKey("doc_loaders.id"), nullable=True, unique=True
     )
     enabled_doc_loader = relationship(
-        "DocLoaderModel", foreign_keys=[doc_loader_id], uselist=False, post_update=True
+        "DocLoaderModel",
+        foreign_keys=[doc_loader_id],
+        uselist=False,
+        post_update=True,
+        lazy="selectin",
     )
     doc_loaders: Mapped[list[DocLoaderModel]] = relationship(
         "DocLoaderModel",
         back_populates="source_model",
         cascade="all, delete-orphan",
         foreign_keys=[DocLoaderModel.source_id],
+        lazy="selectin",
     )
 
     doc_ingest_processor_id: Mapped[int] = mapped_column(
@@ -224,16 +238,21 @@ class SourceModel(Base):
         foreign_keys=[doc_ingest_processor_id],
         uselist=False,
         post_update=True,
+        lazy="selectin",
     )
     doc_ingest_processors: Mapped[list[DocIngestProcessorModel]] = relationship(
         "DocIngestProcessorModel",
         back_populates="source_model",
         cascade="all, delete-orphan",
         foreign_keys=[DocIngestProcessorModel.source_id],
+        lazy="selectin",
     )
 
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
-    enabled_doc_db = relationship("DocDBModel")
+    enabled_doc_db = relationship(
+        "DocDBModel",
+        lazy="selectin",
+    )
 
     DEFAULT_NAME: str = "default_source_name"
     DEFAULT_TEMPLATE_NAME: str = "default_template_name"
@@ -249,6 +268,7 @@ class SourceModel(Base):
         back_populates="source_model",
         cascade="all, delete-orphan",
         foreign_keys=[DocumentModel.source_id],
+        lazy="selectin",
     )
     date_of_last_successful_update: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
@@ -272,13 +292,18 @@ class DomainModel(Base):
         Integer, ForeignKey("sources.id"), nullable=True, unique=True
     )
     current_source = relationship(
-        "SourceModel", foreign_keys=[current_source_id], uselist=False, post_update=True
+        "SourceModel",
+        foreign_keys=[current_source_id],
+        uselist=False,
+        post_update=True,
+        lazy="selectin",
     )
     sources: Mapped[list[SourceModel]] = relationship(
         "SourceModel",
         back_populates="domain_model",
         cascade="all, delete-orphan",
         foreign_keys=[SourceModel.domain_id],
+        lazy="selectin",
     )
 
     @property
@@ -293,29 +318,39 @@ class DomainModel(Base):
         foreign_keys=[doc_ingest_processor_id],
         uselist=False,
         post_update=True,
+        lazy="selectin",
     )
     doc_ingest_processors: Mapped[list[DocIngestProcessorModel]] = relationship(
         "DocIngestProcessorModel",
         back_populates="domain_model",
         cascade="all, delete-orphan",
         foreign_keys=[DocIngestProcessorModel.domain_id],
+        lazy="selectin",
     )
 
     doc_loader_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("doc_loaders.id"), nullable=True, unique=True
     )
     enabled_doc_loader = relationship(
-        "DocLoaderModel", foreign_keys=[doc_loader_id], uselist=False, post_update=True
+        "DocLoaderModel",
+        foreign_keys=[doc_loader_id],
+        uselist=False,
+        post_update=True,
+        lazy="selectin",
     )
     doc_loaders: Mapped[list[DocLoaderModel]] = relationship(
         "DocLoaderModel",
         back_populates="domain_model",
         cascade="all, delete-orphan",
         foreign_keys=[DocLoaderModel.domain_id],
+        lazy="selectin",
     )
 
     doc_db_id: Mapped[int] = mapped_column(Integer, ForeignKey("doc_dbs.id"), nullable=True)
-    enabled_doc_db = relationship("DocDBModel")
+    enabled_doc_db = relationship(
+        "DocDBModel",
+        lazy="selectin",
+    )
 
     DEFAULT_NAME: str = "default_domain_name"
     DEFAULT_TEMPLATE_NAME: str = "default_template_name"
@@ -330,6 +365,7 @@ class DomainModel(Base):
         primaryjoin="DomainModel.id==SourceModel.domain_id",
         secondaryjoin="SourceModel.id==DocumentModel.source_id",
         viewonly=True,
+        lazy="selectin",
     )
 
 
@@ -340,28 +376,32 @@ class DocIndexModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     current_domain_id: Mapped[int] = mapped_column(Integer, ForeignKey("domains.id"), nullable=True)
-    current_domain = relationship("DomainModel", foreign_keys=[current_domain_id], post_update=True)
+    current_domain = relationship(
+        "DomainModel",
+        foreign_keys=[current_domain_id],
+        post_update=True,
+        lazy="selectin",
+    )
     domains: Mapped[list[DomainModel]] = relationship(
         "DomainModel",
         back_populates="doc_index_model",
         cascade="all, delete-orphan",
         foreign_keys=[DomainModel.context_id],
+        lazy="selectin",
     )
 
     doc_dbs: Mapped[list[DocDBModel]] = relationship(
         "DocDBModel",
         back_populates="doc_index_model",
         foreign_keys="DocDBModel.context_id",
+        lazy="selectin",
     )
-
-    @property
-    def list_of_doc_db_names(self) -> list:
-        return [doc_db.name for doc_db in self.doc_dbs]
 
     doc_index_templates: Mapped[list[DocIndexTemplateModel]] = relationship(
         "DocIndexTemplateModel",
         back_populates="doc_index_model",
         foreign_keys=[DocIndexTemplateModel.context_id],
+        lazy="selectin",
     )
 
     @property

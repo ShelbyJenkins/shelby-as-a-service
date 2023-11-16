@@ -5,7 +5,7 @@ from typing import Annotated, Any, Generator, Literal, Optional, Type, Union, ge
 import gradio as gr
 import services.llm as llm
 from agents.agent_base import AgentBase
-from context_index.doc_index.doc_retrieval import DocRetrieval
+from context_index.doc_index.docs.doc_retrieval import DocRetrieval
 from pydantic import BaseModel, Field
 from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_service import LLMService

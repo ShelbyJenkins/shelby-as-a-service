@@ -4,6 +4,7 @@ from typing import Any, Optional, Type
 import context_index.doc_index as doc_index_models
 from app.app_base import AppBase, LoggerWrapper
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 
 class ServiceBase(AppBase):
@@ -21,9 +22,13 @@ class ServiceBase(AppBase):
     list_of_class_names: list[str]
     list_of_class_ui_names: list[str]
     list_of_required_class_instances: list[Type]
+    session: Session
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs) -> None:
         self.log = self.logger_wrapper(self.__class__.__name__)
+
+        if session := kwargs.get("session"):
+            self.session = session
 
         class_config = config_file_dict.get(self.CLASS_NAME, {})
         if getattr(self, "ClassConfigModel", None):

@@ -2,7 +2,7 @@ from typing import Any, Optional, Type
 
 import context_index.doc_index as doc_index_models
 import services.database as database
-from context_index.doc_index.context_docs import IngestDoc
+from context_index.doc_index.docs.context_docs import IngestDoc
 from services.database.database_base import DatabaseBase
 from services.embedding.embedding_service import EmbeddingService
 from services.gradio_interface.gradio_base import GradioBase

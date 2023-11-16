@@ -1,10 +1,10 @@
 import os
 import typing
-from typing import Any, Literal, Optional, get_args
+from typing import Any, Literal, Optional, Type, get_args
 
-from app.app_base import AppBase
+from app.app_base import AppBase, LoggerWrapper
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, object_session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
 class Base(DeclarativeBase):
@@ -19,48 +19,61 @@ class IndexBase(AppBase):
     _write_session_factory: typing.Callable[[], Session]
     session: Session
     local_index_dir: str
-    write_session: Optional[Session] = None
+    logger_wrapper = LoggerWrapper
 
     @classmethod
     def setup_index(cls):
         db_path = os.path.join(cls.local_index_dir, "database.db")
         os.makedirs(cls.local_index_dir, exist_ok=True)
-        cls.engine = create_engine(f"sqlite:///{db_path}")
+        IndexBase.engine = create_engine(f"sqlite:///{db_path}")
         Base.metadata.create_all(cls.engine)
-        cls._session_factory = sessionmaker(bind=cls.engine, expire_on_commit=False)
-        cls._write_session_factory = sessionmaker(bind=cls.engine)
+        IndexBase._session_factory = sessionmaker(bind=cls.engine, expire_on_commit=False)
+        IndexBase._write_session_factory = sessionmaker(bind=cls.engine)
 
     @classmethod
-    def open_session(cls) -> Session:
-        if cls._session_factory is None:
-            raise Exception("Database not set up. Call setup_index first.")
-        return cls._session_factory()
+    def indexbase_open_session(cls, obj: Optional[Any] = None) -> Session:
+        if IndexBase._session_factory is None:
+            raise Exception("Database not set up. Call IndexBase.setup_index first.")
+        session = IndexBase._session_factory()
+        if obj is not None:
+            session.add(obj)
+        return session
 
     @classmethod
-    def open_write_session(cls, objects: Any | list[Any]) -> Session:
-        if IndexBase.write_session:
-            cls.close_write_session()
-        IndexBase.write_session = cls._write_session_factory()
-        if not isinstance(objects, list):
-            objects = [objects]
-        for obj in objects:
-            IndexBase.write_session.add(obj)
-
-        return IndexBase.write_session
-
-    @classmethod
-    def close_session(cls, session: Session):
+    def indexbase_close_session(cls, session: Session):
         if session.is_active:
             session.commit()
-            session.close()
-        if session.dirty:
+        elif session.dirty:
             cls.log.info("Session was dirty. Rolling back.")
             session.rollback()
-            session.close()
+        session.expunge_all()
+        session.close()
 
     @classmethod
-    def close_write_session(cls):
-        IndexBase.close_session(IndexBase.write_session)
+    def indexbase_open_write_session(cls, obj) -> Session:
+        if IndexBase._write_session_factory is None:
+            raise Exception("Database not set up. Call IndexBase.setup_index first.")
+        write_session = IndexBase._write_session_factory()
+        write_session.add(obj)
+        return write_session
+
+    @classmethod
+    def indexbase_close_write_session(cls, write_session: Optional[Session] = None):
+        if write_session is None:
+            cls.log.info("No write session to close.")
+            return
+        cls.indexbase_close_session(write_session)
+
+    @classmethod
+    def indexbase_commit_session(cls, session: Optional[Session] = None):
+        if session is None:
+            cls.log.info("No session to commit.")
+            return
+        try:
+            session.commit()
+        except:
+            session.rollback()
+            cls.log.info("Session was dirty. Rolling back.")
 
     @staticmethod
     def get_index_model_instance(
@@ -91,3 +104,15 @@ class IndexBase(AppBase):
             raise Exception("Unexpected error: domain should not be None at this point.")
 
         return requested_instance
+
+    @staticmethod
+    def get_requested_class(
+        requested_class: str, available_classes: list[Type["IndexBase"]]
+    ) -> Any:
+        for available_class in available_classes:
+            if (
+                available_class.CLASS_NAME == requested_class
+                or available_class.CLASS_UI_NAME == requested_class
+            ):
+                return available_class
+        raise ValueError(f"Requested class {requested_class} not found in {available_classes}")

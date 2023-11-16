@@ -2,12 +2,11 @@ import logging
 from typing import Any, Optional, Type
 
 import context_index.doc_index as doc_index_models
+from context_index.doc_index.doc_index_base import DocIndexBase
 from context_index.doc_index.doc_index_templates import DocIndexTemplates
-from context_index.index_base import IndexBase
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 from services.embedding.embedding_service import EmbeddingService
-from services.service_base import ServiceBase
 from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
 )
@@ -16,32 +15,29 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 
-class DocIndex(IndexBase, ServiceBase):
-    doc_index_model_instance: doc_index_models.DocIndexModel
-    session: Session
+class DocIndex(DocIndexBase):
     log: logging.Logger
     context_template: doc_index_models.DocIndexTemplateModel
 
     def __init__(self) -> None:
         self.log = logging.getLogger(__name__)
-
-        DocIndex.setup_index()
+        self.setup_index()
         self.setup_doc_index()
 
     def setup_doc_index(self):
         try:
-            DocIndex.session = self.open_session()
+            DocIndexBase.session = self.indexbase_open_session()
             if doc_index_model_instance := DocIndex.session.query(
                 doc_index_models.DocIndexModel
             ).first():
-                DocIndex.doc_index_model_instance = doc_index_model_instance
+                DocIndexBase.doc_index_model_instance = doc_index_model_instance
                 self.populate_service_providers(
                     target_instance=DocIndex.doc_index_model_instance,
                     doc_index_model_name=doc_index_models.DocDBModel.CLASS_NAME,  # type: ignore
                 )
                 self.add_default_doc_index_templates_to_index()
             else:
-                DocIndex.doc_index_model_instance = doc_index_models.DocIndexModel()
+                DocIndexBase.doc_index_model_instance = doc_index_models.DocIndexModel()
                 DocIndex.session.add(DocIndex.doc_index_model_instance)
                 DocIndex.session.flush()
 
@@ -57,55 +53,46 @@ class DocIndex(IndexBase, ServiceBase):
             DocIndex.session.rollback()
             raise
 
-    @property
-    def close_doc_index_session(self):
-        self.close_session(DocIndex.session)
+    def delete_source(self):
+        pass
 
-    @property
-    def open_doc_index_session(self):
-        DocIndex.session = self.open_session()
-        # DocIndex.session.refresh(DocIndex.doc_index_model_instance)
+    def delete_domain(self):
+        pass
 
-    def open_doc_index_write_session(self, objects: Any | list[Any]) -> Session:
-        self.close_doc_index_session
-        return self.open_write_session(objects)
+    def set_current_domain_or_source_provider_instance(
+        self,
+        domain_or_source: Type[doc_index_models.DomainModel] | Type[doc_index_models.SourceModel],
+        doc_index_model_name: doc_index_models.DOC_INDEX_MODEL_NAMES,
+        set_id: Optional[int] = None,
+        set_name: Optional[str] = None,
+    ):
+        if domain_or_source is doc_index_models.DomainModel:
+            parent_instance = self.domain
+        elif domain_or_source is doc_index_models.SourceModel:
+            parent_instance = self.source
+        else:
+            raise Exception(f"Unexpected error: {domain_or_source.__name__} not found.")
+        match doc_index_model_name:
+            case doc_index_models.DocDBModel.CLASS_NAME:
+                parent_instance.enabled_doc_db = self.get_index_model_instance(
+                    list_of_instances=self.index.doc_dbs, id=set_id, name=set_name
+                )
+            case doc_index_models.DocLoaderModel.CLASS_NAME:
+                parent_instance.enabled_doc_loader = self.get_index_model_instance(
+                    list_of_instances=parent_instance.doc_loaders, id=set_id, name=set_name
+                )
+            case doc_index_models.DocIngestProcessorModel.CLASS_NAME:
+                parent_instance.enabled_doc_ingest_processor = self.get_index_model_instance(
+                    list_of_instances=parent_instance.doc_ingest_processors,
+                    id=set_id,
+                    name=set_name,
+                )
+            case _:
+                raise Exception(
+                    f"Unexpected error: doc_index_model_name should be of type doc_index_models.DOC_INDEX_MODEL_NAMES but is {doc_index_model_name}."
+                )
 
-    @property
-    def close_doc_index_write_session(self):
-        self.close_write_session()
-        self.open_doc_index_session
-
-    @property
-    def commit_session(self):
-        try:
-            DocIndex.session.commit()
-        except:
-            DocIndex.session.rollback()  # Rollback in case of error
-            raise
-
-    @property
-    def domain_names(self) -> list:  # Can't type this due to Gradio issue
-        return [domain.name for domain in DocIndex.doc_index_model_instance.domains]
-
-    @property
-    def source_names_in_doc_index(self) -> list:
-        return [name[0] for name in DocIndex.session.query(doc_index_models.SourceModel.name).all()]
-
-    @property
-    def index(self) -> doc_index_models.DocIndexModel:
-        return DocIndex.doc_index_model_instance
-
-    @property
-    def domain(self) -> doc_index_models.DomainModel:
-        if getattr(self.index, "current_domain", None) is None:
-            raise Exception(f"{self.index} has no domain.")
-        return self.index.current_domain
-
-    @property
-    def source(self) -> doc_index_models.SourceModel:
-        if getattr(self.domain, "current_source", None) is None:
-            raise Exception(f"{self.domain} has no source.")
-        return self.domain.current_source
+        DocIndex.session.flush()
 
     @classmethod
     def create_doc_index_model_instance(
@@ -151,76 +138,6 @@ class DocIndex(IndexBase, ServiceBase):
 
         config = provider_class.ClassConfigModel(**config).model_dump()
         return doc_index_model(name=provider_name, config=config)
-
-    def get_provider_instance_model_from_service_name(
-        self,
-        service_name: str,
-        provider_name: str,
-        parent_domain_or_source: Optional[
-            doc_index_models.DomainModel | doc_index_models.SourceModel
-        ] = None,
-    ) -> Any:
-        # Used for UI components generated by services
-        if not parent_domain_or_source:
-            if service_name == DatabaseService.CLASS_NAME:
-                provider_model = self.get_index_model_instance(
-                    list_of_instances=self.index.doc_dbs, name=provider_name
-                )
-            else:
-                raise ValueError(f"service_name must be {DatabaseService.CLASS_NAME}")
-        else:
-            if service_name == DocLoadingService.CLASS_NAME:
-                provider_model = self.get_index_model_instance(
-                    list_of_instances=parent_domain_or_source.doc_loaders, name=provider_name
-                )
-
-            elif service_name == IngestProcessingService.CLASS_NAME:
-                provider_model = self.get_index_model_instance(
-                    list_of_instances=parent_domain_or_source.doc_ingest_processors,
-                    name=provider_name,
-                )
-            else:
-                raise ValueError(
-                    f"service_name must be {DocLoadingService.CLASS_NAME}, {IngestProcessingService.CLASS_NAME}"
-                )
-        if provider_model is None:
-            raise ValueError(f"provider_model {provider_model} not found")
-        return provider_model
-
-    def set_current_domain_or_source_provider_instance(
-        self,
-        domain_or_source: Type[doc_index_models.DomainModel] | Type[doc_index_models.SourceModel],
-        doc_index_model_name: doc_index_models.DOC_INDEX_MODEL_NAMES,
-        set_id: Optional[int] = None,
-        set_name: Optional[str] = None,
-    ):
-        if domain_or_source is doc_index_models.DomainModel:
-            parent_instance = self.domain
-        elif domain_or_source is doc_index_models.SourceModel:
-            parent_instance = self.source
-        else:
-            raise Exception(f"Unexpected error: {domain_or_source.__name__} not found.")
-        match doc_index_model_name:
-            case doc_index_models.DocDBModel.CLASS_NAME:
-                parent_instance.enabled_doc_db = self.get_index_model_instance(
-                    list_of_instances=self.index.doc_dbs, id=set_id, name=set_name
-                )
-            case doc_index_models.DocLoaderModel.CLASS_NAME:
-                parent_instance.enabled_doc_loader = self.get_index_model_instance(
-                    list_of_instances=parent_instance.doc_loaders, id=set_id, name=set_name
-                )
-            case doc_index_models.DocIngestProcessorModel.CLASS_NAME:
-                parent_instance.enabled_doc_ingest_processor = self.get_index_model_instance(
-                    list_of_instances=parent_instance.doc_ingest_processors,
-                    id=set_id,
-                    name=set_name,
-                )
-            case _:
-                raise Exception(
-                    f"Unexpected error: doc_index_model_name should be of type doc_index_models.DOC_INDEX_MODEL_NAMES but is {doc_index_model_name}."
-                )
-
-        DocIndex.session.flush()
 
     def create_domain_or_source(
         self,
@@ -507,114 +424,3 @@ class DocIndex(IndexBase, ServiceBase):
             enabled_doc_db=enabled_doc_db,
             batch_update_enabled=batch_update_enabled,
         )
-
-    def delete_source(self):
-        pass
-
-    def delete_domain(self):
-        pass
-
-    def delete_document(self, document: doc_index_models.DocumentModel) -> bool:
-        undeleted_chunks = []
-
-        def delete_entries(doc_db_ids_requiring_deletion, chunk_doc_db_name):
-            try:
-                DatabaseService().clear_existing_entries_by_id(
-                    domain_name=document.domain_model.name,
-                    doc_db_provider_name=chunk_doc_db_name,  # type: ignore
-                    doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
-                )
-            except Exception as error:
-                self.log.info(f"An error occurred: {error}")
-                persisted_chunks = DatabaseService().fetch_by_ids(
-                    domain_name=document.domain_model.name,
-                    doc_db_provider_name=chunk_doc_db_name,  # type: ignore
-                    ids=doc_db_ids_requiring_deletion,
-                )
-                if not persisted_chunks:
-                    self.log.info(
-                        f"It seems like the chunks were deleted succesffuly despite the error."
-                    )
-                else:
-                    self.log.info(
-                        f"Failed to delete the following chunks: '{persisted_chunks.keys()}'"
-                    )
-                    undeleted_chunks.extend(list(persisted_chunks.keys()))
-
-        session = self.open_doc_index_write_session(document)
-        chunk_doc_db_name = None
-        doc_db_ids_requiring_deletion = []
-
-        for chunk in document.context_chunks:
-            if chunk_doc_db_name is None:
-                chunk_doc_db_name = chunk.chunk_doc_db_name
-            if chunk_doc_db_name != chunk.chunk_doc_db_name:
-                delete_entries(doc_db_ids_requiring_deletion, chunk_doc_db_name)
-                chunk_doc_db_name = chunk.chunk_doc_db_name
-                doc_db_ids_requiring_deletion = []
-            doc_db_ids_requiring_deletion.append(chunk.chunk_doc_db_id)
-        delete_entries(doc_db_ids_requiring_deletion, chunk_doc_db_name)
-
-        if undeleted_chunks:
-            self.log.info(
-                f"Failed to delete the following chunks for document: '{document.title}'. Persisting document."
-            )
-            self.close_doc_index_write_session
-            return False
-        try:
-            session.delete(document)
-            session.flush()
-            session.refresh(document.source_model.domain_model)
-            self.log.info(f"Successfully deleted document '{document.title}'")
-        except Exception as error:
-            self.log.info(f"An error occurred: {error}")
-            session.rollback()
-            return False
-        finally:
-            self.close_doc_index_write_session
-
-        return True
-
-    def clear_source(self, source: doc_index_models.SourceModel) -> bool:
-        self.open_doc_index_write_session(source)
-        persisted_doc_index_docs = []
-        deleted_doc_index_docs = []
-        for document in source.documents:
-            if not self.delete_document(document=document):
-                persisted_doc_index_docs.append(document)
-            else:
-                deleted_doc_index_docs.append(document)
-
-        self.close_doc_index_write_session
-        if not persisted_doc_index_docs:
-            self.log.info(f"Successfully deleted all documents for {source.name}")
-            return True
-        else:
-            undeleted_titles = [document.title for document in persisted_doc_index_docs]
-            deleted_titles = [document.title for document in deleted_doc_index_docs]
-            self.log.info(
-                f"Successfully deleted {deleted_titles}.\n"
-                f"Failed to delete the following documents: {undeleted_titles}"
-            )
-            return False
-
-    def clear_domain(self, domain: doc_index_models.DomainModel):
-        self.open_doc_index_write_session(domain)
-        domain_name = domain.name
-        cleared_doc_index_sources = []
-        uncleared_doc_index_sources = []
-        for source in domain.sources:
-            if self.clear_source(source=source):
-                cleared_doc_index_sources.append(source)
-            else:
-                uncleared_doc_index_sources.append(source)
-        if not uncleared_doc_index_sources:
-            self.log.info(f"Successfully cleared all documents for {domain_name}")
-        else:
-            uncleared_sources = [source.name for source in uncleared_doc_index_sources]
-            cleared_sources = [source.name for source in cleared_doc_index_sources]
-            self.log.info(
-                f"Successfully cleared {cleared_sources}.\n"
-                f"Failed to delete all documents for the following cleared: {uncleared_sources}"
-            )
-        self.close_doc_index_write_session

@@ -3,7 +3,7 @@ from typing import Any, Optional, Type
 import context_index.doc_index as doc_index_models
 import services.text_processing.ingest_processing as ingest_processing
 import services.text_processing.text_utils as text_utils
-from context_index.doc_index.context_docs import IngestDoc
+from context_index.doc_index.docs.context_docs import IngestDoc
 from services.gradio_interface.gradio_base import GradioBase
 from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 from services.text_processing.text_utils import tiktoken_len
@@ -88,7 +88,6 @@ class IngestProcessingService(IngestProcessingBase):
         self,
         ingest_docs: list[IngestDoc],
         source: doc_index_models.SourceModel,
-        session: Session,
     ) -> tuple[list[IngestDoc], list[str]]:
         doc_index_ingest_processor_instance: IngestProcessingBase = (
             self.init_provider_instance_from_doc_index(domain_or_source=source)
@@ -126,11 +125,11 @@ class IngestProcessingService(IngestProcessingBase):
                 self.log.info(f"🔴 Skipping doc because text_chunks is None")
                 continue
             doc_db_ids_requiring_deletion.extend(
-                self.clear_and_get_existing_doc_db_chunks(ingest_doc=doc, session=session)
+                self.clear_and_get_existing_doc_db_chunks(ingest_doc=doc)
             )
             upsert_docs.append(
                 self.create_document_and_chunk_models(
-                    text_chunks=text_chunks, ingest_doc=doc, source=source, session=session
+                    text_chunks=text_chunks, ingest_doc=doc, source=source
                 )
             )
         if not upsert_docs:
@@ -147,17 +146,15 @@ class IngestProcessingService(IngestProcessingBase):
 
         return upsert_docs, doc_db_ids_requiring_deletion
 
-    def clear_and_get_existing_doc_db_chunks(
-        self, ingest_doc: IngestDoc, session: Session
-    ) -> list[str]:
+    def clear_and_get_existing_doc_db_chunks(self, ingest_doc: IngestDoc) -> list[str]:
         doc_db_ids = []
         if not ingest_doc.existing_document_model:
             return []
         for chunk in ingest_doc.existing_document_model.context_chunks:
             doc_db_ids.append(chunk.id)
-            session.flush()
-            session.delete(chunk)
-            session.flush()
+            self.session.flush()
+            self.session.delete(chunk)
+            self.session.flush()
         return doc_db_ids
 
     def create_document_and_chunk_models(
@@ -165,7 +162,6 @@ class IngestProcessingService(IngestProcessingBase):
         text_chunks: list[str],
         ingest_doc: IngestDoc,
         source: doc_index_models.SourceModel,
-        session: Session,
     ) -> IngestDoc:
         if not ingest_doc.existing_document_model:
             ingest_doc.existing_document_model = doc_index_models.DocumentModel(
@@ -178,9 +174,9 @@ class IngestProcessingService(IngestProcessingBase):
                 source_type=ingest_doc.source_type,
                 date_published=ingest_doc.date_published,
             )
-            session.flush()
+            self.session.flush()
             source.documents.append(ingest_doc.existing_document_model)
-            session.flush()
+            self.session.flush()
         for chunk in text_chunks:
             ingest_doc.existing_document_model.context_chunks.append(
                 doc_index_models.ChunkModel(
@@ -188,7 +184,7 @@ class IngestProcessingService(IngestProcessingBase):
                 )
             )
             self.successfully_chunked_counter += 1
-            session.flush()
+            self.session.flush()
         doc_token_count = [tiktoken_len(chunk) for chunk in text_chunks]
         self.docs_token_counts.extend(doc_token_count)
         self.log.info(

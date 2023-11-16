@@ -2,7 +2,7 @@ from typing import Any, Optional, Type, Union
 
 import context_index.doc_index as doc_index_models
 import services.document_loading as document_loading
-from context_index.doc_index.context_docs import IngestDoc
+from context_index.doc_index.docs.context_docs import IngestDoc
 from langchain.schema import Document
 from services.document_loading.document_loading_base import DocLoadingBase
 from services.gradio_interface.gradio_base import GradioBase
