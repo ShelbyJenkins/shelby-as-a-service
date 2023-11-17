@@ -4,8 +4,9 @@ from typing import Any, Literal, Optional
 
 import gradio as gr
 import pinecone
-from pinecone import FetchResponse
-from pydantic import BaseModel
+from context_index.doc_index.docs.context_docs import RetrievalDoc
+from pinecone import FetchResponse, QueryResponse
+from pydantic import BaseModel, ValidationError
 from services.database.database_base import DatabaseBase
 
 
@@ -149,10 +150,10 @@ class PineconeDatabase(DatabaseBase):
 
     def query_by_terms_with_provider(
         self,
-        search_terms,
+        search_terms: list[float],
         domain_name: str,
         retrieve_n_docs: Optional[int] = None,
-    ) -> list[dict]:
+    ) -> list[RetrievalDoc]:
         pinecone_index = self.init_provider()
         filter = None  # Need to implement
         if retrieve_n_docs is None:
@@ -160,7 +161,7 @@ class PineconeDatabase(DatabaseBase):
         else:
             top_k = retrieve_n_docs
 
-        response = pinecone_index.query(
+        response: QueryResponse = pinecone_index.query(
             top_k=top_k,
             include_values=False,
             namespace=domain_name,
@@ -170,17 +171,26 @@ class PineconeDatabase(DatabaseBase):
         )
 
         returned_documents = []
-
-        for m in response.matches:
-            response = {
-                "content": m.metadata["content"],
-                "title": m.metadata["title"],
-                "url": m.metadata["url"],
-                "doc_type": m.metadata["doc_type"],
-                "score": m.score,
-                "id": m.id,
-            }
-            returned_documents.append(response)
+        matches: list[dict] = response.get("matches", {})
+        for m in matches:
+            metadata: dict[str, Any] = m.get("metadata", {})
+            try:
+                returned_documents.append(
+                    RetrievalDoc(
+                        domain_name=metadata.get("domain_name"),
+                        source_name=metadata.get("source_name"),
+                        context_chunk=metadata["context_chunk"],
+                        document_id=metadata.get("document_id"),
+                        title=metadata.get("title"),
+                        uri=metadata.get("url"),
+                        source_type=metadata.get("source_type"),
+                        score=m.get("score", 0),
+                        chunk_doc_db_id=m.get("id"),
+                        date_of_creation=metadata.get("date_of_creation"),
+                    )
+                )
+            except ValidationError as e:
+                self.log.error(f"Failed to validate metadata: {metadata} due to error: {e}")
 
         return returned_documents
         #     soft_filter = {

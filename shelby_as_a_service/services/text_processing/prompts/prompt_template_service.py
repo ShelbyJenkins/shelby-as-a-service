@@ -3,6 +3,7 @@ from typing import Literal, Optional
 
 import services.text_processing.text_utils as text_utils
 import yaml
+from context_index.doc_index.docs.context_docs import RetrievalDoc
 
 
 def create_logit_bias(
@@ -36,9 +37,15 @@ def create_logit_bias(
     return logit_bias, max_tokens
 
 
-def create_openai_prompt(query, prompt_template_path, context_docs=None) -> list[dict[str, str]]:
+def create_openai_prompt(
+    query, prompt_template_path, context_docs: Optional[list[RetrievalDoc]] = None
+) -> list[dict[str, str]]:
+    document_string = None
+    if context_docs:
+        document_string = create_document_string(context_docs)
+
     prompt_template = load_prompt_template(prompt_template_path)
-    document_string = create_document_string(context_docs)
+
     if query:
         user_content = "Query: " + query
     else:
@@ -66,24 +73,16 @@ def tiktoken_len_of_openai_prompt(prompt, llm_model_instance) -> int:
     return num_tokens
 
 
-def create_document_string(documents=None):
-    if documents is None:
-        return None
-
-    if isinstance(documents, str):
-        return text_utils.clean_text_content(documents)
-
+def create_document_string(context_docs: list[RetrievalDoc]):
     content_strs = []
 
-    for i, doc in enumerate(documents):
-        if document_number := getattr(doc, "doc_num", None):
-            doc_num = document_number
-        elif document_number := doc.get("doc_num", None):
-            doc_num = document_number
+    for i, doc in enumerate(context_docs):
+        if doc.retrieval_rank:
+            doc_num = doc.retrieval_rank
         else:
             doc_num = i
-        document_content = text_utils.extract_document_content(doc)
-        document_content = text_utils.clean_text_content(document_content)
+
+        document_content = text_utils.clean_text_content(doc.context_chunk)
 
         content_strs.append(f"{document_content} doc_num: [{doc_num}]")
 

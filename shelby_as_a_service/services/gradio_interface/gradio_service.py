@@ -148,5 +148,5 @@ class GradioService(GradioBase):
 
         output.append(gr.Column(scale=settings_ui_scale))
         output.append(gr.Column(scale=primary_ui_scale))
-        self.update_settings_file = True
+        GradioBase.update_settings_file = True
         return output

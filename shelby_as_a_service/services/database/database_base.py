@@ -1,7 +1,21 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
+from pydantic import BaseModel
 from services.service_base import ServiceBase
+
+
+class ClassConfigModel(BaseModel):
+    index_env: str
+    index_name: str
+    vectorstore_dimension: int
+    upsert_batch_size: int
+    vectorstore_metric: str
+    vectorstore_pod_type: str
+    enabled_doc_embedder_name: str
+    enabled_doc_embedder_config: dict[str, Any]
+    retrieve_n_docs: int
+    indexed_metadata: list[str]
 
 
 class DatabaseBase(ABC, ServiceBase):
@@ -9,13 +23,18 @@ class DatabaseBase(ABC, ServiceBase):
     domain_name: str
     DOC_INDEX_KEY: str = "enabled_doc_db"
 
+    config: ClassConfigModel
+
     def get_index_domain_or_source_entry_count_with_provider(
         self, source_name: Optional[str] = None, domain_name: Optional[str] = None
     ) -> int:
         raise NotImplementedError
 
     def query_by_terms_with_provider(
-        self, search_terms: list[str] | str, domain_name: str, retrieve_n_docs: Optional[int] = None
+        self,
+        search_terms: list[float] | str,
+        domain_name: str,
+        retrieve_n_docs: Optional[int] = None,
     ) -> list[dict]:
         raise NotImplementedError
 

@@ -2,6 +2,8 @@ from typing import Any, Optional, Type
 
 import context_index.doc_index as doc_index_models
 import gradio as gr
+from context_index.doc_index.doc_index_base import DocIndexBase
+from context_index.doc_index.docs.context_docs import RetrievalDoc
 from pydantic import BaseModel
 from services.database.database_service import DatabaseService
 from services.gradio_interface.gradio_base import GradioBase
@@ -16,8 +18,9 @@ class DocRetrieval(ServiceBase):
     REQUIRED_CLASSES: list[Type] = [DatabaseService]
 
     class ClassConfigModel(BaseModel):
-        doc_max_tokens: float = 1400
-        docs_max_count: float = 4
+        doc_max_tokens: int = 1400
+        docs_max_count: int = 4
+        max_total_tokens: int = 1000
         topic_constraint_enabled: bool = False
         keyword_generator_enabled: bool = False
         doc_relevancy_check_enabled: bool = False
@@ -34,14 +37,14 @@ class DocRetrieval(ServiceBase):
         self,
         query: str,
         retrieve_n_docs: Optional[int] = None,
-        doc_max_tokens: Optional[float] = None,
-        max_total_tokens: Optional[float] = None,
-        docs_max_count: Optional[float] = None,
-        enabled_domains: Optional[list[str]] = None,
+        doc_max_tokens: Optional[int] = None,
+        max_total_tokens: Optional[int] = None,
+        docs_max_count: Optional[int] = None,
+        enabled_domains: Optional[list[str] | str] = None,
         topic_constraint_enabled: Optional[bool] = None,
         keyword_generator_enabled: Optional[bool] = None,
         doc_relevancy_check_enabled: Optional[bool] = None,
-    ) -> list[dict]:
+    ) -> list[RetrievalDoc]:
         """
         Retrieves documents based on a query.
 
@@ -61,8 +64,26 @@ class DocRetrieval(ServiceBase):
         if enabled_domains is None:
             enabled_domains = ["all"]
         if enabled_domains == ["all"]:
-            print("get all data domains here")
-            # enabled_domains
+            enabled_domains = [domain.name for domain in doc_index_models.DocIndexModel.domains]
+        if not isinstance(enabled_domains, list):
+            enabled_domains = [enabled_domains]
+        domain_models = (
+            DocIndexBase.session.query(doc_index_models.DomainModel)
+            .filter(doc_index_models.DomainModel.name.in_(enabled_domains))
+            .all()
+        )
+
+        docs_max_count = (
+            docs_max_count if docs_max_count is not None else self.config.docs_max_count
+        )
+        doc_max_tokens = (
+            doc_max_tokens if doc_max_tokens is not None else self.config.doc_max_tokens
+        )
+        max_total_tokens = (
+            max_total_tokens if max_total_tokens is not None else self.config.max_total_tokens
+        )
+        if not retrieve_n_docs:
+            retrieve_n_docs = docs_max_count + 4
 
         if (
             self.config.topic_constraint_enabled
@@ -83,33 +104,30 @@ class DocRetrieval(ServiceBase):
             #     )
             pass
 
-        docs_max_count = (
-            docs_max_count if docs_max_count is not None else self.config.docs_max_count
-        )
-        retrieve_n_docs = retrieve_n_docs if retrieve_n_docs is not None else 4
+        returned_documents_list: list[RetrievalDoc] = []
+        for domain in domain_models:
+            domain_doc_db_providers: set[doc_index_models.DocDBModel] = set()
+            for source in domain.sources:
+                domain_doc_db_providers.add(source.enabled_doc_db)
 
-        returned_documents_list = []
-        for domain_name in enabled_domains:
-            # get database provider from domain here
-            # we will have to set sources to use the same doc dbs as their domain
-            # or search each sources doc_db for the query
-            returned_documents = DatabaseService().query_by_terms(
-                search_terms=query,
-                retrieve_n_docs=retrieve_n_docs,
-                domain_name=domain_name,
-            )
+            for domain_doc_db_provider in domain_doc_db_providers:
+                returned_documents = DatabaseService().query_by_terms(
+                    search_terms=query,
+                    retrieve_n_docs=retrieve_n_docs,
+                    domain_name=domain.name,
+                    doc_db_provider_name=domain_doc_db_provider.name,  # type: ignore
+                    doc_db_embedding_provider_name=domain_doc_db_provider.enabled_doc_embedder.name,  # type: ignore
+                    enabled_doc_embedder_config=domain_doc_db_provider.enabled_doc_embedder.config,
+                )
 
-            returned_documents_list.extend(returned_documents)
+                returned_documents_list.extend(returned_documents)
+            domain_doc_db_providers.clear()
 
-        returned_documents_list = process_retrieved_docs(
+        processed_documents_list = process_retrieved_docs(
             retrieved_documents=returned_documents_list,
-            doc_max_tokens=doc_max_tokens
-            if doc_max_tokens is not None
-            else self.config.doc_max_tokens,
-            max_total_tokens=max_total_tokens if max_total_tokens is not None else 0,
-            docs_max_count=docs_max_count
-            if docs_max_count is not None
-            else self.config.docs_max_count,
+            doc_max_tokens=doc_max_tokens,
+            max_total_tokens=max_total_tokens,
+            docs_max_count=docs_max_count,
         )
 
         if (
@@ -120,14 +138,14 @@ class DocRetrieval(ServiceBase):
             # parsed_documents = ActionAgent.doc_relevancy_check(query, parsed_documents)
             pass
 
-        if returned_documents_list is None:
-            returned_documents_list = []
+        if processed_documents_list is None:
+            processed_documents_list = []
 
-        if returned_documents_list is None or len(returned_documents_list) < 1:
+        if processed_documents_list is None or len(processed_documents_list) < 1:
             raise ValueError(
                 "No supporting documents found. Currently we don't support queries without supporting context."
             )
-        return returned_documents_list
+        return processed_documents_list
 
     def create_settings_ui(self):
         components = {}

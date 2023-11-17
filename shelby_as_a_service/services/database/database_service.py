@@ -2,7 +2,7 @@ from typing import Any, Optional, Type
 
 import context_index.doc_index as doc_index_models
 import services.database as database
-from context_index.doc_index.docs.context_docs import IngestDoc
+from context_index.doc_index.docs.context_docs import IngestDoc, RetrievalDoc
 from services.database.database_base import DatabaseBase
 from services.embedding.embedding_service import EmbeddingService
 from services.gradio_interface.gradio_base import GradioBase
@@ -57,16 +57,38 @@ class DatabaseService(DatabaseBase):
         retrieve_n_docs: Optional[int] = None,
         doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
-    ) -> list[dict]:
-        doc_db = self.get_doc_db_instance(
+        doc_db_embedding_provider_name: Optional[str] = None,
+        enabled_doc_embedder_config: Optional[dict[str, Any]] = None,
+    ) -> list[RetrievalDoc]:
+        doc_index_db_instance = self.get_doc_db_instance(
             doc_db_provider_name=doc_db_provider_name,
             doc_index_db_instance=doc_index_db_instance,
         )
         if isinstance(search_terms, str):
             search_terms = [search_terms]
+
+        if doc_index_db_instance.DOC_DB_REQUIRES_EMBEDDINGS:
+            if not doc_db_embedding_provider_name:
+                doc_db_embedding_provider_name = (
+                    doc_index_db_instance.config.enabled_doc_embedder_name
+                )
+            if not enabled_doc_embedder_config:
+                enabled_doc_embedder_config = (
+                    doc_index_db_instance.config.enabled_doc_embedder_config
+                )
+
+            terms = EmbeddingService(
+                embedding_provider_name=doc_db_embedding_provider_name,
+                enabled_doc_embedder_config=enabled_doc_embedder_config,
+            ).get_embeddings_from_list_of_texts(
+                texts=search_terms,
+            )
+        else:
+            terms = search_terms
+
         retrieved_docs = []
-        for term in search_terms:
-            docs = doc_db.query_by_terms_with_provider(
+        for term in terms:
+            docs = doc_index_db_instance.query_by_terms_with_provider(
                 search_terms=term, retrieve_n_docs=retrieve_n_docs, domain_name=domain_name
             )
             if docs:
@@ -82,14 +104,14 @@ class DatabaseService(DatabaseBase):
         doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ) -> dict[str, Any] | None:
-        doc_db = self.get_doc_db_instance(
+        doc_index_db_instance = self.get_doc_db_instance(
             doc_db_provider_name=doc_db_provider_name,
             doc_index_db_instance=doc_index_db_instance,
         )
         if isinstance(ids, str):
             ids = [ids]
 
-        docs = doc_db.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
+        docs = doc_index_db_instance.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
         if not docs:
             self.log.info(f"No documents found.")
         return docs
@@ -101,21 +123,27 @@ class DatabaseService(DatabaseBase):
         doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ):
-        doc_db = self.get_doc_db_instance(
+        doc_index_db_instance = self.get_doc_db_instance(
             doc_db_provider_name=doc_db_provider_name,
             doc_index_db_instance=doc_index_db_instance,
         )
-        current_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
-            domain_name=domain_name
+        current_entry_count = (
+            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+                domain_name=domain_name
+            )
         )
-        self.log.info(f"Upserting {len(entries_to_upsert)} entries to {doc_db.CLASS_NAME}")
+        self.log.info(
+            f"Upserting {len(entries_to_upsert)} entries to {doc_index_db_instance.CLASS_NAME}"
+        )
 
-        response = doc_db.upsert_with_provider(
+        response = doc_index_db_instance.upsert_with_provider(
             entries_to_upsert=entries_to_upsert, domain_name=domain_name
         )
 
-        post_upsert_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
-            domain_name=domain_name
+        post_upsert_entry_count = (
+            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+                domain_name=domain_name
+            )
         )
         if post_upsert_entry_count - current_entry_count != len(entries_to_upsert):
             raise ValueError(
@@ -132,22 +160,26 @@ class DatabaseService(DatabaseBase):
         doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
         doc_index_db_instance: Optional[DatabaseBase] = None,
     ) -> bool:
-        doc_db = self.get_doc_db_instance(
+        doc_index_db_instance = self.get_doc_db_instance(
             doc_db_provider_name=doc_db_provider_name,
             doc_index_db_instance=doc_index_db_instance,
         )
-        existing_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
-            domain_name=domain_name
+        existing_entry_count = (
+            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+                domain_name=domain_name
+            )
         )
         if not isinstance(doc_db_ids_requiring_deletion, list):
             doc_db_ids_requiring_deletion = [doc_db_ids_requiring_deletion]
 
-        response = doc_db.clear_existing_entries_by_id_with_provider(
+        response = doc_index_db_instance.clear_existing_entries_by_id_with_provider(
             doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
             domain_name=domain_name,
         )
-        post_delete_entry_count = doc_db.get_index_domain_or_source_entry_count_with_provider(
-            domain_name=domain_name
+        post_delete_entry_count = (
+            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+                domain_name=domain_name
+            )
         )
         if existing_entry_count - post_delete_entry_count != len(doc_db_ids_requiring_deletion):
             raise ValueError(

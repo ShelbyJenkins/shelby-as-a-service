@@ -5,6 +5,7 @@ from typing import Any, Optional, Type
 import gradio as gr
 import services.text_processing.prompts.prompt_template_service as prompts
 from pydantic import BaseModel
+from services.gradio_interface.gradio_base import GradioBase
 from services.service_base import ServiceBase
 
 
@@ -93,7 +94,7 @@ class LLMBase(ABC, ServiceBase):
         for model_name, _ in self.config.available_models.items():
             if model_name == requested_model:
                 self.config.current_llm_model_name = model_name
-                self.update_settings_file = True
+                GradioBase.update_settings_file = True
                 output.append(gr.Group(visible=True))
             else:
                 output.append(gr.Group(visible=False))

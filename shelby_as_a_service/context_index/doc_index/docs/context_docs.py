@@ -13,26 +13,24 @@ from pydantic import BaseModel
 
 
 class RetrievalDoc(BaseModel):
-    source_name: Optional[str] = None
     domain_name: Optional[str] = None
-    document_id: int
-    source_id: int
-    domain_id: int
-    chunk_id: int
-    chunk_doc_db_id: int
-    title: str
+    source_name: Optional[str] = None
+    chunk_doc_db_id: Optional[str] = None
+    document_id: Optional[int] = None
+    title: Optional[str] = None
     context_chunk: str
-    content_token_count: int
-    uri: str
-    source_type: str
-    date_of_last_update: datetime
-    date_of_creation: datetime
-    date_published: datetime
+    content_token_count: int = 0
+    uri: Optional[str] = None
+    source_type: Optional[str] = None
+    date_of_creation: Optional[datetime] = None
+    # date_published: datetime
+    score: float = 0
+    retrieval_rank: Optional[int] = None
 
 
 class IngestDoc(BaseModel):
-    source_name: Optional[str] = None
     domain_name: Optional[str] = None
+    source_name: Optional[str] = None
     existing_document_id: Optional[int] = None
     existing_document_model: Optional[DocumentModel] = None
     source_id: Optional[int] = None

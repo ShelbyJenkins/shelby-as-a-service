@@ -49,7 +49,6 @@ class AppBase:
 
     total_cost: Decimal = Decimal("0")
     last_request_cost: Decimal = Decimal("0")
-    update_settings_file: bool = False
 
     @classmethod
     def setup_app(cls, app_name):

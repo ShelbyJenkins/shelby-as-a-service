@@ -1,14 +1,15 @@
 from typing import Any
 
 import services.text_processing.text_utils as text_utils
+from context_index.doc_index.docs.context_docs import RetrievalDoc
 
 
 def process_retrieved_docs(
-    retrieved_documents: list[dict],
+    retrieved_documents: list[RetrievalDoc],
     doc_max_tokens: float = 0,
     max_total_tokens: float = 0,
     docs_max_count: float = 0,
-) -> list[Any]:
+) -> list[RetrievalDoc]:
     """
     Parses a list of retrieved documents, filtering them based on their token count and/or total token count,
     and optionally limiting the number of documents to retrieve.
@@ -29,65 +30,69 @@ def process_retrieved_docs(
     if len(retrieved_documents) < 1:
         return []
 
-    # Sort the list by score
-    sorted_documents = sorted(retrieved_documents, key=lambda x: x["score"], reverse=True)
-
     docs_total_tokens = 0
-    for document in sorted_documents:
-        token_count = text_utils.tiktoken_len(document["content"])
-        document["token_count"] = token_count
+    for doc in retrieved_documents:
+        token_count = text_utils.tiktoken_len(doc.context_chunk)
+        doc.content_token_count = token_count
         docs_total_tokens += token_count
 
-    sorted_documents = [doc for doc in sorted_documents if doc["token_count"] <= doc_max_tokens]
-
     if len(retrieved_documents) == 1:
-        retrieved_documents[0]["doc_num"] = 1
+        retrieved_documents[0].retrieval_rank = 1
         return retrieved_documents
+
+    if all(doc.score == 0 for doc in retrieved_documents):
+        sorted_docs = retrieved_documents
+    else:
+        sorted_docs: list[RetrievalDoc] = sorted(
+            retrieved_documents, key=lambda x: x.score, reverse=True
+        )
+
+    preproc_docs = [doc for doc in sorted_docs if doc.content_token_count <= doc_max_tokens]
 
     if max_total_tokens > 0:
         iterations = 0
-        original_documents_count = len(sorted_documents)
+        original_docs_count = len(preproc_docs)
         while docs_total_tokens > max_total_tokens:
-            if iterations >= original_documents_count:
+            if iterations >= original_docs_count:
                 break
 
             # Find the index of the document with the highest token_count that exceeds max_total_tokens
             max_token_count_idx = max(
                 (
                     idx
-                    for idx, document in enumerate(sorted_documents)
-                    if document["token_count"] > max_total_tokens
+                    for idx, doc in enumerate(preproc_docs)
+                    if doc.content_token_count > max_total_tokens
                 ),
-                key=lambda idx: sorted_documents[idx]["token_count"],
+                key=lambda idx: preproc_docs[idx].content_token_count,
                 default=None,
             )
-            # If a document was found that meets the conditions, remove it from the list
+            # If a doc was found that meets the conditions, remove it from the list
             if max_token_count_idx is not None:
-                sorted_documents.pop(max_token_count_idx)
+                preproc_docs.pop(max_token_count_idx)
             else:
-                # Find the index of the document with the highest token_count
+                # Find the index of the doc with the highest token_count
                 max_token_count_idx = max(
-                    range(len(sorted_documents)),
-                    key=lambda idx: sorted_documents[idx]["token_count"],
+                    range(len(preproc_docs)),
+                    key=lambda idx: preproc_docs[idx].content_token_count,
                 )
-                # Remove the document with the highest token_count from the list
-                sorted_documents.pop(max_token_count_idx)
+                # Remove the doc with the highest token_count from the list
+                preproc_docs.pop(max_token_count_idx)
 
-            docs_total_tokens = sum(document["token_count"] for document in sorted_documents)
+            docs_total_tokens = sum(doc.content_token_count for doc in preproc_docs)
             iterations += 1
 
     if docs_max_count > 1:
         # Same as above but removes based on total count of docs instead of token count.
-        while len(sorted_documents) > docs_max_count:
+        while len(preproc_docs) > docs_max_count:
             max_token_count_idx = max(
-                enumerate(sorted_documents), key=lambda x: x[1]["token_count"]
+                enumerate(preproc_docs), key=lambda x: x[1].content_token_count
             )[0]
-            sorted_documents.pop(max_token_count_idx)
+            preproc_docs.pop(max_token_count_idx)
 
-        for i, document in enumerate(sorted_documents, start=1):
-            document["doc_num"] = i
+        for i, doc in enumerate(preproc_docs, start=1):
+            doc.retrieval_rank = i
 
-    return sorted_documents
+    return preproc_docs
 
 
 # def old_process_retrieved_docs(retrieved_documents=None):

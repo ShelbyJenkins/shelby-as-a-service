@@ -5,6 +5,7 @@ from typing import Annotated, Any, Generator, Literal, Optional, Type, Union, ge
 import gradio as gr
 import services.llm as llm
 from agents.agent_base import AgentBase
+from context_index.doc_index.docs.context_docs import RetrievalDoc
 from context_index.doc_index.docs.doc_retrieval import DocRetrieval
 from pydantic import BaseModel, Field
 from services.gradio_interface.gradio_base import GradioBase
@@ -67,7 +68,7 @@ class CEQAgent(AgentBase):
         llm_model_name: Optional[str] = None,
         model_token_utilization: Optional[float] = None,
         context_to_response_ratio: Optional[float] = None,
-        enabled_domains: Optional[list[str]] = None,
+        enabled_domains: Optional[list[str] | str] = None,
         stream: Optional[bool] = None,
         sprite_name: Optional[str] = "webui_sprite",
     ) -> Union[Generator[str, None, None], dict[str, str]]:
@@ -98,18 +99,14 @@ class CEQAgent(AgentBase):
 
         prompt = self.create_prompt(
             query=chat_in,
-            llm_provider_name=llm_provider_name,
+            llm_provider_name=llm_provider_name,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
         )
 
         available_request_tokens, _ = self.llm_service.get_available_request_tokens(
             prompt=prompt,
-            model_token_utilization=model_token_utilization
-            if model_token_utilization is not None
-            else self.config.model_token_utilization,
-            context_to_response_ratio=context_to_response_ratio
-            if context_to_response_ratio is not None
-            else self.config.context_to_response_ratio,
+            model_token_utilization=model_token_utilization,
+            context_to_response_ratio=context_to_response_ratio,
             llm_provider_name=llm_provider_name,
             llm_model_name=llm_model_name,
         )
@@ -122,7 +119,7 @@ class CEQAgent(AgentBase):
 
         prompt = self.create_prompt(
             query=chat_in,
-            llm_provider_name=llm_provider_name,
+            llm_provider_name=llm_provider_name,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
             context_docs=context_docs,
         )
@@ -132,11 +129,9 @@ class CEQAgent(AgentBase):
 
         for current_response in self.llm_service.create_chat(
             prompt=prompt,
-            llm_provider_name=llm_provider_name,
+            llm_provider_name=llm_provider_name,  # type: ignore
             llm_model_name=llm_model_name,
-            model_token_utilization=model_token_utilization
-            if model_token_utilization is not None
-            else self.config.model_token_utilization,
+            model_token_utilization=model_token_utilization,
             stream=stream,
         ):
             if previous_response is not None:
@@ -157,7 +152,7 @@ class CEQAgent(AgentBase):
             return full_response
 
     def _ceq_append_meta(
-        self, response_content_string: str, documents: list[dict], llm_model_name
+        self, response_content_string: str, context_docs: list[RetrievalDoc], llm_model_name
     ) -> dict[str, str]:
         # Covering LLM doc notations cases
         # The modified pattern now includes optional opening parentheses or brackets before "Document"
@@ -187,18 +182,18 @@ class CEQAgent(AgentBase):
         }
 
         if matches:
-            # Creates a lit of each unique mention of [n] in LLM response
+            # Creates a list of each unique mention of [n] in LLM response
             unique_doc_nums = set([int(match[1:-1]) for match in matches])
             for doc_num in unique_doc_nums:
                 # doc_num given to llm has an index starting a 1
                 # Subtract 1 to get the correct index in the list
                 doc_index = doc_num - 1
                 # Access the document from the list using the index
-                if 0 <= doc_index < len(documents):
+                if 0 <= doc_index < len(context_docs):
                     document = {
-                        "doc_num": documents[doc_index]["doc_num"],
-                        "url": documents[doc_index]["url"].replace(" ", "-"),
-                        "title": documents[doc_index]["title"],
+                        "doc_num": context_docs[doc_index].retrieval_rank,
+                        "url": context_docs[doc_index].uri.replace(" ", "-"),
+                        "title": context_docs[doc_index].title,
                     }
                     answer_obj["documents"].append(document)
                 else:
@@ -231,7 +226,7 @@ class CEQAgent(AgentBase):
 
         with gr.Tab(label=self.doc_retrieval.CLASS_UI_NAME):
             components["enabled_domains"] = gr.Dropdown(
-                choices=["all"].extend(self.doc_index.domain_names),
+                choices=["all"] + self.doc_index.domain_names,
                 value="all",
                 label="Topics to Search",
                 multiselect=True,

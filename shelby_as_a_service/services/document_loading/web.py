@@ -73,7 +73,8 @@ class GenericRecursiveWebScraper(DocLoadingBase):
         return ""
 
     def load_docs_with_provider(self, uri) -> list[Document]:
-        return RecursiveUrlLoader(url=uri, extractor=self.custom_extractor).load()
+        # return RecursiveUrlLoader(url=uri, extractor=self.custom_extractor).load()
+        return RecursiveUrlLoader(url=uri).load()
 
     @classmethod
     def create_provider_ui_components(cls, config_model: ClassConfigModel, visibility: bool = True):

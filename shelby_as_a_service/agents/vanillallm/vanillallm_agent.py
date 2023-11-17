@@ -47,13 +47,13 @@ class VanillaLLM(AgentBase):
 
         prompt = self.create_prompt(
             query=chat_in,
-            llm_provider_name=llm_provider_name,
+            llm_provider_name=llm_provider_name,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
         )
 
         for response in self.llm_service.create_chat(
             prompt=prompt,
-            llm_provider_name=llm_provider_name,
+            llm_provider_name=llm_provider_name,  # type: ignore
             llm_model_name=llm_model_name,
             model_token_utilization=model_token_utilization
             if model_token_utilization is not None

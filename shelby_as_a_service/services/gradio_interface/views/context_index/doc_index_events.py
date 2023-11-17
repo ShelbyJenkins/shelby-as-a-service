@@ -58,7 +58,7 @@ def domains_event_handlers(
     ).success(
         fn=lambda *x: save_domain_or_source_config_settings(
             domain_or_source_config_values=x,
-            parent_domain=GradioBase.doc_index.domain,
+            parent_domain=doc_index_models.DomainModel,
         ),
         inputs=set(domain_tab_dict["domain_or_source_config"].values()),
     ).success(
@@ -131,7 +131,7 @@ def sources_event_handlers(
     ).success(
         fn=lambda *x: save_domain_or_source_config_settings(
             domain_or_source_config_values=x,
-            parent_source=GradioBase.doc_index.source,
+            parent_source=doc_index_models.SourceModel,
         ),
         inputs=set(source_tab_dict["domain_or_source_config"].values()),
     ).success(
@@ -194,10 +194,14 @@ def domain_or_source_event_handlers(
 
     if domain_or_source is doc_index_models.DomainModel:
         domain = GradioBase.doc_index.domain
+        domain_type = doc_index_models.DomainModel
         source = None
+        source_type = None
     elif domain_or_source is doc_index_models.SourceModel:
         domain = GradioBase.doc_index.domain
+        domain_type = None
         source = GradioBase.doc_index.source
+        source_type = doc_index_models.SourceModel
     else:
         raise ValueError(
             f"domain_or_source must be doc_index_models.DomainModel or doc_index_models.SourceModel"
@@ -232,8 +236,8 @@ def domain_or_source_event_handlers(
     ).success(
         fn=lambda *x: save_domain_or_source_config_settings(
             domain_or_source_config_values=x,
-            parent_domain=domain,
-            parent_source=source,
+            parent_domain=domain_type,
+            parent_source=source_type,
         ),
         inputs=set(tab_dict["domain_or_source_config"].values()),
     )
@@ -241,15 +245,15 @@ def domain_or_source_event_handlers(
 
 def save_domain_or_source_config_settings(
     domain_or_source_config_values,
-    parent_domain: Optional[doc_index_models.DomainModel] = None,
-    parent_source: Optional[doc_index_models.SourceModel] = None,
+    parent_domain: Optional[Type[doc_index_models.DomainModel]] = None,
+    parent_source: Optional[Type[doc_index_models.SourceModel]] = None,
 ):
     if not parent_domain and not parent_source:
         raise ValueError("parent_domain and parent_source cannot both be not None")
-    elif isinstance(parent_source, doc_index_models.SourceModel):
-        parent_instance = parent_source
-    elif isinstance(parent_domain, doc_index_models.DomainModel):
-        parent_instance = parent_domain
+    elif parent_source:
+        parent_instance = GradioBase.doc_index.source
+    elif parent_domain:
+        parent_instance = GradioBase.doc_index.domain
     else:
         raise ValueError("parent_domain and parent_source must be SourceModel or DomainModel")
 

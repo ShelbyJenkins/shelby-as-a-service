@@ -1,17 +1,12 @@
-import logging
-from typing import Any, Optional, Type
+from typing import Any, Optional
 
 import context_index.doc_index as doc_index_models
-from context_index.doc_index.doc_index_templates import DocIndexTemplates
 from context_index.index_base import IndexBase
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
-from services.embedding.embedding_service import EmbeddingService
 from services.text_processing.ingest_processing.ingest_processing_service import (
     IngestProcessingService,
 )
-from services.text_processing.text_utils import check_and_handle_name_collision
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 

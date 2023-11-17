@@ -20,39 +20,22 @@ class EmbeddingService(EmbeddingBase):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
         self.list_of_embedding_provider_instances = self.list_of_required_class_instances
         embedding_provider_name = kwargs.get("embedding_provider_name", None)
-        embedding_model_name = kwargs.get("embedding_model_name", None)
         if embedding_provider_name:
             self.current_embedding_provider = self.get_requested_class_instance(
                 requested_class=embedding_provider_name,
                 available_classes=self.list_of_embedding_provider_instances,
             )
+        embedding_model_name = kwargs.get("embedding_model_name", None)
+        embedding_config: dict = kwargs.get("enabled_doc_embedder_config", None)
+        if not embedding_model_name:
+            if embedding_config:
+                embedding_model_name = embedding_config.get("current_embedding_model_name", None)
+
         if embedding_model_name:
             self.current_embedding_model = self.get_model_instance(
                 requested_model_name=embedding_model_name,
                 provider=self.current_embedding_provider,
             )
-
-    def get_embedding_instance(
-        self,
-        embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        embedding_instance: Optional[EmbeddingBase] = None,
-    ) -> EmbeddingBase:
-        if embedding_provider_name and embedding_instance:
-            raise ValueError(
-                "Must provide either embedding_provider_name or embedding_instance, not both."
-            )
-        if embedding_provider_name:
-            embedding = self.get_requested_class_instance(
-                requested_class=embedding_provider_name,
-                available_classes=self.list_of_embedding_provider_instances,
-            )
-        elif embedding_instance:
-            embedding = embedding_instance
-        else:
-            embedding = self.current_embedding_provider
-        if embedding is None:
-            raise ValueError("embedding must not be None")
-        return embedding
 
     def get_embedding_of_text(
         self,
@@ -110,6 +93,28 @@ class EmbeddingService(EmbeddingBase):
             raise ValueError("No embeddings returned")
         self.log.info(f"Got {len(text_embeddings)} embeddings")
         return text_embeddings
+
+    def get_embedding_instance(
+        self,
+        embedding_provider_name: Optional[embedding.AVAILABLE_PROVIDERS_TYPINGS] = None,
+        embedding_instance: Optional[EmbeddingBase] = None,
+    ) -> EmbeddingBase:
+        if embedding_provider_name and embedding_instance:
+            raise ValueError(
+                "Must provide either embedding_provider_name or embedding_instance, not both."
+            )
+        if embedding_provider_name:
+            embedding = self.get_requested_class_instance(
+                requested_class=embedding_provider_name,
+                available_classes=self.list_of_embedding_provider_instances,
+            )
+        elif embedding_instance:
+            embedding = embedding_instance
+        else:
+            embedding = self.current_embedding_provider
+        if embedding is None:
+            raise ValueError("embedding must not be None")
+        return embedding
 
     def get_document_embeddings_for_chunks_to_upsert(
         self,

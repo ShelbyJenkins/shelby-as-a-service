@@ -28,12 +28,13 @@ class GradioLogCaptureHandler(logging.Handler):
 
 class GradioBase(ServiceBase):
     log: logging.Logger
+    update_settings_file: bool = False
 
     async def check_for_updates(self):
         while True:
             await asyncio.sleep(5)  # non-blocking sleep
-            if ServiceBase.update_settings_file:
-                ServiceBase.update_settings_file = False
+            if GradioBase.update_settings_file:
+                GradioBase.update_settings_file = False
                 ConfigManager.update_config_file_from_loaded_models()
 
     @staticmethod
@@ -130,7 +131,7 @@ class GradioBase(ServiceBase):
                 if hasattr(config_model, key):
                     setattr(config_model, key, value)
 
-            ServiceBase.update_settings_file = True
+            GradioBase.update_settings_file = True
 
         components_to_monitor = []
         for _, component in components.items():

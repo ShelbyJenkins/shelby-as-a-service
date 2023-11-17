@@ -181,7 +181,7 @@ class MainChatView(GradioBase):
                         self.config.current_agent_ui_name = agent.CLASS_UI_NAME
                         self.current_agent_instance = agent
 
-                self.update_settings_file = True
+                GradioBase.update_settings_file = True
 
             def get_nav_evt(evt: gr.SelectData):
                 output = set_agent_view(evt.value)
