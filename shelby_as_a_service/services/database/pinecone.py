@@ -10,6 +10,27 @@ from pydantic import BaseModel, ValidationError
 from services.database.database_base import DatabaseBase
 
 
+class ClassConfigModel(BaseModel):
+    index_env: str = "us-central1-gcp"
+    index_name: str = "shelby-as-a-service"
+    vectorstore_dimension: int = 1536
+    upsert_batch_size: int = 20
+    vectorstore_metric: str = "cosine"
+    vectorstore_pod_type: str = "p1"
+    enabled_doc_embedder_name: str = "openai_embedding"
+    enabled_doc_embedder_config: dict[str, Any] = {}
+    retrieve_n_docs: int = 5
+    indexed_metadata: list = [
+        "domain_name",
+        "source_name",
+        "source_type",
+        "date_of_creation",
+    ]
+
+    class Config:
+        extra = "ignore"
+
+
 class PineconeDatabase(DatabaseBase):
     class_name = Literal["pinecone_database"]
     CLASS_NAME: str = typing.get_args(class_name)[0]
@@ -17,23 +38,7 @@ class PineconeDatabase(DatabaseBase):
     REQUIRED_SECRETS: list[str] = ["pinecone_api_key"]
     DOC_DB_REQUIRES_EMBEDDINGS: bool = True
 
-    class ClassConfigModel(BaseModel):
-        index_env: str = "us-central1-gcp"
-        index_name: str = "shelby-as-a-service"
-        vectorstore_dimension: int = 1536
-        upsert_batch_size: int = 20
-        vectorstore_metric: str = "cosine"
-        vectorstore_pod_type: str = "p1"
-        enabled_doc_embedder_name: str = "openai_embedding"
-        enabled_doc_embedder_config: dict[str, Any] = {}
-        retrieve_n_docs: int = 5
-        indexed_metadata: list = [
-            "domain_name",
-            "source_name",
-            "source_type",
-            "date_of_creation",
-        ]
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
     existing_entry_count: int
     domain_name: str
@@ -42,10 +47,29 @@ class PineconeDatabase(DatabaseBase):
 
     def __init__(
         self,
+        index_env: Optional[str] = None,
+        index_name: Optional[str] = None,
+        vectorstore_dimension: Optional[int] = None,
+        upsert_batch_size: Optional[int] = None,
+        vectorstore_metric: Optional[str] = None,
+        vectorstore_pod_type: Optional[str] = None,
+        retrieve_n_docs: Optional[int] = None,
+        context_index_config: dict[str, Any] = {},
         config_file_dict: dict[str, Any] = {},
         **kwargs,
     ):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+        super().__init__(
+            index_env=index_env,
+            index_name=index_name,
+            vectorstore_dimension=vectorstore_dimension,
+            upsert_batch_size=upsert_batch_size,
+            vectorstore_metric=vectorstore_metric,
+            vectorstore_pod_type=vectorstore_pod_type,
+            retrieve_n_docs=retrieve_n_docs,
+            context_index_config=context_index_config,
+            config_file_dict=config_file_dict,
+            **kwargs,
+        )
 
     def init_provider(self) -> pinecone.Index:
         if self.pinecone_index is not None:
@@ -215,7 +239,7 @@ class PineconeDatabase(DatabaseBase):
         # hard_query_response = pinecone_index.query(
         #     top_k=retrieve_n_docs,
         #     include_values=False,
-        #     namespace=AppBase.config.app_name,
+        #     namespace=AppBase.app_config.app_name,
         #     include_metadata=True,
         #     filter=hard_filter,
         #     vector=dense_embedding

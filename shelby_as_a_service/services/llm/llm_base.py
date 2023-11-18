@@ -9,19 +9,39 @@ from services.gradio_interface.gradio_base import GradioBase
 from services.service_base import ServiceBase
 
 
+class ClassConfigModel(BaseModel):
+    current_llm_model_name: str = "gpt-3.5-turbo"
+    available_models: dict[str, Any]
+
+    class Config:
+        extra = "ignore"
+
+
+class ModelConfig(BaseModel):
+    MODEL_NAME: str
+    TOKENS_MAX: int
+    COST_PER_K: float
+    TOKENS_PER_MESSAGE: int
+    TOKENS_PER_NAME: int
+    frequency_penalty: float
+    max_tokens: int
+    presence_penalty: float
+    temperature: float
+    top_p: float
+
+    class Config:
+        extra = "ignore"
+
+
 class LLMBase(ABC, ServiceBase):
-    ModelConfig: BaseModel
     MODEL_DEFINITIONS: dict[str, Any]
     list_of_llm_provider_instances: list["LLMBase"] = []
-    llm_model_instance: BaseModel
+    llm_provider: "LLMBase"
+
     MAX_RETRIES: int = 3
 
-    class ClassConfigModel(BaseModel):
-        current_llm_model_name: str = "gpt-3.5-turbo"
-
-        class Config:
-            extra = "ignore"
-
+    class_config_model = ClassConfigModel
+    llm_model_instance: ModelConfig
     config: ClassConfigModel
 
     @staticmethod
@@ -35,33 +55,19 @@ class LLMBase(ABC, ServiceBase):
 
     def get_available_request_tokens(
         self,
-        llm_provider_name: str,
+        llm_provider: "LLMBase",
         prompt: list[dict[str, str]],
-        model_token_utilization,
-        llm_model_name: Optional[str] = None,
+        token_utilization,
         context_to_response_ratio=0.00,
     ) -> tuple[int, int]:
-        llm_provider_instance: LLMBase = self.get_requested_class_instance(
-            requested_class=llm_provider_name,
-            available_classes=self.list_of_llm_provider_instances,
-        )
-        if llm_model_name is None:
-            llm_model_name = llm_provider_instance.config.current_llm_model_name
-        if not isinstance(llm_model_name, str):
-            raise ValueError(
-                f"llm_model_name {llm_model_name} is not a string. It is a {type(llm_model_name)}."
-            )
-        llm_model_instance = self.get_model_instance(
-            requested_model_name=llm_model_name,
-            provider=llm_provider_instance,
-        )
+        llm_model_instance = llm_provider.llm_model_instance
         total_prompt_tokens = self.get_prompt_length(
             prompt=prompt,
-            llm_provider_name=llm_provider_name,
+            llm_provider_name=llm_provider.CLASS_NAME,
             llm_model_instance=llm_model_instance,
         )
         available_tokens = llm_model_instance.TOKENS_MAX - 10  # for safety in case of model changes
-        available_tokens = available_tokens * (model_token_utilization)
+        available_tokens = available_tokens * (token_utilization)
         if context_to_response_ratio > 0.0:
             available_request_tokens = available_tokens * context_to_response_ratio
             available_request_tokens = available_request_tokens - total_prompt_tokens
@@ -72,7 +78,7 @@ class LLMBase(ABC, ServiceBase):
 
         return int(available_request_tokens), int(max_tokens)
 
-    def calculate_cost(self, total_token_count: int, llm_model_instance):
+    def calculate_cost(self, total_token_count: int, llm_model_instance: ModelConfig):
         # Convert numbers to Decimal
         COST_PER_K_decimal = Decimal(llm_model_instance.COST_PER_K)
         token_count_decimal = Decimal(total_token_count)
@@ -103,7 +109,6 @@ class LLMBase(ABC, ServiceBase):
     def generate_text(
         self,
         prompt: list[dict[str, str]],
-        llm_model_instance,
         max_tokens: int,
     ):
         raise NotImplementedError
@@ -111,7 +116,6 @@ class LLMBase(ABC, ServiceBase):
     def make_decision(
         self,
         prompt: list[dict[str, str]],
-        llm_model_instance,
         logit_bias: dict[str, int],
         max_tokens: int,
     ):
@@ -120,7 +124,6 @@ class LLMBase(ABC, ServiceBase):
     def create_chat(
         self,
         prompt: list[dict[str, str]],
-        llm_model_instance,
         max_tokens: int,
         stream: bool,
     ):

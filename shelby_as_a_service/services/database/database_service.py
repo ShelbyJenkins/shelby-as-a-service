@@ -15,72 +15,52 @@ class DatabaseService(DatabaseBase):
     REQUIRED_CLASSES: list[Type] = database.AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = database.AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_TYPINGS = database.AVAILABLE_PROVIDERS_TYPINGS
-    list_of_doc_db_provider_instances: list[DatabaseBase] = []
-    current_doc_db_provider: DatabaseBase
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.list_of_doc_db_provider_instances = self.list_of_required_class_instances
-        doc_db_provider_name = kwargs.get("doc_db_provider_name", None)
-        if doc_db_provider_name:
-            self.current_doc_db_provider = self.get_requested_class_instance(
-                requested_class=doc_db_provider_name,
-                available_classes=self.list_of_doc_db_provider_instances,
-            )
-
-    def get_doc_db_instance(
+    def __init__(
         self,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        doc_index_db_instance: Optional[DatabaseBase] = None,
-    ) -> DatabaseBase:
-        if doc_db_provider_name and doc_index_db_instance:
-            raise ValueError(
-                "Must provide either doc_db_provider_name or doc_index_db_instance, not both."
+        doc_db_provider_name: database.AVAILABLE_PROVIDERS_TYPINGS,
+        doc_db_embedding_provider_name: Optional[str] = None,
+        doc_db_embedding_provider_config: dict[str, Any] = {},
+        context_index_config: dict[str, Any] = {},
+        **kwargs,
+    ):
+        super().__init__(
+            current_provider_name=doc_db_provider_name,
+            context_index_config=context_index_config,
+            **kwargs,
+        )
+
+        if not self.current_provider_instance:
+            raise ValueError("current_provider_instance not properly set!")
+
+        self.current_doc_db: DatabaseBase = self.current_provider_instance
+
+        if self.current_doc_db.DOC_DB_REQUIRES_EMBEDDINGS:
+            self.embedding_service = EmbeddingService(
+                embedding_provider_name=doc_db_embedding_provider_name,  # type: ignore
+                context_index_config=doc_db_embedding_provider_config,
             )
-        if doc_db_provider_name:
-            doc_db = self.get_requested_class_instance(
-                requested_class=doc_db_provider_name,
-                available_classes=self.list_of_doc_db_provider_instances,
-            )
-        elif doc_index_db_instance:
-            doc_db = doc_index_db_instance
-        else:
-            doc_db = self.current_doc_db_provider
-        if doc_db is None:
-            raise ValueError("doc_db must not be None")
-        return doc_db
 
     def query_by_terms(
         self,
         domain_name: str,
         search_terms: list[str] | str,
         retrieve_n_docs: Optional[int] = None,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        doc_index_db_instance: Optional[DatabaseBase] = None,
         doc_db_embedding_provider_name: Optional[str] = None,
         enabled_doc_embedder_config: Optional[dict[str, Any]] = None,
     ) -> list[RetrievalDoc]:
-        doc_index_db_instance = self.get_doc_db_instance(
-            doc_db_provider_name=doc_db_provider_name,
-            doc_index_db_instance=doc_index_db_instance,
-        )
         if isinstance(search_terms, str):
             search_terms = [search_terms]
 
-        if doc_index_db_instance.DOC_DB_REQUIRES_EMBEDDINGS:
+        if self.current_doc_db.DOC_DB_REQUIRES_EMBEDDINGS:
             if not doc_db_embedding_provider_name:
                 doc_db_embedding_provider_name = (
-                    doc_index_db_instance.config.enabled_doc_embedder_name
+                    self.current_doc_db.config.enabled_doc_embedder_name
                 )
             if not enabled_doc_embedder_config:
-                enabled_doc_embedder_config = (
-                    doc_index_db_instance.config.enabled_doc_embedder_config
-                )
+                enabled_doc_embedder_config = self.current_doc_db.config.enabled_doc_embedder_config
 
-            terms = EmbeddingService(
-                embedding_provider_name=doc_db_embedding_provider_name,
-                enabled_doc_embedder_config=enabled_doc_embedder_config,
-            ).get_embeddings_from_list_of_texts(
+            terms = self.embedding_service.get_embeddings_from_list_of_texts(
                 texts=search_terms,
             )
         else:
@@ -88,7 +68,7 @@ class DatabaseService(DatabaseBase):
 
         retrieved_docs = []
         for term in terms:
-            docs = doc_index_db_instance.query_by_terms_with_provider(
+            docs = self.current_doc_db.query_by_terms_with_provider(
                 search_terms=term, retrieve_n_docs=retrieve_n_docs, domain_name=domain_name
             )
             if docs:
@@ -101,17 +81,11 @@ class DatabaseService(DatabaseBase):
         self,
         domain_name: str,
         ids: list[str] | str,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        doc_index_db_instance: Optional[DatabaseBase] = None,
     ) -> dict[str, Any] | None:
-        doc_index_db_instance = self.get_doc_db_instance(
-            doc_db_provider_name=doc_db_provider_name,
-            doc_index_db_instance=doc_index_db_instance,
-        )
         if isinstance(ids, str):
             ids = [ids]
 
-        docs = doc_index_db_instance.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
+        docs = self.current_doc_db.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
         if not docs:
             self.log.info(f"No documents found.")
         return docs
@@ -120,28 +94,22 @@ class DatabaseService(DatabaseBase):
         self,
         entries_to_upsert: list[dict[str, Any]],
         domain_name: str,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        doc_index_db_instance: Optional[DatabaseBase] = None,
     ):
-        doc_index_db_instance = self.get_doc_db_instance(
-            doc_db_provider_name=doc_db_provider_name,
-            doc_index_db_instance=doc_index_db_instance,
-        )
         current_entry_count = (
-            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=domain_name
             )
         )
         self.log.info(
-            f"Upserting {len(entries_to_upsert)} entries to {doc_index_db_instance.CLASS_NAME}"
+            f"Upserting {len(entries_to_upsert)} entries to {self.current_doc_db.CLASS_NAME}"
         )
 
-        response = doc_index_db_instance.upsert_with_provider(
+        response = self.current_doc_db.upsert_with_provider(
             entries_to_upsert=entries_to_upsert, domain_name=domain_name
         )
 
         post_upsert_entry_count = (
-            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=domain_name
             )
         )
@@ -157,27 +125,21 @@ class DatabaseService(DatabaseBase):
         self,
         domain_name: str,
         doc_db_ids_requiring_deletion: list[str] | str,
-        doc_db_provider_name: Optional[database.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        doc_index_db_instance: Optional[DatabaseBase] = None,
     ) -> bool:
-        doc_index_db_instance = self.get_doc_db_instance(
-            doc_db_provider_name=doc_db_provider_name,
-            doc_index_db_instance=doc_index_db_instance,
-        )
         existing_entry_count = (
-            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=domain_name
             )
         )
         if not isinstance(doc_db_ids_requiring_deletion, list):
             doc_db_ids_requiring_deletion = [doc_db_ids_requiring_deletion]
 
-        response = doc_index_db_instance.clear_existing_entries_by_id_with_provider(
+        response = self.current_doc_db.clear_existing_entries_by_id_with_provider(
             doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
             domain_name=domain_name,
         )
         post_delete_entry_count = (
-            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=domain_name
             )
         )
@@ -194,12 +156,12 @@ class DatabaseService(DatabaseBase):
     def upsert_documents_from_context_index_source(
         self, upsert_docs: list[IngestDoc], source: doc_index_models.SourceModel
     ):
-        doc_index_db_instance: DatabaseBase = self.init_provider_instance_from_doc_index(
+        self.current_doc_db: DatabaseBase = self.init_provider_instance_from_doc_index(
             domain_or_source=source
         )
 
         current_entry_count = (
-            doc_index_db_instance.get_index_domain_or_source_entry_count_with_provider(
+            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=source.domain_model.name
             )
         )
@@ -217,19 +179,14 @@ class DatabaseService(DatabaseBase):
                 chunks_to_upsert.append(chunk)
 
         entries_to_upsert = []
-        if doc_index_db_instance.DOC_DB_REQUIRES_EMBEDDINGS:
-            EmbeddingService(
-                embedding_provider_name=source.enabled_doc_db.enabled_doc_embedder.name,
-                embedding_model_name=source.enabled_doc_db.enabled_doc_embedder.config.get(
-                    "current_embedding_model_name"
-                ),
-            ).get_document_embeddings_for_chunks_to_upsert(
-                chunks_to_upsert=chunks_to_upsert, doc_index_db_model=source.enabled_doc_db
+        if self.current_doc_db.DOC_DB_REQUIRES_EMBEDDINGS:
+            self.embedding_service.get_document_embeddings_for_chunks_to_upsert(
+                chunks_to_upsert=chunks_to_upsert
             )
             for chunk in chunks_to_upsert:
                 metadata = chunk.prepare_upsert_metadata()
                 entries_to_upsert.append(
-                    doc_index_db_instance.prepare_upsert_for_vectorstore_with_provider(
+                    self.current_doc_db.prepare_upsert_for_vectorstore_with_provider(
                         id=chunk.chunk_doc_db_id, values=chunk.chunk_embedding, metadata=metadata
                     )
                 )
@@ -239,7 +196,6 @@ class DatabaseService(DatabaseBase):
         self.upsert(
             entries_to_upsert=entries_to_upsert,
             domain_name=source.domain_model.name,
-            doc_index_db_instance=doc_index_db_instance,
         )
 
     @classmethod

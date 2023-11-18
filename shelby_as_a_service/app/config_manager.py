@@ -250,18 +250,28 @@ class ConfigManager:
         from app.app_base import AppBase
 
         def recurse(class_instance, config_dict):
-            config_dict[class_instance.CLASS_NAME] = class_instance.config.model_dump()
-            module_config_dict = config_dict[class_instance.CLASS_NAME]
+            if hasattr(class_instance, "config"):
+                config_dict[class_instance.CLASS_NAME] = class_instance.config.model_dump()
+                module_config_dict = config_dict[class_instance.CLASS_NAME]
 
-            if required_classes := getattr(class_instance, "REQUIRED_CLASSES", None):
-                for child_module in required_classes:
-                    child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
-                    recurse(child_class_instance, module_config_dict)
+                if required_classes := getattr(class_instance, "REQUIRED_CLASSES", None):
+                    for child_module in required_classes:
+                        child_class_instance = getattr(class_instance, child_module.CLASS_NAME)
+                        recurse(child_class_instance, module_config_dict)
 
         app_dict = {}
-        app_dict["app"] = AppBase.config.model_dump()
+        app_dict["app"] = AppBase.app_config.model_dump()
 
         for sprite in AppBase.enabled_sprite_instances:
             recurse(sprite, app_dict)
 
-        ConfigManager.save_app(AppBase.config.app_name, app_dict)
+        ConfigManager.save_app(AppBase.app_config.app_name, app_dict)
+
+    @staticmethod
+    def get_config(app_name: str, path: list[str]):
+        config_file_dict = ConfigManager.load_app(app_name=app_name)
+        for key in path:
+            config_file_dict = config_file_dict.get(key, {})
+            if not config_file_dict:
+                raise ValueError(f"Config not found for path {path} at key {key}")
+        return config_file_dict

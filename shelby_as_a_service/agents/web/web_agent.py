@@ -26,6 +26,7 @@ class WebAgent(ServiceBase):
         llm_model: str = "gpt-4"
         database_provider: str = "local_file_database"
 
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
 
     def __init__(self):

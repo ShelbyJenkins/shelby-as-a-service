@@ -55,9 +55,10 @@ class GradioBase(ServiceBase):
         )
 
         for provider_class in required_classes:
+            provider_class: ServiceBase
             provider_name = provider_class.CLASS_NAME
             provider_config = provider_configs_dict.get(provider_name, {})
-            config_model = provider_class.ClassConfigModel(**provider_config)
+            config_model = provider_class.class_config_model(**provider_config)
             visibility = GradioBase.set_current_ui_provider_visible(
                 provider_name, enabled_provider_name
             )

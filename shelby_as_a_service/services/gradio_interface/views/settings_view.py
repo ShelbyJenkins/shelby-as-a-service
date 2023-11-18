@@ -6,6 +6,13 @@ from pydantic import BaseModel
 from services.gradio_interface.gradio_base import GradioBase
 
 
+class ClassConfigModel(BaseModel):
+    current_ui_view_name: str = "Settings View"
+
+    class Config:
+        extra = "ignore"
+
+
 class SettingsView(GradioBase):
     class_name = Literal["settings_view"]
     CLASS_NAME: str = get_args(class_name)[0]
@@ -13,12 +20,7 @@ class SettingsView(GradioBase):
     SETTINGS_UI_COL = 4
     PRIMARY_UI_COL = 6
 
-    class ClassConfigModel(BaseModel):
-        current_ui_view_name: str = "Settings View"
-
-        class Config:
-            extra = "ignore"
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):

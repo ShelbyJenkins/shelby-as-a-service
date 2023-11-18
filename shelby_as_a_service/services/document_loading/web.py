@@ -24,11 +24,23 @@ class GenericWebScraper(DocLoadingBase):
         class Config:
             extra = "ignore"
 
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
     ui_components: dict[str, Any]
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(
+        self,
+        continue_on_failure: Optional[bool] = None,
+        context_index_config: dict[str, Any] = {},
+        config_file_dict: dict[str, Any] = {},
+        **kwargs
+    ):
+        super().__init__(
+            continue_on_failure=continue_on_failure,
+            context_index_config=context_index_config,
+            config_file_dict=config_file_dict,
+            **kwargs
+        )
 
     def load_docs_with_provider(self, uri) -> list[Document]:
         return WebBaseLoader(web_path=uri).load()
@@ -59,10 +71,30 @@ class GenericRecursiveWebScraper(DocLoadingBase):
         use_async: bool = False
         prevent_outside: bool = True
 
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(
+        self,
+        exclude_dirs: Optional[str] = None,
+        max_depth: Optional[int] = None,
+        timeout: Optional[int] = None,
+        use_async: Optional[bool] = None,
+        prevent_outside: Optional[bool] = None,
+        context_index_config: dict[str, Any] = {},
+        config_file_dict: dict[str, Any] = {},
+        **kwargs
+    ):
+        super().__init__(
+            exclude_dirs=exclude_dirs,
+            max_depth=max_depth,
+            timeout=timeout,
+            use_async=use_async,
+            prevent_outside=prevent_outside,
+            context_index_config=context_index_config,
+            config_file_dict=config_file_dict,
+            **kwargs
+        )
 
     @staticmethod
     def custom_extractor(html_text: str) -> str:

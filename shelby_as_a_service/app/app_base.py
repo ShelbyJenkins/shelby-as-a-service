@@ -38,7 +38,7 @@ class AppBase:
         enabled_extensions: list[str] = []
         disabled_extensions: list[str] = []
 
-    config: ClassConfigModel
+    app_config: ClassConfigModel
 
     log: "LoggerWrapper"
 
@@ -70,14 +70,14 @@ class AppBase:
             app_name = ConfigManager.load_webui_sprite_default_config()
 
         config_file_dict = ConfigManager.load_app(app_name)
-        AppBase.config = AppBase.ClassConfigModel(**config_file_dict.get("app", {}))
+        AppBase.app_config = AppBase.ClassConfigModel(**config_file_dict.get("app", {}))
         AppBase._get_logger(logger_name=app_name)
         AppBase.log.info(f"Setting up shelby_as_a_service app instance with name: {app_name}...")
 
         load_dotenv(os.path.join(AppBase.APP_DIR_PATH, app_name, ".env"))
 
         AppBase.list_of_extension_configs = ConfigManager.get_extension_configs()
-        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.config.app_name, "index")
+        cls.local_index_dir = os.path.join(cls.APP_DIR_PATH, cls.app_config.app_name, "index")
         from context_index.doc_index.doc_index import DocIndex
 
         AppBase.doc_index: DocIndex = DocIndex()
@@ -105,7 +105,7 @@ class AppBase:
         AppBase.AVAILABLE_SPRITES_TYPINGS = interfaces.AVAILABLE_SPRITES_TYPINGS
         AppBase.AVAILABLE_SPRITES_UI_NAMES: list[str] = interfaces.AVAILABLE_SPRITES_UI_NAMES
         for sprite in AppBase.AVAILABLE_SPRITES:
-            if sprite.CLASS_NAME in AppBase.config.enabled_sprites:
+            if sprite.CLASS_NAME in AppBase.app_config.enabled_sprites:
                 # ConfigManager.add_extensions_to_sprite(
                 #     AppBase.list_of_extension_configs, sprite
                 # )
@@ -145,7 +145,7 @@ class AppBase:
                     "Logger must be initialized with an logger_name before it can be used without it."
                 )
 
-            logs_dir = os.path.join(AppBase.APP_DIR_PATH, AppBase.config.app_name, "logs")
+            logs_dir = os.path.join(AppBase.APP_DIR_PATH, AppBase.app_config.app_name, "logs")
             os.makedirs(logs_dir, exist_ok=True)
             log_file_path = os.path.join(logs_dir, f"{logger_name}.log")
 
@@ -182,7 +182,7 @@ class AppBase:
         if required_secrets := getattr(self, "REQUIRED_SECRETS", None):
             for required_secret in required_secrets:
                 env_secret = None
-                secret_str = f"{AppBase.config.app_name}_{required_secret}".upper()
+                secret_str = f"{AppBase.app_config.app_name}_{required_secret}".upper()
                 env_secret = os.environ.get(secret_str, None)
                 if env_secret:
                     AppBase.secrets[required_secret] = env_secret

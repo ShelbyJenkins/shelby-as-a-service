@@ -95,22 +95,39 @@ class DocIngest(DocIndexBase):
 
     @classmethod
     def _ingest_source(cls, source: doc_index_models.SourceModel, session: Session) -> bool:
+        doc_loader_model: doc_index_models.DocLoaderModel = source.enabled_doc_loader
         if (
-            ingest_docs := DocLoadingService().load_docs_from_context_index_source(source=source)
+            ingest_docs := DocLoadingService(
+                doc_loader_provider_name=doc_loader_model.name,  # type: ignore
+                context_index_config=doc_loader_model.config,
+            ).load_docs_from_context_index_source(source=source)
         ) is None:
             raise ValueError(f"Could not load docs from {source.name}")
 
+        doc_ingest_processor_model: doc_index_models.DocIngestProcessorModel = (
+            source.enabled_doc_ingest_processor
+        )
         (
             upsert_docs,
             doc_db_ids_requiring_deletion,
         ) = IngestProcessingService(
-            session=session
+            doc_ingest_processor_name=doc_ingest_processor_model.name,  # type: ignore
+            context_index_config=doc_ingest_processor_model.config,
+            session=session,
         ).process_documents_from_context_index_source(ingest_docs=ingest_docs, source=source)
 
         if not upsert_docs:
             raise ValueError(f"Could not process docs from {source.name}")
 
-        doc_db_service = DatabaseService()
+        doc_db_model: doc_index_models.DocDBModel = source.enabled_doc_db
+        doc_embedding_model: doc_index_models.DocEmbeddingModel = doc_db_model.enabled_doc_embedder
+        doc_db_service = DatabaseService(
+            doc_db_provider_name=doc_db_model.name,  # type: ignore
+            doc_db_embedding_provider_name=doc_embedding_model.name,  # type: ignore
+            doc_db_embedding_provider_config=doc_embedding_model.config,
+            context_index_config=doc_db_model.config,
+            session=session,
+        )
         doc_db_service.upsert_documents_from_context_index_source(
             upsert_docs=upsert_docs, source=source
         )

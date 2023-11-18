@@ -11,20 +11,20 @@ from services.service_base import ServiceBase
 from services.text_processing.process_retrieval import process_retrieved_docs
 
 
+class ClassConfigModel(BaseModel):
+    doc_max_tokens: int = 1400
+    docs_max_count: int = 4
+    max_total_tokens: int = 1000
+    topic_constraint_enabled: bool = False
+    keyword_generator_enabled: bool = False
+    doc_relevancy_check_enabled: bool = False
+
+
 class DocRetrieval(ServiceBase):
     CLASS_NAME: str = "doc_retrieval"
     CLASS_UI_NAME: str = "doc_retrieval"
 
-    REQUIRED_CLASSES: list[Type] = [DatabaseService]
-
-    class ClassConfigModel(BaseModel):
-        doc_max_tokens: int = 1400
-        docs_max_count: int = 4
-        max_total_tokens: int = 1000
-        topic_constraint_enabled: bool = False
-        keyword_generator_enabled: bool = False
-        doc_relevancy_check_enabled: bool = False
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
     list_of_class_names: list
     list_of_class_ui_names: list
@@ -111,7 +111,11 @@ class DocRetrieval(ServiceBase):
                 domain_doc_db_providers.add(source.enabled_doc_db)
 
             for domain_doc_db_provider in domain_doc_db_providers:
-                returned_documents = DatabaseService().query_by_terms(
+                returned_documents = DatabaseService(
+                    doc_db_provider_name=domain_doc_db_provider.name,  # type: ignore
+                    context_index_config=domain_doc_db_provider.config,
+                    doc_db_embedding_provider_config=domain_doc_db_provider.enabled_doc_embedder.config,
+                ).query_by_terms(
                     search_terms=query,
                     retrieve_n_docs=retrieve_n_docs,
                     domain_name=domain.name,

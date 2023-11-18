@@ -2,11 +2,22 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Type
 
 from context_index.doc_index.docs.context_docs import IngestDoc
+from pydantic import BaseModel
 from services.service_base import ServiceBase
+
+
+class ClassConfigModel(BaseModel):
+    pass
+
+    class Config:
+        extra = "ignore"
 
 
 class IngestProcessingBase(ABC, ServiceBase):
     DOC_INDEX_KEY: str = "enabled_doc_ingest_processor"
+
+    class_config_model = ClassConfigModel
+    config: ClassConfigModel
 
     def preprocess_text_with_provider(self, text: str) -> str:
         raise NotImplementedError

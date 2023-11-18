@@ -7,19 +7,21 @@ from services.gradio_interface.gradio_service import GradioService
 from services.service_base import ServiceBase
 
 
+class ClassConfigModel(BaseModel):
+    default_local_app_enabled: bool = False
+    default_local_app_name: Optional[str] = None
+
+    class Config:
+        extra = "ignore"
+
+
 class WebUISprite(ServiceBase):
     class_name = Literal["webui_sprite"]
     CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "webui_sprite"
     REQUIRED_CLASSES: list[Type] = [GradioService]
 
-    class ClassConfigModel(BaseModel):
-        default_local_app_enabled: bool = False
-        default_local_app_name: Optional[str] = None
-
-        class Config:
-            extra = "ignore"
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
     gradio_ui: GradioService
 

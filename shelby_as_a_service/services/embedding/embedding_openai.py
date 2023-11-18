@@ -8,6 +8,13 @@ from pydantic import BaseModel
 from services.embedding.embedding_base import EmbeddingBase
 
 
+class ClassConfigModel(BaseModel):
+    current_embedding_model_name: str = "text-embedding-ada-002"
+
+    class Config:
+        extra = "ignore"
+
+
 class OpenAIEmbedding(EmbeddingBase):
     class_name = Literal["openai_embedding"]
     CLASS_NAME: str = typing.get_args(class_name)[0]
@@ -21,6 +28,9 @@ class OpenAIEmbedding(EmbeddingBase):
         TOKENS_MAX: int
         COST_PER_K: float
 
+        class Config:
+            extra = "ignore"
+
     MODEL_DEFINITIONS: dict[str, Any] = {
         "text-embedding-ada-002": {
             "MODEL_NAME": "text-embedding-ada-002",
@@ -29,30 +39,36 @@ class OpenAIEmbedding(EmbeddingBase):
         }
     }
 
-    class ClassConfigModel(BaseModel):
-        current_embedding_model_name: str = "text-embedding-ada-002"
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(
+        self,
+        provider_model_name: Optional[str] = None,
+        context_index_config: dict[str, Any] = {},
+        config_file_dict: dict[str, Any] = {},
+        **kwargs,
+    ):
+        super().__init__(
+            provider_model_name=provider_model_name,
+            context_index_config=context_index_config,
+            config_file_dict=config_file_dict,
+            **kwargs,
+        )
+        if not self.current_provider_model_instance:
+            raise ValueError("current_provider_model_instance not properly set!")
+        self.current_embedding_model: "OpenAIEmbedding.ModelConfig" = (
+            self.current_provider_model_instance
+        )
 
     def get_embedding_of_text_with_provider(
         self,
         text: str,
-        embedding_model_instance: Optional["OpenAIEmbedding.ModelConfig"] = None,
     ) -> list[float]:
-        if embedding_model_instance is None:
-            model_instance: OpenAIEmbedding.ModelConfig = self.get_model_instance(
-                requested_model_name=self.config.current_embedding_model_name,
-                provider=self,
-            )
-        else:
-            model_instance = embedding_model_instance
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             api_key=self.secrets["openai_api_key"],
-            model=model_instance.MODEL_NAME,
+            model=self.current_embedding_model.MODEL_NAME,
             request_timeout=self.OPENAI_TIMEOUT_SECONDS,  # type: ignore
         )
 
@@ -65,19 +81,11 @@ class OpenAIEmbedding(EmbeddingBase):
     def get_embeddings_from_list_of_texts_with_provider(
         self,
         texts: list[str],
-        embedding_model_instance: Optional["OpenAIEmbedding.ModelConfig"] = None,
     ) -> list[list[float]]:
-        if embedding_model_instance is None:
-            model_instance: OpenAIEmbedding.ModelConfig = self.get_model_instance(
-                requested_model_name=self.config.current_embedding_model_name,
-                provider=self,
-            )
-        else:
-            model_instance = embedding_model_instance
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             api_key=self.secrets["openai_api_key"],
-            model=model_instance.MODEL_NAME,
+            model=self.current_embedding_model.MODEL_NAME,
             request_timeout=self.OPENAI_TIMEOUT_SECONDS,  # type: ignore
         )
 

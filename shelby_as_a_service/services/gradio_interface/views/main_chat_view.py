@@ -4,8 +4,17 @@ from typing import Any, Literal, Optional, Type, get_args
 
 import agents as agents
 import gradio as gr
+from app.config_manager import ConfigManager
 from pydantic import BaseModel
 from services.gradio_interface.gradio_base import GradioBase
+
+
+class ClassConfigModel(BaseModel):
+    current_agent_name: str = "vanillallm_agent"
+    current_agent_ui_name: str = "VanillaLLM Agent"
+
+    class Config:
+        extra = "ignore"
 
 
 class MainChatView(GradioBase):
@@ -18,27 +27,23 @@ class MainChatView(GradioBase):
     AVAILABLE_AGENTS_TYPINGS = agents.AVAILABLE_AGENTS_TYPINGS
     AVAILABLE_AGENTS_UI_NAMES: list[str] = agents.AVAILABLE_AGENTS_UI_NAMES
 
-    class ClassConfigModel(BaseModel):
-        current_agent_name: str = "vanillallm_agent"
-        current_agent_ui_name: str = "VanillaLLM Agent"
-
-        class Config:
-            extra = "ignore"
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
     vanillallm_agent: agents.VanillaLLM
     ceq_agent: agents.CEQAgent
-    list_of_agent_instances: list[agents.VanillaLLM | agents.CEQAgent] = []
-    current_agent_instance: agents.VanillaLLM | agents.CEQAgent
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
-
-        self.list_of_agent_instances = self.list_of_required_class_instances
-        self.current_agent_instance = self.get_requested_class_instance(
-            requested_class=self.config.current_agent_name,
-            available_classes=self.list_of_agent_instances,
-        )
+        if self.list_of_required_class_instances:
+            self.list_of_agent_instances: list[
+                agents.VanillaLLM | agents.CEQAgent
+            ] = self.list_of_required_class_instances
+            self.current_agent_instance: agents.VanillaLLM | agents.CEQAgent = (
+                self.get_requested_class(
+                    requested_class=self.config.current_agent_name,
+                    available_classes=self.REQUIRED_CLASSES,
+                )
+            )
 
     def set_view_event_handlers(self):
         pass
@@ -46,7 +51,23 @@ class MainChatView(GradioBase):
     def run_chat(self, chat_in):
         self.log.info(f"Running query: {chat_in}")
 
-        response = self.current_agent_instance.create_chat(
+        main_chat_config = ConfigManager.get_config(
+            app_name=self.app_config.app_name, path=["webui_sprite", "gradio_ui", "main_chat_view"]
+        )
+
+        current_agent_name = main_chat_config.get("current_agent_name")
+        if not isinstance(current_agent_name, str):
+            raise ValueError("current_agent_name not properly set!")
+
+        requested_agent_class = self.get_requested_class(
+            requested_class=current_agent_name,
+            available_classes=self.REQUIRED_CLASSES,
+        )
+        requested_agent: agents.VanillaLLM | agents.CEQAgent = requested_agent_class(
+            config_file_dict=main_chat_config
+        )
+
+        response = requested_agent.create_chat(
             chat_in=chat_in,
         )
         yield from response

@@ -12,6 +12,24 @@ from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_service import LLMService
 
 
+class ClassConfigModel(BaseModel):
+    """
+    The configuration settings for the CEQ agent module.
+
+    Attributes:
+        enabled_domains (list[str]): A list of enabled data domains.
+        context_to_response_ratio (float): The ratio of context tokens to response tokens to use for generating the response.
+    """
+
+    current_llm_provider_name: str = "openai_llm"
+    token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
+    enabled_domains: list[str] = ["all"]
+    context_to_response_ratio: Annotated[float, Field(ge=0, le=1.0)] = 0.5
+
+    class Config:
+        extra = "ignore"
+
+
 class CEQAgent(AgentBase):
     """
     CEQ (Context enhanced querying) is a subset of RAG (Retrieval Augmented Generation).
@@ -21,7 +39,7 @@ class CEQAgent(AgentBase):
     3) Appending the documents to a users query (Prompt Stuffing) for additional context
 
     Methods:
-        run_chat(self, chat_in, llm_provider=None, llm_model=None, model_token_utilization=None,
+        run_chat(self, chat_in, llm_provider=None, llm_model=None, token_utilization=None,
                  context_to_response_ratio=None, stream=None, sprite_name="webui_sprite"): Generates a response to user input.
     """
 
@@ -34,23 +52,7 @@ class CEQAgent(AgentBase):
     )
     REQUIRED_CLASSES: list[Type] = [DocRetrieval, LLMService]
 
-    class ClassConfigModel(BaseModel):
-        """
-        The configuration settings for the CEQ agent module.
-
-        Attributes:
-            enabled_domains (list[str]): A list of enabled data domains.
-            context_to_response_ratio (float): The ratio of context tokens to response tokens to use for generating the response.
-        """
-
-        current_llm_provider_name: str = "openai_llm"
-        model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
-        enabled_domains: list[str] = ["all"]
-        context_to_response_ratio: Annotated[float, Field(ge=0, le=1.0)] = 0.5
-
-        class Config:
-            extra = "ignore"
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
     llm_service: LLMService
     doc_retrieval: DocRetrieval
@@ -58,15 +60,14 @@ class CEQAgent(AgentBase):
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(
-            config_file_dict=config_file_dict, llm_provider_name="openai_llm", **kwargs
+            config_file_dict=config_file_dict,
+            **kwargs,
         )
 
     def create_chat(
         self,
         chat_in,
-        llm_provider_name: Optional[str] = None,
-        llm_model_name: Optional[str] = None,
-        model_token_utilization: Optional[float] = None,
+        token_utilization: Optional[float] = None,
         context_to_response_ratio: Optional[float] = None,
         enabled_domains: Optional[list[str] | str] = None,
         stream: Optional[bool] = None,
@@ -80,7 +81,7 @@ class CEQAgent(AgentBase):
             chat_in (str): The user input to generate a response for.
             llm_provider (Optional[str]): The LLM provider to use for generating the response.
             llm_model_name (Optional[str]): The LLM model to use for generating the response.
-            model_token_utilization (Optional[float]): The percentage of available tokens to use for generating the response.
+            token_utilization (Optional[float]): The percentage of available tokens to use for generating the response.
             context_to_response_ratio (Optional[float]): The ratio of context tokens to response tokens to use for generating the response.
             stream (Optional[bool]): Whether to stream the response or not.
             sprite_name (Optional[str]): The name of the sprite to use for displaying the response.
@@ -88,10 +89,8 @@ class CEQAgent(AgentBase):
         Yields:
             str: The generated response to the user input.
         """
-        if llm_provider_name is None:
-            llm_provider_name = self.config.current_llm_provider_name
-        if model_token_utilization is None:
-            model_token_utilization = self.config.model_token_utilization
+        if token_utilization is None:
+            token_utilization = self.config.token_utilization
         if context_to_response_ratio is None:
             context_to_response_ratio = self.config.context_to_response_ratio
         if enabled_domains is None:
@@ -99,16 +98,15 @@ class CEQAgent(AgentBase):
 
         prompt = self.create_prompt(
             query=chat_in,
-            llm_provider_name=llm_provider_name,  # type: ignore
+            llm_provider_name=self.llm_service.llm_provider.CLASS_NAME,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
         )
 
         available_request_tokens, _ = self.llm_service.get_available_request_tokens(
             prompt=prompt,
-            model_token_utilization=model_token_utilization,
+            token_utilization=token_utilization,
             context_to_response_ratio=context_to_response_ratio,
-            llm_provider_name=llm_provider_name,
-            llm_model_name=llm_model_name,
+            llm_provider=self.llm_service.llm_provider,
         )
 
         context_docs = self.doc_retrieval.get_documents(
@@ -119,7 +117,7 @@ class CEQAgent(AgentBase):
 
         prompt = self.create_prompt(
             query=chat_in,
-            llm_provider_name=llm_provider_name,  # type: ignore
+            llm_provider_name=self.llm_service.llm_provider.CLASS_NAME,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
             context_docs=context_docs,
         )
@@ -129,9 +127,7 @@ class CEQAgent(AgentBase):
 
         for current_response in self.llm_service.create_chat(
             prompt=prompt,
-            llm_provider_name=llm_provider_name,  # type: ignore
-            llm_model_name=llm_model_name,
-            model_token_utilization=model_token_utilization,
+            token_utilization=token_utilization,
             stream=stream,
         ):
             if previous_response is not None:
@@ -232,8 +228,8 @@ class CEQAgent(AgentBase):
                 multiselect=True,
                 min_width=0,
             )
-            components["model_token_utilization"] = gr.Slider(
-                value=self.config.model_token_utilization,
+            components["token_utilization"] = gr.Slider(
+                value=self.config.token_utilization,
                 label="Percent of Model Context Size to Use",
                 minimum=0.0,
                 maximum=1.0,

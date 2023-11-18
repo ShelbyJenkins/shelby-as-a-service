@@ -23,6 +23,7 @@ class DatabaseBase(ABC, ServiceBase):
     domain_name: str
     DOC_INDEX_KEY: str = "enabled_doc_db"
 
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
 
     def get_index_domain_or_source_entry_count_with_provider(

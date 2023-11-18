@@ -79,6 +79,7 @@ class OpenAPIMinifier(IngestProcessingBase):
             "deprecated",
         ]
 
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):

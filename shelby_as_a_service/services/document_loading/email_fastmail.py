@@ -10,6 +10,14 @@ from pydantic import BaseModel
 from services.document_loading.document_loading_base import DocLoadingBase
 
 
+class ClassConfigModel(BaseModel):
+    hostname: str = "api.fastmail.com"
+    username: Optional[str] = None
+
+    class Config:
+        extra = "ignore"
+
+
 class EmailFastmail(DocLoadingBase):
     """The tiniest JMAP client you can imagine.
     From: https://github.com/fastmail/JMAP-Samples/blob/main/python3/tiny_jmap_library.py"""
@@ -23,20 +31,27 @@ class EmailFastmail(DocLoadingBase):
         "JMAP_TOKEN",
     ]
 
-    class ClassConfigModel(BaseModel):
-        hostname: str = "api.fastmail.com"
-        username: Optional[str] = None
-
-        class Config:
-            extra = "ignore"
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
 
     token: str
     api_url: str
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(
+        self,
+        hostname: Optional[str] = None,
+        username: Optional[str] = None,
+        context_index_config: dict[str, Any] = {},
+        config_file_dict: dict[str, Any] = {},
+        **kwargs,
+    ):
+        super().__init__(
+            hostname=hostname,
+            username=username,
+            context_index_config=context_index_config,
+            config_file_dict=config_file_dict,
+            **kwargs,
+        )
         """Initialize using a hostname, username and bearer token"""
         self.session = None
         self.account_id = None

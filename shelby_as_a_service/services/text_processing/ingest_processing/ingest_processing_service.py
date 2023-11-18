@@ -7,7 +7,6 @@ from context_index.doc_index.docs.context_docs import IngestDoc
 from services.gradio_interface.gradio_base import GradioBase
 from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 from services.text_processing.text_utils import tiktoken_len
-from sqlalchemy.orm import Session
 
 
 class IngestProcessingService(IngestProcessingBase):
@@ -16,54 +15,33 @@ class IngestProcessingService(IngestProcessingBase):
     REQUIRED_CLASSES: list[Type] = ingest_processing.AVAILABLE_PROVIDERS
     AVAILABLE_PROVIDERS_UI_NAMES: list[str] = ingest_processing.AVAILABLE_PROVIDERS_UI_NAMES
     AVAILABLE_PROVIDERS_TYPINGS = ingest_processing.AVAILABLE_PROVIDERS_TYPINGS
-    successfully_chunked_counter: int = 0
+
     docs_token_counts: list[int] = []
-    list_of_doc_ingest_processor_provider_instances: list[IngestProcessingBase] = []
-    current_doc_ingest_processor_provider: IngestProcessingBase
+    successfully_chunked_counter: int = 0
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
-        self.list_of_doc_ingest_processor_provider_instances = self.list_of_required_class_instances
-        doc_ingest_processor_name = kwargs.get("doc_ingest_processor_name", None)
-        if doc_ingest_processor_name:
-            self.current_doc_ingest_processor_provider = self.get_requested_class_instance(
-                requested_class=doc_ingest_processor_name,
-                available_classes=self.list_of_doc_ingest_processor_provider_instances,
-            )
-
-    def get_doc_ingest_processor_instance(
+    def __init__(
         self,
-        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
-    ) -> IngestProcessingBase:
-        if doc_ingest_processor_name and doc_index_ingest_processor_instance:
-            raise ValueError(
-                "Must provide either doc_ingest_processor_name or doc_index_ingest_processor_instance, not both."
-            )
-        if doc_ingest_processor_name:
-            doc_ingest_processor = self.get_requested_class_instance(
-                requested_class=doc_ingest_processor_name,
-                available_classes=self.list_of_doc_ingest_processor_provider_instances,
-            )
-        elif doc_index_ingest_processor_instance:
-            doc_ingest_processor = doc_index_ingest_processor_instance
-        else:
-            doc_ingest_processor = self.current_doc_ingest_processor_provider
-        if doc_ingest_processor is None:
-            raise ValueError("doc_ingest_processor must not be None")
-        return doc_ingest_processor
+        doc_ingest_processor_name: ingest_processing.AVAILABLE_PROVIDERS_TYPINGS,
+        config_file_dict: dict[str, Any] = {},
+        context_index_config: dict[str, Any] = {},
+        **kwargs,
+    ):
+        super().__init__(
+            current_provider_name=doc_ingest_processor_name,
+            config_file_dict=config_file_dict,
+            context_index_config=context_index_config,
+            **kwargs,
+        )
+        if not self.current_provider_instance:
+            raise ValueError("self.current_provider_instance not properly set!")
+
+        self.current_doc_ingest_processor: IngestProcessingBase = self.current_provider_instance
 
     def create_chunks(
         self,
         text: str | dict,
-        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
     ) -> Optional[list[str]]:
-        doc_ingest_processor = self.get_doc_ingest_processor_instance(
-            doc_ingest_processor_name=doc_ingest_processor_name,
-            doc_index_ingest_processor_instance=doc_index_ingest_processor_instance,
-        )
-        doc_chunks = doc_ingest_processor.create_chunks_with_provider(text=text)
+        doc_chunks = self.current_doc_ingest_processor.create_chunks_with_provider(text=text)
         if not doc_chunks:
             self.log.info(f"{text[:10]} produced no chunks")
             return None
@@ -75,30 +53,20 @@ class IngestProcessingService(IngestProcessingBase):
     def preprocess_text(
         self,
         text: str,
-        doc_ingest_processor_name: Optional[ingest_processing.AVAILABLE_PROVIDERS_TYPINGS] = None,
-        doc_index_ingest_processor_instance: Optional[IngestProcessingBase] = None,
     ) -> str:
-        doc_ingest_processor = self.get_doc_ingest_processor_instance(
-            doc_ingest_processor_name=doc_ingest_processor_name,
-            doc_index_ingest_processor_instance=doc_index_ingest_processor_instance,
-        )
-        return doc_ingest_processor.preprocess_text_with_provider(text=text)
+        return self.current_doc_ingest_processor.preprocess_text_with_provider(text=text)
 
     def process_documents_from_context_index_source(
         self,
         ingest_docs: list[IngestDoc],
         source: doc_index_models.SourceModel,
     ) -> tuple[list[IngestDoc], list[str]]:
-        doc_index_ingest_processor_instance: IngestProcessingBase = (
-            self.init_provider_instance_from_doc_index(domain_or_source=source)
-        )
         preprocessed_docs = []
         for doc in ingest_docs:
             if isinstance(doc.precleaned_content, dict):
                 raise ValueError("IngestDoc precleaned_content must be a string here.")
             doc.cleaned_content = self.preprocess_text(
                 text=doc.precleaned_content,
-                doc_index_ingest_processor_instance=doc_index_ingest_processor_instance,
             )
             doc.cleaned_content_token_count = text_utils.tiktoken_len(doc.cleaned_content)
             doc.hashed_cleaned_content = text_utils.hash_content(doc.cleaned_content)
@@ -119,7 +87,6 @@ class IngestProcessingService(IngestProcessingBase):
                 raise ValueError("doc.cleaned_content must not be None")
             text_chunks = self.create_chunks(
                 text=doc.cleaned_content,
-                doc_index_ingest_processor_instance=doc_index_ingest_processor_instance,
             )
             if not text_chunks:
                 self.log.info(f"🔴 Skipping doc because text_chunks is None")

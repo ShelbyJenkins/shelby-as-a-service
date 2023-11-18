@@ -9,6 +9,14 @@ from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_service import LLMService
 
 
+class ClassConfigModel(BaseModel):
+    current_llm_provider_name: str = "openai_llm"
+    token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
+
+    class Config:
+        extra = "ignore"
+
+
 class VanillaLLM(AgentBase):
     class_name = Literal["vanillallm_agent"]
     CLASS_NAME: str = get_args(class_name)[0]
@@ -16,56 +24,42 @@ class VanillaLLM(AgentBase):
     DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/vanillallm/vanillallm_prompt_templates.yaml"
     REQUIRED_CLASSES: list[Type] = [LLMService]
 
-    class ClassConfigModel(BaseModel):
-        current_llm_provider_name: str = "openai_llm"
-        model_token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
-
-        class Config:
-            extra = "ignore"
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
     llm_service: LLMService
     list_of_required_class_instances: list[LLMService] = []
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(
-            config_file_dict=config_file_dict, llm_provider_name="openai_llm", **kwargs
-        )
+        super().__init__(config_file_dict=config_file_dict, **kwargs)
 
     def create_chat(
         self,
         chat_in: str,
-        llm_provider_name: Optional[str] = None,
-        llm_model_name: Optional[str] = None,
-        model_token_utilization: Optional[float] = None,
+        token_utilization: Optional[float] = None,
         stream: Optional[bool] = None,
     ):
-        if llm_provider_name is None:
-            llm_provider_name = self.config.current_llm_provider_name
-        if model_token_utilization is None:
-            model_token_utilization = self.config.model_token_utilization
+        if token_utilization is None:
+            token_utilization = self.config.token_utilization
 
         prompt = self.create_prompt(
             query=chat_in,
-            llm_provider_name=llm_provider_name,  # type: ignore
+            llm_provider_name=self.llm_service.llm_provider.CLASS_NAME,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
         )
 
         for response in self.llm_service.create_chat(
             prompt=prompt,
-            llm_provider_name=llm_provider_name,  # type: ignore
-            llm_model_name=llm_model_name,
-            model_token_utilization=model_token_utilization
-            if model_token_utilization is not None
-            else self.config.model_token_utilization,
+            token_utilization=token_utilization
+            if token_utilization is not None
+            else self.config.token_utilization,
             stream=stream,
         ):
             yield response["response_content_string"]
 
     def create_main_chat_ui(self):
         components = {}
-        components["model_token_utilization"] = gr.Slider(
-            value=self.config.model_token_utilization,
+        components["token_utilization"] = gr.Slider(
+            value=self.config.token_utilization,
             label="Percent of Model Context Size to Use",
             minimum=0.0,
             maximum=1.0,

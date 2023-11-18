@@ -12,6 +12,13 @@ from services.gradio_interface.gradio_base import GradioBase
 from services.gradio_interface.gradio_themes import AtYourServiceTheme
 
 
+class ClassConfigModel(BaseModel):
+    current_ui_view_name: str = "Chat"
+
+    class Config:
+        extra = "ignore"
+
+
 class GradioService(GradioBase):
     CLASS_NAME: str = "gradio_ui"
     CLASS_UI_NAME: str = "gradio_ui"
@@ -21,17 +28,14 @@ class GradioService(GradioBase):
     SETTINGS_UI_COL = 2
     PRIMARY_UI_COL = 8
 
-    class ClassConfigModel(BaseModel):
-        current_ui_view_name: str = "Chat"
-
-        class Config:
-            extra = "ignore"
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
-    list_of_view_instances: list[
-        gradio_interface.MainChatView
-        | gradio_interface.SettingsView
-        | gradio_interface.DocIndexView
+    list_of_view_instances: Optional[
+        list[
+            gradio_interface.MainChatView
+            | gradio_interface.SettingsView
+            | gradio_interface.DocIndexView
+        ]
     ] = []
     main_chat_view: "gradio_interface.MainChatView"
     settings_view: "gradio_interface.SettingsView"

@@ -11,6 +11,14 @@ from services.llm.llm_base import LLMBase
 from typing_extensions import Annotated
 
 
+class ClassConfigModel(BaseModel):
+    provider_model_name: str = "gpt-3.5-turbo"
+    available_models: dict[str, "OpenAILLM.ModelConfig"]
+
+    class Config:
+        extra = "ignore"
+
+
 class OpenAILLM(LLMBase):
     class_name = Literal["openai_llm"]
     CLASS_NAME: str = typing.get_args(class_name)[0]
@@ -18,6 +26,7 @@ class OpenAILLM(LLMBase):
     REQUIRED_SECRETS: list[str] = ["openai_api_key"]
     MODELS_TYPE: str = "llm_models"
     OPENAI_TIMEOUT_SECONDS: float = 60
+    class_config_model = ClassConfigModel
 
     class ModelConfig(BaseModel):
         MODEL_NAME: str
@@ -26,7 +35,7 @@ class OpenAILLM(LLMBase):
         TOKENS_PER_MESSAGE: int
         TOKENS_PER_NAME: int
         frequency_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
-        max_tokens: Annotated[int, Field(ge=0, le=16384)] = 4096
+        max_tokens: Optional[Annotated[int, Field(ge=0, le=16384)]] = 4096
         presence_penalty: Optional[Union[Annotated[float, Field(ge=-2, le=2)], None]] = 0
         temperature: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
         top_p: Optional[Union[Annotated[float, Field(ge=0, le=2.0)], None]] = 1
@@ -62,23 +71,44 @@ class OpenAILLM(LLMBase):
         },
     }
 
-    class ClassConfigModel(BaseModel):
-        current_llm_model_name: str = "gpt-3.5-turbo"
-        available_models: dict[str, "OpenAILLM.ModelConfig"]
-
-        class Config:
-            extra = "ignore"
-
     config: ClassConfigModel
     llm_models: list
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(
+        self,
+        provider_model_name: Optional[str] = None,
+        frequency_penalty: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        presence_penalty: Optional[float] = None,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+        config_file_dict: dict[str, Any] = {},
+        **kwargs,
+    ):
+        if not provider_model_name:
+            provider_model_name = ClassConfigModel().provider_model_name  # type: ignore
+        if not provider_model_name:
+            provider_model_name = kwargs.pop("provider_model_name", None)
+        else:
+            kwargs.pop("provider_model_name", None)
+        super().__init__(
+            provider_model_name=provider_model_name,
+            frequency_penalty=frequency_penalty,
+            max_tokens=max_tokens,
+            presence_penalty=presence_penalty,
+            temperature=temperature,
+            top_p=top_p,
+            config_file_dict=config_file_dict,
+            **kwargs,
+        )
+        if self.current_provider_model_instance:
+            self.llm_model_instance = self.current_provider_model_instance
+        if not self.llm_model_instance:
+            raise ValueError("llm_model_instance not properly set!")
 
     def generate_text(
         self,
         prompt: list,
-        llm_model_instance: ModelConfig,
         max_tokens: int,
     ):
         llm = OpenAI(
@@ -88,12 +118,12 @@ class OpenAILLM(LLMBase):
         )
         response = llm.chat.completions.create(
             messages=prompt,
-            model=llm_model_instance.MODEL_NAME,
-            frequency_penalty=llm_model_instance.frequency_penalty,
+            model=self.llm_model_instance.MODEL_NAME,
+            frequency_penalty=self.llm_model_instance.frequency_penalty,
             max_tokens=max_tokens,
-            presence_penalty=llm_model_instance.presence_penalty,
-            temperature=llm_model_instance.temperature,
-            top_p=llm_model_instance.top_p,
+            presence_penalty=self.llm_model_instance.presence_penalty,
+            temperature=self.llm_model_instance.temperature,
+            top_p=self.llm_model_instance.top_p,
         )
         (
             response_message_content,
@@ -108,7 +138,6 @@ class OpenAILLM(LLMBase):
     def make_decision(
         self,
         prompt: list,
-        llm_model_instance: ModelConfig,
         logit_bias: dict[str, int],
         max_tokens: int,
     ):
@@ -119,12 +148,12 @@ class OpenAILLM(LLMBase):
         )
         response = llm.chat.completions.create(
             messages=prompt,
-            model=llm_model_instance.MODEL_NAME,
-            frequency_penalty=llm_model_instance.frequency_penalty,
+            model=self.llm_model_instance.MODEL_NAME,
+            frequency_penalty=self.llm_model_instance.frequency_penalty,
             max_tokens=max_tokens,
-            presence_penalty=llm_model_instance.presence_penalty,
-            temperature=llm_model_instance.temperature,
-            top_p=llm_model_instance.top_p,
+            presence_penalty=self.llm_model_instance.presence_penalty,
+            temperature=self.llm_model_instance.temperature,
+            top_p=self.llm_model_instance.top_p,
             logit_bias=logit_bias,
         )
         (
@@ -140,22 +169,21 @@ class OpenAILLM(LLMBase):
     def create_chat(
         self,
         prompt: list,
-        llm_model_instance: ModelConfig,
         max_tokens: int,
         stream: bool,
     ):
         if stream:
-            yield from self._create_streaming_chat(prompt, max_tokens, llm_model_instance)
+            yield from self._create_streaming_chat(prompt, max_tokens)
         else:
             # response = await OpenAI(
             #     openai_api_key=self.secrets["openai_api_key"],
-            #     model_name=llm_model_instance.MODEL_NAME,
+            #     model_name=self.llm_model_instance.MODEL_NAME,
             #     streaming=stream,
-            #     temperature=llm_model_instance.temperature,
+            #     temperature=self.llm_model_instance.temperature,
             #     max_tokens=max_tokens,
-            #     top_p=llm_model_instance.top_p,
-            #     frequency_penalty=llm_model_instance.frequency_penalty,
-            #     presence_penalty=llm_model_instance.presence_penalty,
+            #     top_p=self.llm_model_instance.top_p,
+            #     frequency_penalty=self.llm_model_instance.frequency_penalty,
+            #     presence_penalty=self.llm_model_instance.presence_penalty,
             #     n=1,
             #     request_timeout=30,
             #     max_retries=3,
@@ -168,12 +196,12 @@ class OpenAILLM(LLMBase):
             )
             response = llm.chat.completions.create(
                 messages=prompt,
-                model=llm_model_instance.MODEL_NAME,
-                frequency_penalty=llm_model_instance.frequency_penalty,
+                model=self.llm_model_instance.MODEL_NAME,
+                frequency_penalty=self.llm_model_instance.frequency_penalty,
                 max_tokens=max_tokens,
-                presence_penalty=llm_model_instance.presence_penalty,
-                temperature=llm_model_instance.temperature,
-                top_p=llm_model_instance.top_p,
+                presence_penalty=self.llm_model_instance.presence_penalty,
+                temperature=self.llm_model_instance.temperature,
+                top_p=self.llm_model_instance.top_p,
             )
             (
                 response_message_content,
@@ -187,7 +215,7 @@ class OpenAILLM(LLMBase):
             yield response
             return response
 
-    def _create_streaming_chat(self, prompt, max_tokens, llm_model_instance):
+    def _create_streaming_chat(self, prompt, max_tokens):
         llm = OpenAI(
             api_key=self.secrets["openai_api_key"],
             max_retries=self.MAX_RETRIES,
@@ -195,13 +223,13 @@ class OpenAILLM(LLMBase):
         )
         stream = llm.chat.completions.create(
             messages=prompt,
-            model=llm_model_instance.MODEL_NAME,
-            frequency_penalty=llm_model_instance.frequency_penalty,
+            model=self.llm_model_instance.MODEL_NAME,
+            frequency_penalty=self.llm_model_instance.frequency_penalty,
             max_tokens=max_tokens,
-            presence_penalty=llm_model_instance.presence_penalty,
+            presence_penalty=self.llm_model_instance.presence_penalty,
             stream=True,
-            temperature=llm_model_instance.temperature,
-            top_p=llm_model_instance.top_p,
+            temperature=self.llm_model_instance.temperature,
+            top_p=self.llm_model_instance.top_p,
         )
 
         chunk: ChatCompletionChunk
@@ -217,7 +245,7 @@ class OpenAILLM(LLMBase):
                 continue
             if len(delta_content) != 0:
                 chunk_token_count = text_utils.tiktoken_len(
-                    delta_content, llm_model_instance.MODEL_NAME
+                    delta_content, self.llm_model_instance.MODEL_NAME
                 )
                 total_response_tokens += chunk_token_count
                 total_token_count += chunk_token_count
@@ -250,7 +278,7 @@ class OpenAILLM(LLMBase):
 
     def create_settings_ui(self):
         model_dropdown = gr.Dropdown(
-            value=self.config.current_llm_model_name,
+            value=self.config.provider_model_name,
             choices=self.llm_models,
             label="OpenAI LLM Model",
             interactive=True,
@@ -260,7 +288,7 @@ class OpenAILLM(LLMBase):
         for model_name, model in self.config.available_models.items():
             model_compoments = {}
 
-            if self.config.current_llm_model_name == model_name:
+            if self.config.provider_model_name == model_name:
                 visibility = True
             else:
                 visibility = False

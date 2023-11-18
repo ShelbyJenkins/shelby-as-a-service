@@ -7,25 +7,49 @@ from services.text_processing.dfs_text_splitter import DFSTextSplitter
 from services.text_processing.ingest_processing.ingest_processing_base import IngestProcessingBase
 
 
+class ClassConfigModel(BaseModel):
+    enabled_text_splitter: str = "dfs_text_splitter"
+    preprocessor_min_length: int = 150
+    text_splitter_goal_length: int = 750
+    text_splitter_overlap_percent: int = 15  # In percent
+
+    class Config:
+        extra = "ignore"
+
+
 class IngestCEQ(IngestProcessingBase):
     class_name = Literal["ceq_ingest_processor"]
     CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Context Enhanced Query Ingest Processor"
     AVAILABLE_TEXT_SPLITTERS: list[str] = ["dfs_text_splitter"]
 
-    class ClassConfigModel(BaseModel):
-        enabled_text_splitter: str = "dfs_text_splitter"
-        preprocessor_min_length: int = 150
-        text_splitter_goal_length: int = 750
-        text_splitter_overlap_percent: int = 15  # In percent
-
+    class_config_model = ClassConfigModel
     config: ClassConfigModel
 
     domain_name: str
     source_name: str
 
-    def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
-        super().__init__(config_file_dict=config_file_dict, **kwargs)
+    def __init__(
+        self,
+        provider_model_name: Optional[str] = None,
+        preprocessor_min_length: Optional[int] = None,
+        text_splitter_goal_length: Optional[int] = None,
+        text_splitter_overlap_percent: Optional[int] = None,
+        context_index_config: dict[str, Any] = {},
+        config_file_dict: dict[str, Any] = {},
+        **kwargs,
+    ):
+        if not provider_model_name:
+            provider_model_name = context_index_config.get("enabled_text_splitter")
+
+        super().__init__(
+            enabled_text_splitter=provider_model_name,
+            preprocessor_min_length=preprocessor_min_length,
+            text_splitter_goal_length=text_splitter_goal_length,
+            text_splitter_overlap_percent=text_splitter_overlap_percent,
+            config_file_dict=config_file_dict,
+            **kwargs,
+        )
 
         self.text_splitter = DFSTextSplitter(
             goal_length=self.config.text_splitter_goal_length,
