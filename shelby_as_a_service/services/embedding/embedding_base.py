@@ -7,7 +7,7 @@ from services.service_base import ServiceBase
 
 
 class ClassConfigModel(BaseModel):
-    current_embedding_model_name: str
+    provider_model_name: str
     available_models: dict[str, Any]
 
     class Config:
@@ -25,12 +25,11 @@ class ModelConfig(BaseModel):
 
 class EmbeddingBase(ABC, ServiceBase):
     ModelConfig: Type[BaseModel]
-    class_config_model = ClassConfigModel
     config: BaseModel
     MODEL_DEFINITIONS: dict[str, Any]
     DOC_INDEX_KEY: str = "enabled_doc_embedder"
-    current_embedder_provider: "EmbeddingBase"
-    current_embedding_model: "ModelConfig"
+    embedding_provider: "EmbeddingBase"
+    embedding_model_instance: "ModelConfig"
 
     def get_embedding_of_text_with_provider(self, text: str) -> list[float]:
         raise NotImplementedError

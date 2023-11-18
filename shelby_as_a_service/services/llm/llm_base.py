@@ -10,7 +10,7 @@ from services.service_base import ServiceBase
 
 
 class ClassConfigModel(BaseModel):
-    current_llm_model_name: str = "gpt-3.5-turbo"
+    provider_model_name: str
     available_models: dict[str, Any]
 
     class Config:
@@ -37,10 +37,9 @@ class LLMBase(ABC, ServiceBase):
     MODEL_DEFINITIONS: dict[str, Any]
     list_of_llm_provider_instances: list["LLMBase"] = []
     llm_provider: "LLMBase"
-
+    SAFETY_TOKENS: int = 10
     MAX_RETRIES: int = 3
 
-    class_config_model = ClassConfigModel
     llm_model_instance: ModelConfig
     config: ClassConfigModel
 
@@ -57,7 +56,7 @@ class LLMBase(ABC, ServiceBase):
         self,
         llm_provider: "LLMBase",
         prompt: list[dict[str, str]],
-        token_utilization,
+        token_utilization: float,
         context_to_response_ratio=0.00,
     ) -> tuple[int, int]:
         llm_model_instance = llm_provider.llm_model_instance
@@ -66,17 +65,37 @@ class LLMBase(ABC, ServiceBase):
             llm_provider_name=llm_provider.CLASS_NAME,
             llm_model_instance=llm_model_instance,
         )
-        available_tokens = llm_model_instance.TOKENS_MAX - 10  # for safety in case of model changes
-        available_tokens = available_tokens * (token_utilization)
+
+        available_tokens = llm_model_instance.TOKENS_MAX * (token_utilization)
         if context_to_response_ratio > 0.0:
             available_request_tokens = available_tokens * context_to_response_ratio
-            available_request_tokens = available_request_tokens - total_prompt_tokens
+            max_response_tokens = available_request_tokens - total_prompt_tokens
         else:
-            available_request_tokens = available_tokens - total_prompt_tokens
-        available_response_tokens = available_tokens - available_request_tokens
-        max_tokens = available_response_tokens + available_request_tokens
+            max_response_tokens = available_tokens - total_prompt_tokens
+        # for safety in case of model changes
+        while max_response_tokens > (llm_model_instance.TOKENS_MAX - self.SAFETY_TOKENS):
+            max_response_tokens -= 1
+        return int(total_prompt_tokens), int(max_response_tokens)
 
-        return int(available_request_tokens), int(max_tokens)
+    def get_logit_bias_total_prompt_tokens(
+        self,
+        llm_provider: "LLMBase",
+        prompt: list[dict[str, str]],
+        logit_bias_response_tokens: int,
+    ) -> int:
+        llm_model_instance = llm_provider.llm_model_instance
+        total_prompt_tokens = self.get_prompt_length(
+            prompt=prompt,
+            llm_provider_name=llm_provider.CLASS_NAME,
+            llm_model_instance=llm_model_instance,
+        )
+        max_response_tokens = total_prompt_tokens + logit_bias_response_tokens
+        # for safety in case of model changes
+        if max_response_tokens > llm_model_instance.TOKENS_MAX - self.SAFETY_TOKENS:
+            raise ValueError(
+                f"max_response_tokens {max_response_tokens} is greater than available_tokens {llm_model_instance.TOKENS_MAX - self.SAFETY_TOKENS}."
+            )
+        return int(total_prompt_tokens)
 
     def calculate_cost(self, total_token_count: int, llm_model_instance: ModelConfig):
         # Convert numbers to Decimal
@@ -99,7 +118,7 @@ class LLMBase(ABC, ServiceBase):
         output = []
         for model_name, _ in self.config.available_models.items():
             if model_name == requested_model:
-                self.config.current_llm_model_name = model_name
+                self.config.provider_model_name = model_name
                 GradioBase.update_settings_file = True
                 output.append(gr.Group(visible=True))
             else:
@@ -118,6 +137,7 @@ class LLMBase(ABC, ServiceBase):
         prompt: list[dict[str, str]],
         logit_bias: dict[str, int],
         max_tokens: int,
+        n: int,
     ):
         raise NotImplementedError
 

@@ -27,7 +27,7 @@ class IngestProcessingService(IngestProcessingBase):
         **kwargs,
     ):
         super().__init__(
-            current_provider_name=doc_ingest_processor_name,
+            provider_name=doc_ingest_processor_name,
             config_file_dict=config_file_dict,
             context_index_config=context_index_config,
             **kwargs,

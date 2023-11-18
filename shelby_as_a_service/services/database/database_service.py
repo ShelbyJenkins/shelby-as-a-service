@@ -25,7 +25,7 @@ class DatabaseService(DatabaseBase):
         **kwargs,
     ):
         super().__init__(
-            current_provider_name=doc_db_provider_name,
+            provider_name=doc_db_provider_name,
             context_index_config=context_index_config,
             **kwargs,
         )
@@ -46,20 +46,11 @@ class DatabaseService(DatabaseBase):
         domain_name: str,
         search_terms: list[str] | str,
         retrieve_n_docs: Optional[int] = None,
-        doc_db_embedding_provider_name: Optional[str] = None,
-        enabled_doc_embedder_config: Optional[dict[str, Any]] = None,
     ) -> list[RetrievalDoc]:
         if isinstance(search_terms, str):
             search_terms = [search_terms]
 
         if self.current_doc_db.DOC_DB_REQUIRES_EMBEDDINGS:
-            if not doc_db_embedding_provider_name:
-                doc_db_embedding_provider_name = (
-                    self.current_doc_db.config.enabled_doc_embedder_name
-                )
-            if not enabled_doc_embedder_config:
-                enabled_doc_embedder_config = self.current_doc_db.config.enabled_doc_embedder_config
-
             terms = self.embedding_service.get_embeddings_from_list_of_texts(
                 texts=search_terms,
             )
@@ -156,10 +147,6 @@ class DatabaseService(DatabaseBase):
     def upsert_documents_from_context_index_source(
         self, upsert_docs: list[IngestDoc], source: doc_index_models.SourceModel
     ):
-        self.current_doc_db: DatabaseBase = self.init_provider_instance_from_doc_index(
-            domain_or_source=source
-        )
-
         current_entry_count = (
             self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=source.domain_model.name

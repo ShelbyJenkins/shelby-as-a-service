@@ -199,14 +199,20 @@ class PineconeDatabase(DatabaseBase):
         for m in matches:
             metadata: dict[str, Any] = m.get("metadata", {})
             try:
+                if not (context_chunk := metadata.get("context_chunk")):
+                    context_chunk = metadata.get("content")
+                if not context_chunk:
+                    raise ValueError(
+                        f"Neither 'context_chunk' nor 'content' found in metadata: {metadata}"
+                    )
                 returned_documents.append(
                     RetrievalDoc(
                         domain_name=metadata.get("domain_name"),
                         source_name=metadata.get("source_name"),
-                        context_chunk=metadata["context_chunk"],
+                        context_chunk=context_chunk,
                         document_id=metadata.get("document_id"),
                         title=metadata.get("title"),
-                        uri=metadata.get("url"),
+                        uri=metadata.get("uri"),
                         source_type=metadata.get("source_type"),
                         score=m.get("score", 0),
                         chunk_doc_db_id=m.get("id"),

@@ -1,8 +1,6 @@
-import typing
 from typing import Annotated, Any, Generator, Literal, Optional, Type, get_args
 
 import gradio as gr
-import services.llm as llm
 from agents.agent_base import AgentBase
 from pydantic import BaseModel, Field
 from services.gradio_interface.gradio_base import GradioBase
@@ -10,7 +8,7 @@ from services.llm.llm_service import LLMService
 
 
 class ClassConfigModel(BaseModel):
-    current_llm_provider_name: str = "openai_llm"
+    llm_provider_name: str = "openai_llm"
     token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
 
     class Config:
@@ -26,7 +24,7 @@ class VanillaLLM(AgentBase):
 
     class_config_model = ClassConfigModel
     config: ClassConfigModel
-    llm_service: LLMService
+
     list_of_required_class_instances: list[LLMService] = []
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
@@ -42,7 +40,7 @@ class VanillaLLM(AgentBase):
             token_utilization = self.config.token_utilization
 
         prompt = self.create_prompt(
-            query=chat_in,
+            user_input=chat_in,
             llm_provider_name=self.llm_service.llm_provider.CLASS_NAME,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
         )

@@ -8,7 +8,7 @@ from services.llm.llm_base import LLMBase
 
 
 class ClassConfigModel(BaseModel):
-    current_llm_provider_name: str = "openai_llm"
+    llm_provider_name: str = "openai_llm"
     stream: bool = False
 
     class Config:
@@ -33,10 +33,10 @@ class LLMService(LLMBase):
     ):
         if not llm_provider_name:
             llm_provider_name = kwargs.pop("llm_provider_name", None)
-        if not llm_provider_name:
-            llm_provider_name = ClassConfigModel().current_llm_provider_name  # type: ignore
         else:
             kwargs.pop("llm_provider_name", None)
+        if not llm_provider_name:
+            llm_provider_name = ClassConfigModel.model_fields["llm_provider_name"].default  # type: ignore
         if not llm_model_name:
             llm_model_name = kwargs.pop("llm_model_name", None)
         else:
@@ -60,24 +60,24 @@ class LLMService(LLMBase):
         self,
         prompt: list[dict[str, str]],
         token_utilization: float = 1,
-        max_tokens: Optional[int] = None,
+        max_response_tokens: Optional[int] = None,
     ):
-        total_prompt_tokens, new_max_tokens = self.get_available_request_tokens(
+        total_prompt_tokens, new_max_response_tokens = self.get_available_request_tokens(
             prompt=prompt,
             token_utilization=token_utilization,
             llm_provider=self.llm_provider,
         )
-        if max_tokens is None:
-            max_tokens = new_max_tokens
+        if max_response_tokens is None:
+            max_response_tokens = new_max_response_tokens
 
         llm_model_instance = self.llm_provider.llm_model_instance
         # Already set in get_available_request_tokens, but here for safety
-        while max_tokens + total_prompt_tokens > (llm_model_instance.TOKENS_MAX - 15):
-            max_tokens -= 1
+        while max_response_tokens > (llm_model_instance.TOKENS_MAX - self.SAFETY_TOKENS):
+            max_response_tokens -= 1
 
         response = self.llm_provider.generate_text(
             prompt=prompt,
-            max_tokens=max_tokens,
+            max_tokens=max_response_tokens,
         )
 
         total_token_count = self.calculate_cost(
@@ -96,36 +96,27 @@ class LLMService(LLMBase):
         self,
         prompt: list[dict[str, str]],
         logit_bias: dict[str, int],
-        max_tokens: int,
-    ):
-        total_prompt_tokens, _ = self.get_available_request_tokens(
-            prompt=prompt,
-            token_utilization=1,
+        logit_bias_response_tokens: int,
+        consensus_after_n_tries,
+    ) -> list[str] | str:
+        total_prompt_tokens = self.get_logit_bias_total_prompt_tokens(
             llm_provider=self.llm_provider,
-        )
-
-        llm_model_instance = self.llm_provider.llm_model_instance
-        # Already set in get_available_request_tokens, but here for safety
-        while max_tokens + total_prompt_tokens > (llm_model_instance.TOKENS_MAX - 15):
-            max_tokens -= 1
-
-        response = self.llm_provider.make_decision(
             prompt=prompt,
-            max_tokens=max_tokens,
-            logit_bias=logit_bias,
+            logit_bias_response_tokens=logit_bias_response_tokens,
         )
 
-        total_token_count = self.calculate_cost(
-            total_token_count=total_prompt_tokens + response["total_response_tokens"],
-            llm_model_instance=llm_model_instance,
+        responses, total_response_tokens = self.llm_provider.make_decision(
+            prompt=prompt,
+            max_tokens=logit_bias_response_tokens,
+            logit_bias=logit_bias,
+            n=consensus_after_n_tries,
         )
-        return {
-            "response_content_string": response["response_content_string"],
-            "total_prompt_tokens": f"Request token count: {total_prompt_tokens}",
-            "total_response_tokens": f"Response token count: {response['total_response_tokens']}",
-            "total_token_count": f"Total token count: {total_token_count}",
-            "model_name": llm_model_instance.MODEL_NAME,
-        }
+
+        self.calculate_cost(
+            total_token_count=total_prompt_tokens + total_response_tokens,
+            llm_model_instance=self.llm_provider.llm_model_instance,
+        )
+        return responses
 
     def create_chat(
         self,
@@ -133,35 +124,30 @@ class LLMService(LLMBase):
         token_utilization: float = 0.5,
         stream: Optional[bool] = None,
     ):
-        total_prompt_tokens, max_tokens = self.get_available_request_tokens(
+        total_prompt_tokens, max_response_tokens = self.get_available_request_tokens(
             prompt=prompt,
             token_utilization=token_utilization,
             llm_provider=self.llm_provider,
         )
 
-        llm_model_instance = self.llm_provider.llm_model_instance
-        # For safety
-        while max_tokens + total_prompt_tokens > (llm_model_instance.TOKENS_MAX - 15):
-            max_tokens -= 1
-
         response = {}
         for response in self.llm_provider.create_chat(
             prompt=prompt,
-            max_tokens=max_tokens,
+            max_tokens=max_response_tokens,
             stream=stream if stream is not None else self.config.stream,
         ):
             yield response
 
         total_token_count = self.calculate_cost(
             total_token_count=total_prompt_tokens + response["total_response_tokens"],
-            llm_model_instance=llm_model_instance,
+            llm_model_instance=self.llm_provider.llm_model_instance,
         )
         return {
             "response_content_string": response["response_content_string"],
             "total_prompt_tokens": f"Request token count: {total_prompt_tokens}",
             "total_response_tokens": f"Response token count: {response['total_response_tokens']}",
             "total_token_count": f"Total token count: {total_token_count}",
-            "model_name": llm_model_instance.MODEL_NAME,
+            "model_name": self.llm_provider.llm_model_instance.MODEL_NAME,
         }
 
     def create_settings_ui(self):

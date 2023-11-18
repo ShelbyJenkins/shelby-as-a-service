@@ -1,51 +1,107 @@
 # region
-import json
 import os
 import re
-import traceback
+from collections import Counter
+from typing import Any, Literal, Optional, Type, get_args
 
 import openai
-import pinecone
-import tiktoken
+import services.llm as llm
+import services.text_processing.prompts.classifier_service as classifier
+import services.text_processing.prompts.prompt_template_service as prompts
 import yaml
-from models.agent_models import ActionAgentModel
-from services.providers.llm_service import LLMService
-from services.utils.log_service import Logger
-from utils.app_base import AppBase
+from agents.agent_base import AgentBase
+from services.llm.llm_service import LLMService
 
 # endregion
 
 
-class ActionAgent(ServiceBase):
+class ActionAgent(AgentBase):
+    class_name = Literal["action_agent"]
+    CLASS_NAME: str = get_args(class_name)[0]
+    CLASS_UI_NAME = "Action Agent"
+    DEFAULT_PROMPT_TEMPLATE_PATH: str = "agents/vanillallm/vanillallm_prompt_templates.yaml"
+    REQUIRED_CLASSES: list[Type] = [LLMService]
     # ActionAgent
     action_llm_model: str = "gpt-4"
-    # QueryAgent
 
-    ceq_data_domain_constraints_enabled: bool = False
-
-    # APIAgent
-    # api_agent_select_operation_id_llm_model: str = 'gpt-4'
-    # api_agent_create_function_llm_model: str = 'gpt-4'
-    # api_agent_populate_function_llm_model: str = 'gpt-4'
-
-    service_name_: str = "action_agent"
-
-    # Overwrite the AppBase model
-
-    def __init__(self, config, sprite_name):
-        """Initialized like any other service from sprites.
-        However, non-sprite services have the option to also load as modules:
-        They can take a config from a config dict service_config,
-        or by setting variables with **kwargs.
-        """
-        super().__init__()
-        self.setup_instance_config(config, sprite_name)
-        self.log = Logger(
-            AppBase.app_name,
-            "CEQAgent",
-            "ceq_agent.md",
-            level="INFO",
+    def __init__(
+        self,
+        llm_provider_name: llm.AVAILABLE_PROVIDERS_TYPINGS,
+        llm_model_name: str,
+        **kwargs,
+    ):
+        self.log = self.logger_wrapper(self.__class__.__name__)
+        self.llm_service = LLMService(
+            llm_provider_name=llm_provider_name,
+            llm_model_name=llm_model_name,
+            **kwargs,
         )
+
+    def boolean_classifier(
+        self,
+        feature: str,
+        user_input: Optional[str] = None,
+        prompt_string: Optional[str] = None,
+        prompt_template_path: Optional[str] = None,
+        retry_after_fail_n_times: int = 3,
+        consensus_after_n_tries: int = 1,
+    ) -> bool:
+        logit_bias, logit_bias_response_tokens = classifier.create_boolean_classifier_logit_bias()
+        system_prompt_string, user_input_string = classifier.create_boolean_classifier_prompt(
+            feature=feature,
+            user_input=user_input,
+            prompt_string=prompt_string,
+            prompt_template_path=prompt_template_path,
+        )
+        prompt = self.create_prompt(
+            user_input=user_input_string,
+            llm_provider_name=self.llm_service.llm_provider.CLASS_NAME,  # type: ignore
+            prompt_string=system_prompt_string,
+        )
+
+        # This needs to be an odd number so that there is always a majority vote.
+        if consensus_after_n_tries > 1 and consensus_after_n_tries % 2 == 0:
+            consensus_after_n_tries += 1
+
+        fail_count = 0
+        consensus_count = 0
+        results = []
+        failed_last = False
+        while consensus_count < consensus_after_n_tries:
+            if failed_last is True:
+                fail_count += 1
+                if fail_count >= retry_after_fail_n_times:
+                    self.log.info(
+                        f"Failed to get a valid response from {self.llm_service.llm_provider.CLASS_NAME} after {fail_count} retries."
+                    )
+                    break
+                consensus_after_n_tries = consensus_after_n_tries - consensus_count
+            responses = self.llm_service.make_decision(
+                prompt=prompt,
+                logit_bias=logit_bias,
+                logit_bias_response_tokens=logit_bias_response_tokens,
+                consensus_after_n_tries=consensus_after_n_tries,
+            )
+            if not isinstance(responses, list):
+                responses = [responses]
+            for resp in responses:
+                try:
+                    classifier.boolean_classifier_validator(response=resp)
+                except:
+                    failed_last = True
+                    continue
+                results.append(classifier.boolean_classifier_response_parser(response=resp))
+                consensus_count += 1
+
+        if not results:
+            raise ValueError("No results found.")
+
+        answer, log_string = classifier.parse_results(results=results, options=[True, False])
+        self.log.info(f"Results: {log_string}")
+        if not isinstance(answer, bool):
+            raise ValueError("answer should be a boolean.")
+
+        return answer
 
     def action_prompt_template(self, query):
         # Chooses workflow

@@ -86,11 +86,11 @@ class OpenAILLM(LLMBase):
         **kwargs,
     ):
         if not provider_model_name:
-            provider_model_name = ClassConfigModel().provider_model_name  # type: ignore
-        if not provider_model_name:
             provider_model_name = kwargs.pop("provider_model_name", None)
         else:
             kwargs.pop("provider_model_name", None)
+        if not provider_model_name:
+            provider_model_name = ClassConfigModel.model_fields["provider_model_name"].default
         super().__init__(
             provider_model_name=provider_model_name,
             frequency_penalty=frequency_penalty,
@@ -140,13 +140,14 @@ class OpenAILLM(LLMBase):
         prompt: list,
         logit_bias: dict[str, int],
         max_tokens: int,
-    ):
+        n: int = 1,
+    ) -> tuple[list[str] | str, int]:
         llm = OpenAI(
             api_key=self.secrets["openai_api_key"],
             max_retries=self.MAX_RETRIES,
             timeout=self.OPENAI_TIMEOUT_SECONDS,
         )
-        response = llm.chat.completions.create(
+        responses = llm.chat.completions.create(
             messages=prompt,
             model=self.llm_model_instance.MODEL_NAME,
             frequency_penalty=self.llm_model_instance.frequency_penalty,
@@ -155,16 +156,17 @@ class OpenAILLM(LLMBase):
             temperature=self.llm_model_instance.temperature,
             top_p=self.llm_model_instance.top_p,
             logit_bias=logit_bias,
+            n=n,
         )
         (
-            response_message_content,
+            responses,
             total_response_tokens,
-        ) = self._check_response(response)
+        ) = self._check_response(responses)
 
-        return {
-            "response_content_string": response_message_content,
-            "total_response_tokens": total_response_tokens,
-        }
+        return (
+            responses,
+            total_response_tokens,
+        )
 
     def create_chat(
         self,
@@ -264,16 +266,21 @@ class OpenAILLM(LLMBase):
                 }
                 return response
 
-    def _check_response(self, response: ChatCompletion):
-        if not (choices := response.choices[0]):
+    def _check_response(self, response: ChatCompletion) -> tuple[list[str] | str, int]:
+        response_content = []
+        if not (choices := response.choices):
             raise ValueError(f"Error in response: {response}")
-        if not (message := choices.message):
-            raise ValueError(f"Error in response: {choices}")
-        if not (content := message.content):
-            raise ValueError(f"Error in response: {message}")
+        for choice in choices:
+            if not (message := choice.message):
+                raise ValueError(f"Error in response: {choice}")
+            if not (content := message.content):
+                raise ValueError(f"Error in response: {message}")
+            response_content.append(content)
         if not (usage := response.usage):
             raise ValueError(f"Error in response: {response}")
-        return (content, usage.completion_tokens)
+        if len(response_content) == 1:
+            response_content = response_content[0]
+        return (response_content, usage.completion_tokens)
         # total_prompt_tokens = int(response.get("usage").get("prompt_tokens", 0))
 
     def create_settings_ui(self):

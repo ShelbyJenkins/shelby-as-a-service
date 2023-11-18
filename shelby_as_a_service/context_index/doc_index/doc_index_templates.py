@@ -15,7 +15,7 @@ class DocIndexTemplates:
         doc_loader_provider_name = GenericRecursiveWebScraper.CLASS_NAME
         doc_loader_config = GenericRecursiveWebScraper.ClassConfigModel(max_depth=3)
         doc_db_provider_name = PineconeDatabase.CLASS_NAME
-        doc_embedder_provider_name = OpenAIEmbedding.CLASS_NAME
+        doc_embedding_provider_name = OpenAIEmbedding.CLASS_NAME
         doc_embedder_config = OpenAIEmbedding.ClassConfigModel()
 
         batch_update_enabled = True
@@ -27,7 +27,7 @@ class DocIndexTemplates:
         doc_loader_provider_name = GenericRecursiveWebScraper.CLASS_NAME
         doc_loader_config = GenericRecursiveWebScraper.ClassConfigModel(max_depth=2)
         doc_db_provider_name = PineconeDatabase.CLASS_NAME
-        doc_embedder_provider_name = OpenAIEmbedding.CLASS_NAME
+        doc_embedding_provider_name = OpenAIEmbedding.CLASS_NAME
         doc_embedder_config = OpenAIEmbedding.ClassConfigModel()
         batch_update_enabled = True
 

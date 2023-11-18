@@ -9,7 +9,7 @@ from services.embedding.embedding_base import EmbeddingBase
 
 
 class ClassConfigModel(BaseModel):
-    current_embedding_model_name: str = "text-embedding-ada-002"
+    provider_model_name: str = "text-embedding-ada-002"
 
     class Config:
         extra = "ignore"
@@ -49,6 +49,12 @@ class OpenAIEmbedding(EmbeddingBase):
         config_file_dict: dict[str, Any] = {},
         **kwargs,
     ):
+        if not provider_model_name:
+            provider_model_name = kwargs.pop("provider_model_name", None)
+        else:
+            kwargs.pop("provider_model_name", None)
+        if not provider_model_name:
+            provider_model_name = ClassConfigModel.model_fields["provider_model_name"].default
         super().__init__(
             provider_model_name=provider_model_name,
             context_index_config=context_index_config,
@@ -57,7 +63,7 @@ class OpenAIEmbedding(EmbeddingBase):
         )
         if not self.current_provider_model_instance:
             raise ValueError("current_provider_model_instance not properly set!")
-        self.current_embedding_model: "OpenAIEmbedding.ModelConfig" = (
+        self.embedding_model_instance: "OpenAIEmbedding.ModelConfig" = (
             self.current_provider_model_instance
         )
 
@@ -68,7 +74,7 @@ class OpenAIEmbedding(EmbeddingBase):
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             api_key=self.secrets["openai_api_key"],
-            model=self.current_embedding_model.MODEL_NAME,
+            model=self.embedding_model_instance.MODEL_NAME,
             request_timeout=self.OPENAI_TIMEOUT_SECONDS,  # type: ignore
         )
 
@@ -85,7 +91,7 @@ class OpenAIEmbedding(EmbeddingBase):
         embedding_retriever = OpenAIEmbeddings(
             # Note that this is openai_api_key and not api_key
             api_key=self.secrets["openai_api_key"],
-            model=self.current_embedding_model.MODEL_NAME,
+            model=self.embedding_model_instance.MODEL_NAME,
             request_timeout=self.OPENAI_TIMEOUT_SECONDS,  # type: ignore
         )
 

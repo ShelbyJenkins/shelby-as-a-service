@@ -13,7 +13,6 @@ from services.text_processing.ingest_processing.ingest_processing_service import
 )
 from services.text_processing.text_utils import check_and_handle_name_collision
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 
 class DocIndex(DocIndexBase):
@@ -29,7 +28,7 @@ class DocIndex(DocIndexBase):
     def setup_doc_index(self):
         try:
             DocIndexBase.session = self.indexbase_open_session()
-            if doc_index_model_instance := DocIndex.session.query(
+            if doc_index_model_instance := DocIndexBase.session.query(
                 doc_index_models.DocIndexModel
             ).first():
                 DocIndexBase.doc_index_model_instance = doc_index_model_instance
@@ -40,8 +39,8 @@ class DocIndex(DocIndexBase):
                 self.add_default_doc_index_templates_to_index()
             else:
                 DocIndexBase.doc_index_model_instance = doc_index_models.DocIndexModel()
-                DocIndex.session.add(DocIndex.doc_index_model_instance)
-                DocIndex.session.flush()
+                DocIndexBase.session.add(DocIndex.doc_index_model_instance)
+                DocIndexBase.session.flush()
 
                 self.populate_service_providers(
                     target_instance=DocIndex.doc_index_model_instance,
@@ -52,7 +51,7 @@ class DocIndex(DocIndexBase):
                 self.create_domain_or_source()
 
         except SQLAlchemyError:
-            DocIndex.session.rollback()
+            DocIndexBase.session.rollback()
             raise
 
     def delete_source(self):
@@ -96,7 +95,7 @@ class DocIndex(DocIndexBase):
                     f"Unexpected error: doc_index_model_name should be of type doc_index_models.DOC_INDEX_MODEL_NAMES but is {doc_index_model_name}."
                 )
 
-        DocIndex.session.flush()
+        DocIndexBase.commit_session()
 
     @classmethod
     def create_doc_index_model_instance(
@@ -178,7 +177,7 @@ class DocIndex(DocIndexBase):
         if isinstance(new_instance, doc_index_models.SourceModel):
             if parent_domain:  # For type checker
                 parent_domain.sources.append(new_instance)
-        DocIndex.session.flush()
+        DocIndexBase.session.flush()
 
         if not current_domain_or_source:
             if isinstance(new_instance, doc_index_models.DomainModel):
@@ -186,7 +185,7 @@ class DocIndex(DocIndexBase):
             if isinstance(new_instance, doc_index_models.SourceModel):
                 if parent_domain:  # For type checker
                     parent_domain.current_source = new_instance
-            DocIndex.session.flush()
+            DocIndexBase.session.flush()
 
         if not clone_name and not clone_id:  # In this case we're using a template
             if not requested_template_name:
@@ -230,7 +229,7 @@ class DocIndex(DocIndexBase):
                 enabled_doc_ingest_processor_config=object_to_clone.enabled_doc_ingest_processor.config,
                 enabled_doc_loader_config=object_to_clone.enabled_doc_loader.config,
             )
-        self.commit_session
+        DocIndexBase.commit_session()
         return new_instance
 
     def initialize_domain_or_source_config(
@@ -255,7 +254,7 @@ class DocIndex(DocIndexBase):
                 "Unexpected error: enabled_doc_loader should be of type doc_index_models.DocLoaderModel."
             )
         target_instance.doc_loaders.append(enabled_doc_loader)
-        DocIndex.session.flush()
+        DocIndexBase.session.flush()
         target_instance.enabled_doc_loader = enabled_doc_loader
         self.populate_service_providers(
             target_instance=target_instance,
@@ -272,7 +271,7 @@ class DocIndex(DocIndexBase):
                 "Unexpected error: enabled_doc_ingest_processor should be of type doc_index_models.DocIngestProcessorModel."
             )
         target_instance.doc_ingest_processors.append(enabled_doc_ingest_processor)
-        DocIndex.session.flush()
+        DocIndexBase.session.flush()
         target_instance.enabled_doc_ingest_processor = enabled_doc_ingest_processor
         self.populate_service_providers(
             target_instance=target_instance,
@@ -283,7 +282,7 @@ class DocIndex(DocIndexBase):
             list_of_instances=DocIndex.doc_index_model_instance.doc_dbs, name=enabled_doc_db_name
         )
 
-        DocIndex.session.flush()
+        DocIndexBase.session.flush()
 
     def populate_service_providers(
         self,
@@ -349,7 +348,7 @@ class DocIndex(DocIndexBase):
                     name=doc_index_models.DocEmbeddingModel.DEFAULT_PROVIDER_NAME,
                 )
 
-        DocIndex.session.flush()
+        DocIndexBase.session.flush()
 
     def add_default_doc_index_templates_to_index(self):
         for available_template in DocIndexTemplates.AVAILABLE_TEMPLATES:
@@ -381,7 +380,7 @@ class DocIndex(DocIndexBase):
                 )
 
                 DocIndex.doc_index_model_instance.doc_index_templates.append(new_template)
-                DocIndex.session.flush()
+                DocIndexBase.session.flush()
 
     def save_config_as_template(
         self,
@@ -407,7 +406,7 @@ class DocIndex(DocIndexBase):
 
         # Append it to the index's list of context_configs
         DocIndex.doc_index_model_instance.doc_index_templates.append(new_template)
-        DocIndex.session.flush()
+        DocIndexBase.commit_session()
 
     def create_template(
         self,

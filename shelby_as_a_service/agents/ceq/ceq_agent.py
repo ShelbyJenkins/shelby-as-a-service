@@ -21,7 +21,7 @@ class ClassConfigModel(BaseModel):
         context_to_response_ratio (float): The ratio of context tokens to response tokens to use for generating the response.
     """
 
-    current_llm_provider_name: str = "openai_llm"
+    llm_provider_name: str = "openai_llm"
     token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
     enabled_domains: list[str] = ["all"]
     context_to_response_ratio: Annotated[float, Field(ge=0, le=1.0)] = 0.5
@@ -97,12 +97,13 @@ class CEQAgent(AgentBase):
             enabled_domains = self.config.enabled_domains
 
         prompt = self.create_prompt(
-            query=chat_in,
+            user_input=chat_in,
             llm_provider_name=self.llm_service.llm_provider.CLASS_NAME,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
         )
 
-        available_request_tokens, _ = self.llm_service.get_available_request_tokens(
+        # Uses context_to_response_ratio to generate the available tokens for context docs
+        _, available_request_tokens = self.llm_service.get_available_request_tokens(
             prompt=prompt,
             token_utilization=token_utilization,
             context_to_response_ratio=context_to_response_ratio,
@@ -116,7 +117,7 @@ class CEQAgent(AgentBase):
         )
 
         prompt = self.create_prompt(
-            query=chat_in,
+            user_input=chat_in,
             llm_provider_name=self.llm_service.llm_provider.CLASS_NAME,  # type: ignore
             prompt_template_path=self.DEFAULT_PROMPT_TEMPLATE_PATH,
             context_docs=context_docs,
@@ -137,7 +138,7 @@ class CEQAgent(AgentBase):
 
         final_response = previous_response
 
-        llm_model_name = final_response.get("model_name", None) or "unknown llm model"  # type: ignore
+        llm_model_name = final_response.get("model_name", None) or self.llm_service.llm_provider.llm_model_instance.MODEL_NAME  # type: ignore
         response_content_string = final_response.get("response_content_string", None)  # type: ignore
 
         full_response = self._ceq_append_meta(response_content_string, context_docs, llm_model_name)
@@ -186,10 +187,18 @@ class CEQAgent(AgentBase):
                 doc_index = doc_num - 1
                 # Access the document from the list using the index
                 if 0 <= doc_index < len(context_docs):
+                    if not (retrieval_rank := context_docs[doc_index].retrieval_rank):
+                        retrieval_rank = doc_num
+                    if uri := context_docs[doc_index].uri:
+                        uri = uri.replace(" ", "-")
+                    else:
+                        uri = "URI not found"
+                    if not (title := context_docs[doc_index].title):
+                        title = "Title not found"
                     document = {
-                        "doc_num": context_docs[doc_index].retrieval_rank,
-                        "url": context_docs[doc_index].uri.replace(" ", "-"),
-                        "title": context_docs[doc_index].title,
+                        "doc_num": retrieval_rank,
+                        "uri": uri,
+                        "title": title,
                     }
                     answer_obj["documents"].append(document)
                 else:
@@ -211,7 +220,7 @@ class CEQAgent(AgentBase):
             markdown_string += "**Sources:**\n"
             # For each document, add a numbered list item with the title and URL
             for doc in documents:
-                markdown_string += f"[{doc['doc_num']}] **{doc['title']}**: <{doc['url']}>\n"
+                markdown_string += f"[{doc['doc_num']}] **{doc['title']}**: <{doc['uri']}>\n"
         else:
             markdown_string += "No related documents found.\n"
 

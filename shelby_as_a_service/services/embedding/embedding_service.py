@@ -16,17 +16,26 @@ class EmbeddingService(EmbeddingBase):
     def __init__(
         self,
         embedding_provider_name: embedding.AVAILABLE_PROVIDERS_TYPINGS,
-        embedding_provider_model_name: Optional[str] = None,
+        embedding_model_name: Optional[str] = None,
         context_index_config: dict[str, Any] = {},
         config_file_dict: dict[str, Any] = {},
         **kwargs,
     ):
-        if not embedding_provider_model_name:
-            embedding_provider_model_name = context_index_config.get("current_embedding_model_name")
-
+        if not embedding_provider_name:
+            embedding_provider_name = context_index_config.get("embedding_provider_name")  # type: ignore
+        if not embedding_provider_name:
+            embedding_provider_name = kwargs.pop("embedding_provider_name", None)
+        else:
+            kwargs.pop("embedding_provider_name", None)
+        if not embedding_model_name:
+            embedding_model_name = context_index_config.get("embedding_model_name")
+        if not embedding_model_name:
+            embedding_model_name = kwargs.pop("embedding_model_name", None)
+        else:
+            kwargs.pop("embedding_model_name", None)
         super().__init__(
-            current_provider_name=embedding_provider_name,
-            provider_model_name=embedding_provider_model_name,
+            provider_name=embedding_provider_name,
+            provider_model_name=embedding_model_name,
             context_index_config=context_index_config,
             config_file_dict=config_file_dict,
             **kwargs,
@@ -35,15 +44,13 @@ class EmbeddingService(EmbeddingBase):
         if not self.current_provider_instance:
             raise ValueError("current_provider_instance not properly set!")
 
-        self.current_embedder_provider: EmbeddingBase = self.current_provider_instance
+        self.embedding_provider: EmbeddingBase = self.current_provider_instance
 
     def get_embedding_of_text(
         self,
         text: str,
     ) -> list[float]:
-        text_embedding = self.current_embedder_provider.get_embedding_of_text_with_provider(
-            text=text
-        )
+        text_embedding = self.embedding_provider.get_embedding_of_text_with_provider(text=text)
         if text_embedding is None:
             raise ValueError("No embedding returned")
         return text_embedding
@@ -52,10 +59,8 @@ class EmbeddingService(EmbeddingBase):
         self,
         texts: list[str],
     ) -> list[list[float]]:
-        text_embeddings = (
-            self.current_embedder_provider.get_embeddings_from_list_of_texts_with_provider(
-                texts=texts
-            )
+        text_embeddings = self.embedding_provider.get_embeddings_from_list_of_texts_with_provider(
+            texts=texts
         )
         if text_embeddings is None:
             raise ValueError("No embeddings returned")

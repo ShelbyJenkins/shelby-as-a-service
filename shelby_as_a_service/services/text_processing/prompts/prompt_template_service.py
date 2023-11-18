@@ -6,57 +6,24 @@ import yaml
 from context_index.doc_index.docs.context_docs import RetrievalDoc
 
 
-def create_logit_bias(
-    number_of_options: int,
-    number_of_decisions: int,
-    llm_model_name: str,
-    separator: Optional[Literal["\n", ",", " "]] = None,
-) -> tuple[dict[str, int], int]:
-    if number_of_options == 0 or number_of_decisions == 0:
-        raise ValueError(
-            f"Both number_of_options '{number_of_options}' and number_of_decisions '{number_of_options}' should be greater than 0."
-        )
-    logit_bias_weight = 100
-    # 0-number_of_options
-    logit_bias = {str(k): logit_bias_weight for k in range(15, 15 + number_of_options + 1)}
-
-    if number_of_decisions > 1:
-        # separator
-        if not separator:
-            separator = "\n"
-        if len(seperator_token := text_utils.get_tokens(separator, llm_model_name)) > 1:
-            raise ValueError(f"separator_token '{seperator_token}' should be a single token.")
-        logit_bias[str(seperator_token[0])] = logit_bias_weight
-
-    highest_option_tokens = text_utils.get_tokens(str(number_of_options), llm_model_name)
-    if number_of_decisions == 1:
-        max_tokens = len(highest_option_tokens)
-    else:
-        max_tokens = ((len(highest_option_tokens) + 1) * number_of_decisions) - 1
-
-    return logit_bias, max_tokens
-
-
 def create_openai_prompt(
-    query, prompt_template_path, context_docs: Optional[list[RetrievalDoc]] = None
+    user_input: str,
+    prompt_string: Optional[str] = None,
+    prompt_template_path: Optional[str] = None,
+    context_docs: Optional[list[RetrievalDoc]] = None,
 ) -> list[dict[str, str]]:
-    document_string = None
+    system_prompt = load_prompt_template(
+        prompt_template_path=prompt_template_path, prompt_string=prompt_string
+    )
+
     if context_docs:
         document_string = create_document_string(context_docs)
-
-    prompt_template = load_prompt_template(prompt_template_path)
-
-    if query:
-        user_content = "Query: " + query
+        user_content = "Documents: " + document_string + user_input
     else:
-        user_content = ""
-    if document_string:
-        user_content = "Documents: " + document_string + query
+        user_content = user_input
 
-    if prompt_template is None:
-        prompt_template = ""
     return [
-        {"role": "system", "content": prompt_template},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
 
@@ -89,17 +56,30 @@ def create_document_string(context_docs: list[RetrievalDoc]):
     return " ".join(content_strs)
 
 
-def load_prompt_template(prompt_template_path):
-    if prompt_template_path is None:
-        return None
-    with open(
-        prompt_template_path,
-        "r",
-        encoding="utf-8",
-    ) as stream:
-        # Load the YAML data and print the result
-        if prompt_template := (yaml.safe_load(stream)):
-            return prompt_template
-        print("prompt template didn't load")
+def load_prompt_template(
+    prompt_string: Optional[str] = None,
+    prompt_template_path: Optional[str] = None,
+) -> str:
+    if prompt_string and prompt_template_path:
+        raise ValueError("prompt_string and prompt_template_path cannot both be used.")
+    if prompt_template_path:
+        with open(
+            prompt_template_path,
+            "r",
+            encoding="utf-8",
+        ) as stream:
+            if prompt_template := (yaml.safe_load(stream)):
+                system_prompt = prompt_template
+            else:
+                raise ValueError(f"prompt_template_path '{prompt_template_path}' is empty.")
+    elif prompt_string:
+        system_prompt = prompt_string
+    else:
+        raise ValueError("prompt_string and prompt_template_path cannot both be None.")
 
-        return "Answer in peace my friend."
+    if not isinstance(system_prompt, str):
+        raise ValueError("prompt_template should be a string.")
+    if not system_prompt:
+        system_prompt = "Answer in peace my friend."
+
+    return system_prompt

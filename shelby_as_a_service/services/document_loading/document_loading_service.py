@@ -23,7 +23,7 @@ class DocLoadingService(DocLoadingBase):
         **kwargs,
     ):
         super().__init__(
-            current_provider_name=doc_loader_provider_name,
+            provider_name=doc_loader_provider_name,
             context_index_config=context_index_config,
             config_file_dict=config_file_dict,
             **kwargs,
