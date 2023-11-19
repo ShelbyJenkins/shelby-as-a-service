@@ -33,9 +33,9 @@ class DatabaseService(DatabaseBase):
         if not self.current_provider_instance:
             raise ValueError("current_provider_instance not properly set!")
 
-        self.current_doc_db: DatabaseBase = self.current_provider_instance
+        self.doc_db_provider: DatabaseBase = self.current_provider_instance
 
-        if self.current_doc_db.DOC_DB_REQUIRES_EMBEDDINGS:
+        if self.doc_db_provider.DOC_DB_REQUIRES_EMBEDDINGS:
             self.embedding_service = EmbeddingService(
                 embedding_provider_name=doc_db_embedding_provider_name,  # type: ignore
                 context_index_config=doc_db_embedding_provider_config,
@@ -50,7 +50,7 @@ class DatabaseService(DatabaseBase):
         if isinstance(search_terms, str):
             search_terms = [search_terms]
 
-        if self.current_doc_db.DOC_DB_REQUIRES_EMBEDDINGS:
+        if self.doc_db_provider.DOC_DB_REQUIRES_EMBEDDINGS:
             terms = self.embedding_service.get_embeddings_from_list_of_texts(
                 texts=search_terms,
             )
@@ -59,7 +59,7 @@ class DatabaseService(DatabaseBase):
 
         retrieved_docs = []
         for term in terms:
-            docs = self.current_doc_db.query_by_terms_with_provider(
+            docs = self.doc_db_provider.query_by_terms_with_provider(
                 search_terms=term, retrieve_n_docs=retrieve_n_docs, domain_name=domain_name
             )
             if docs:
@@ -76,7 +76,7 @@ class DatabaseService(DatabaseBase):
         if isinstance(ids, str):
             ids = [ids]
 
-        docs = self.current_doc_db.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
+        docs = self.doc_db_provider.fetch_by_ids_with_provider(ids=ids, domain_name=domain_name)
         if not docs:
             self.log.info(f"No documents found.")
         return docs
@@ -87,20 +87,20 @@ class DatabaseService(DatabaseBase):
         domain_name: str,
     ):
         current_entry_count = (
-            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
+            self.doc_db_provider.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=domain_name
             )
         )
         self.log.info(
-            f"Upserting {len(entries_to_upsert)} entries to {self.current_doc_db.CLASS_NAME}"
+            f"Upserting {len(entries_to_upsert)} entries to {self.doc_db_provider.CLASS_NAME}"
         )
 
-        response = self.current_doc_db.upsert_with_provider(
+        response = self.doc_db_provider.upsert_with_provider(
             entries_to_upsert=entries_to_upsert, domain_name=domain_name
         )
 
         post_upsert_entry_count = (
-            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
+            self.doc_db_provider.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=domain_name
             )
         )
@@ -118,19 +118,19 @@ class DatabaseService(DatabaseBase):
         doc_db_ids_requiring_deletion: list[str] | str,
     ) -> bool:
         existing_entry_count = (
-            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
+            self.doc_db_provider.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=domain_name
             )
         )
         if not isinstance(doc_db_ids_requiring_deletion, list):
             doc_db_ids_requiring_deletion = [doc_db_ids_requiring_deletion]
 
-        response = self.current_doc_db.clear_existing_entries_by_id_with_provider(
+        response = self.doc_db_provider.clear_existing_entries_by_id_with_provider(
             doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
             domain_name=domain_name,
         )
         post_delete_entry_count = (
-            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
+            self.doc_db_provider.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=domain_name
             )
         )
@@ -148,7 +148,7 @@ class DatabaseService(DatabaseBase):
         self, upsert_docs: list[IngestDoc], source: doc_index_models.SourceModel
     ):
         current_entry_count = (
-            self.current_doc_db.get_index_domain_or_source_entry_count_with_provider(
+            self.doc_db_provider.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=source.domain_model.name
             )
         )
@@ -166,14 +166,14 @@ class DatabaseService(DatabaseBase):
                 chunks_to_upsert.append(chunk)
 
         entries_to_upsert = []
-        if self.current_doc_db.DOC_DB_REQUIRES_EMBEDDINGS:
+        if self.doc_db_provider.DOC_DB_REQUIRES_EMBEDDINGS:
             self.embedding_service.get_document_embeddings_for_chunks_to_upsert(
                 chunks_to_upsert=chunks_to_upsert
             )
             for chunk in chunks_to_upsert:
                 metadata = chunk.prepare_upsert_metadata()
                 entries_to_upsert.append(
-                    self.current_doc_db.prepare_upsert_for_vectorstore_with_provider(
+                    self.doc_db_provider.prepare_upsert_for_vectorstore_with_provider(
                         id=chunk.chunk_doc_db_id, values=chunk.chunk_embedding, metadata=metadata
                     )
                 )

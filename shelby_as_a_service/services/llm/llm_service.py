@@ -86,10 +86,10 @@ class LLMService(LLMBase):
         )
         return {
             "response_content_string": response["response_content_string"],
-            "total_prompt_tokens": f"Request token count: {total_prompt_tokens}",
-            "total_response_tokens": f"Response token count: {response['total_response_tokens']}",
-            "total_token_count": f"Total token count: {total_token_count}",
-            "model_name": llm_model_instance.MODEL_NAME,
+            "total_prompt_tokens": total_prompt_tokens,
+            "total_response_tokens": response["total_response_tokens"],
+            "total_token_count": total_token_count,
+            "llm_model_name": llm_model_instance.MODEL_NAME,
         }
 
     def make_decision(

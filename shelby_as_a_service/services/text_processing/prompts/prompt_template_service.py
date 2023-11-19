@@ -7,15 +7,16 @@ from context_index.doc_index.docs.context_docs import RetrievalDoc
 
 
 def create_openai_prompt(
-    user_input: str,
+    user_input: Optional[str] = None,
     prompt_string: Optional[str] = None,
     prompt_template_path: Optional[str] = None,
-    context_docs: Optional[list[RetrievalDoc]] = None,
+    context_docs: Optional[list[RetrievalDoc] | list[str] | str] = None,
 ) -> list[dict[str, str]]:
     system_prompt = load_prompt_template(
         prompt_template_path=prompt_template_path, prompt_string=prompt_string
     )
-
+    if not user_input:
+        user_input = ""
     if context_docs:
         document_string = create_document_string(context_docs)
         user_content = "Documents: " + document_string + user_input
@@ -40,16 +41,22 @@ def tiktoken_len_of_openai_prompt(prompt, llm_model_instance) -> int:
     return num_tokens
 
 
-def create_document_string(context_docs: list[RetrievalDoc]):
+def create_document_string(context_docs: list[RetrievalDoc] | list[str] | str):
     content_strs = []
-
+    if isinstance(context_docs, str):
+        context_docs = [context_docs]
     for i, doc in enumerate(context_docs):
-        if doc.retrieval_rank:
-            doc_num = doc.retrieval_rank
+        if isinstance(doc, RetrievalDoc):
+            if doc.retrieval_rank:
+                doc_num = doc.retrieval_rank
+            else:
+                doc_num = i
+            context_chunk = doc.context_chunk
         else:
             doc_num = i
+            context_chunk = doc
 
-        document_content = text_utils.clean_text_content(doc.context_chunk)
+        document_content = text_utils.clean_text_content(context_chunk)
 
         content_strs.append(f"{document_content} doc_num: [{doc_num}]")
 

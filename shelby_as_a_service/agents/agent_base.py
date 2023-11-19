@@ -21,11 +21,11 @@ class AgentBase(ServiceBase):
 
     @staticmethod
     def create_prompt(
-        user_input,
         llm_provider_name: llm.AVAILABLE_PROVIDERS_TYPINGS,  # type: ignore
+        user_input: Optional[str] = None,
         prompt_template_path: Optional[str] = None,
         prompt_string: Optional[str] = None,
-        context_docs: Optional[list[RetrievalDoc]] = None,
+        context_docs: Optional[list[RetrievalDoc] | list[str] | str] = None,
     ) -> list[dict[str, str]]:
         if not prompt_string and not prompt_template_path:
             raise ValueError("prompt_string and prompt_template_path cannot both be None.")
