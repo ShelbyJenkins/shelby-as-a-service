@@ -203,16 +203,16 @@ class LoggerWrapper:
         self.log.removeHandler(handler)
 
     def info(self, msg, *args, **kwargs):
-        self.log.info(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+        self.log.info(f"In {self.class_name}: {msg}", *args, **kwargs)
 
     def debug(self, msg, *args, **kwargs):
-        self.log.debug(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+        self.log.debug(f"In {self.class_name}: {msg}", *args, **kwargs)
 
     def warning(self, msg, *args, **kwargs):
-        self.log.warning(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+        self.log.warning(f"In {self.class_name}: {msg}", *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
-        self.log.error(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+        self.log.error(f"In {self.class_name}: {msg}", *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
-        self.log.critical(f"In Class {self.class_name}: {msg}", *args, **kwargs)
+        self.log.critical(f"In {self.class_name}: {msg}", *args, **kwargs)

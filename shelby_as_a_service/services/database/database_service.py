@@ -145,14 +145,18 @@ class DatabaseService(DatabaseBase):
         return response
 
     def upsert_documents_from_context_index_source(
-        self, upsert_docs: list[IngestDoc], source: doc_index_models.SourceModel
+        self,
+        upsert_docs: list[IngestDoc],
+        source: doc_index_models.SourceModel,
+        doc_db_ids_requiring_deletion: list[str] = [],
     ):
         current_entry_count = (
             self.doc_db_provider.get_index_domain_or_source_entry_count_with_provider(
                 domain_name=source.domain_model.name
             )
         )
-        current_entry_count += 1
+        # To ensure that the doc_db_ids are unique
+        current_entry_count += 1 + len(doc_db_ids_requiring_deletion)
         chunks_to_upsert: list[doc_index_models.ChunkModel] = []
         chunk: doc_index_models.ChunkModel
         for doc in upsert_docs:

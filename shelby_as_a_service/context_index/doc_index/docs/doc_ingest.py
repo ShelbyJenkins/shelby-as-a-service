@@ -129,7 +129,9 @@ class DocIngest(DocIndexBase):
             session=session,
         )
         doc_db_service.upsert_documents_from_context_index_source(
-            upsert_docs=upsert_docs, source=source
+            upsert_docs=upsert_docs,
+            source=source,
+            doc_db_ids_requiring_deletion=doc_db_ids_requiring_deletion,
         )
         if doc_db_ids_requiring_deletion:
             doc_db_service.clear_existing_entries_by_id(
