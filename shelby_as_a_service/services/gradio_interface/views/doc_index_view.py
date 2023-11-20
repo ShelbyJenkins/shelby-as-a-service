@@ -3,7 +3,7 @@ from typing import Any, Literal, Optional, Type, get_args
 
 import context_index.doc_index as doc_index_models
 import gradio as gr
-import services.gradio_interface.views.context_index.doc_index_events as doc_index_events
+import services.gradio_interface.events.doc_index_events as doc_index_events
 from services.database.database_service import DatabaseService
 from services.document_loading.document_loading_service import DocLoadingService
 from services.gradio_interface.gradio_base import GradioBase
@@ -52,52 +52,10 @@ class DocIndexView(GradioBase):
             with gr.Tab(label="Quick Add"):
                 # self.quick_add()
                 pass
-            with gr.Tab(label="Context Builder"):
-                self.create_context_builder_tab()
-            with gr.Tab(label="Management"):
-                save_button = gr.Button(value="Save Changes", variant="primary", min_width=0)
-                # ui_components = DatabaseService.create_service_management_settings_ui()
-                # self.create_management_tab_event_handlers(ui_components, save_button)
+            with gr.Tab(label="Index Builder"):
+                self.create_index_builder_tab()
 
-    def quick_add(self):
-        # self.uic["ingest_button"] = gr.Button(
-        #     value="Ingest",
-        #     variant="primary",
-        #     elem_classes="chat_tab_button",
-        #     min_width=0,
-        # )
-        self.uic["url_textbox"] = gr.Textbox(
-            placeholder="Web URL or Local Filepath (or drag and drop)",
-            lines=1,
-            show_label=False,
-        )
-        gr.Dropdown(
-            value=self.doc_index.domain.source.object_model.enabled_doc_ingest_template.ingest_template_name,
-            choices=self.doc_index.domain.source.list_of_ingest_template_names,
-            label="Ingest Preset",
-            allow_custom_value=False,
-        )
-
-        with gr.Row():
-            self.uic["domains_dropdown"] = gr.Dropdown(
-                value=self.doc_index.domain.object_model.name,
-                choices=self.doc_index.list_of_domain_names,
-                label="Current Topic",
-                allow_custom_value=False,
-            )
-            self.uic["sources_dropdown"] = gr.Dropdown(
-                value=self.doc_index.domain.source.object_model.name,
-                choices=self.doc_index.domain.source_names,
-                label="Current Source",
-                allow_custom_value=False,
-            )
-
-            self.uic["files_drop_box"] = gr.File(
-                visible=True,
-                label="Drag and drop file",
-            )
-
-    def create_context_builder_tab(self):
+    def create_index_builder_tab(self):
         self.uic["cbc"] = {}  # context builder components
         with gr.Row():
             self.uic["cbc"]["domains_dd"] = gr.Dropdown(
@@ -115,8 +73,6 @@ class DocIndexView(GradioBase):
                 multiselect=False,
             )
 
-        with gr.Tab(label="Docs"):
-            pass
         with gr.Tab(label="Sources"):
             self.uic["cbc"]["source_tab_dict"] = self.create_builder_domain_or_source_tab(
                 domain_or_source=doc_index_models.SourceModel

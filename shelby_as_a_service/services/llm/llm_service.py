@@ -1,8 +1,8 @@
-from typing import Any, Generator, Optional, Type
+from typing import Annotated, Any, Generator, Literal, Optional, Type, Union, get_args
 
 import gradio as gr
 import services.llm as llm
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.gradio_interface.gradio_base import GradioBase
 from services.llm.llm_base import LLMBase
 
@@ -10,6 +10,7 @@ from services.llm.llm_base import LLMBase
 class ClassConfigModel(BaseModel):
     llm_provider_name: str = "openai_llm"
     stream: bool = False
+    token_utilization: Annotated[float, Field(ge=0, le=1.0)] = 0.5
 
     class Config:
         extra = "ignore"
@@ -67,6 +68,7 @@ class LLMService(LLMBase):
             token_utilization=token_utilization,
             llm_provider=self.llm_provider,
         )
+
         if max_response_tokens is None:
             max_response_tokens = new_max_response_tokens
 
@@ -121,9 +123,12 @@ class LLMService(LLMBase):
     def create_chat(
         self,
         prompt: list[dict[str, str]],
-        token_utilization: float = 0.5,
+        token_utilization: Optional[float] = None,
         stream: Optional[bool] = None,
     ):
+        if token_utilization is None:
+            token_utilization = self.config.token_utilization
+
         total_prompt_tokens, max_response_tokens = self.get_available_request_tokens(
             prompt=prompt,
             token_utilization=token_utilization,
@@ -163,6 +168,14 @@ class LLMService(LLMBase):
             value=self.config.stream,
             label="Stream Response",
             interactive=True,
+        )
+        components["token_utilization"] = gr.Slider(
+            value=self.config.token_utilization,
+            label="Percent of Model Context Size to Use",
+            minimum=0.0,
+            maximum=1.0,
+            step=0.05,
+            min_width=0,
         )
         for provider_instance in self.list_of_llm_provider_instances:
             provider_instance.create_settings_ui()

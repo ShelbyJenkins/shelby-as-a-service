@@ -12,15 +12,16 @@ from services.gradio_interface.gradio_base import GradioBase
 class ClassConfigModel(BaseModel):
     current_agent_name: str = "vanillallm_agent"
     current_agent_ui_name: str = "VanillaLLM Agent"
+    chat_tab_enabled_ceq_checkbox: bool = False
 
     class Config:
         extra = "ignore"
 
 
-class MainChatView(GradioBase):
-    class_name = Literal["main_chat_view"]
+class GenerateView(GradioBase):
+    class_name = Literal["generate_view"]
     CLASS_NAME: str = get_args(class_name)[0]
-    CLASS_UI_NAME: str = "Chat"
+    CLASS_UI_NAME: str = "Generate"
     SETTINGS_UI_COL = 2
     PRIMARY_UI_COL = 8
     REQUIRED_CLASSES: list[Type] = agents.AVAILABLE_AGENTS
@@ -29,20 +30,17 @@ class MainChatView(GradioBase):
 
     class_config_model = ClassConfigModel
     config: ClassConfigModel
-    vanillallm_agent: agents.VanillaLLM
     ceq_agent: agents.CEQAgent
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
         if self.list_of_required_class_instances:
             self.list_of_agent_instances: list[
-                agents.VanillaLLM | agents.CEQAgent
+                agents.CEQAgent
             ] = self.list_of_required_class_instances
-            self.current_agent_instance: agents.VanillaLLM | agents.CEQAgent = (
-                self.get_requested_class(
-                    requested_class=self.config.current_agent_name,
-                    available_classes=self.REQUIRED_CLASSES,
-                )
+            self.current_agent_instance: agents.CEQAgent = self.get_requested_class(
+                requested_class=self.config.current_agent_name,
+                available_classes=self.REQUIRED_CLASSES,
             )
 
     def set_view_event_handlers(self):
@@ -51,25 +49,19 @@ class MainChatView(GradioBase):
     def run_chat(self, chat_in):
         self.log.info(f"Running query: {chat_in}")
 
-        main_chat_config = ConfigManager.get_config(
-            app_name=self.app_config.app_name, path=["webui_sprite", "gradio_ui", "main_chat_view"]
+        generate_view_config = ConfigManager.get_config(
+            app_name=self.app_config.app_name, path=["webui_sprite", "gradio_ui", "generate_view"]
         )
+        ceq_agent = agents.CEQAgent(config_file_dict=generate_view_config)
 
-        current_agent_name = main_chat_config.get("current_agent_name")
-        if not isinstance(current_agent_name, str):
-            raise ValueError("current_agent_name not properly set!")
-
-        requested_agent_class = self.get_requested_class(
-            requested_class=current_agent_name,
-            available_classes=self.REQUIRED_CLASSES,
-        )
-        requested_agent: agents.VanillaLLM | agents.CEQAgent = requested_agent_class(
-            config_file_dict=main_chat_config
-        )
-
-        response = requested_agent.create_chat(
-            chat_in=chat_in,
-        )
+        if self.config.chat_tab_enabled_ceq_checkbox:
+            response = ceq_agent.create_ceq_chat(
+                chat_in=chat_in,
+            )
+        else:
+            response = ceq_agent.create_vanilla_chat(
+                chat_in=chat_in,
+            )
         yield from response
 
     def create_primary_ui(self):
@@ -79,7 +71,7 @@ class MainChatView(GradioBase):
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=f"Welcome to {MainChatView.CLASS_UI_NAME}",
+                placeholder=f"Welcome to {GenerateView.CLASS_UI_NAME}",
                 elem_id="chat_tab_out_text",
                 elem_classes="chat_tab_out_text_class",
                 scale=7,
@@ -112,7 +104,7 @@ class MainChatView(GradioBase):
                                 max_lines=1,
                                 show_label=False,
                                 placeholder="...status",
-                                elem_id=f"{MainChatView.CLASS_NAME}_chat_tab_status_text",
+                                elem_id=f"{GenerateView.CLASS_NAME}_chat_tab_status_text",
                             )
                         with gr.Row():
                             components["chat_tab_stop_button"] = gr.Button(
@@ -187,33 +179,15 @@ class MainChatView(GradioBase):
         components = {}
 
         with gr.Column():
-            agent_settings_list = []
-            for agent_instance in self.list_of_agent_instances:
-                with gr.Tab(label=agent_instance.CLASS_UI_NAME) as agent_settings:
-                    agent_instance.create_main_chat_ui()
-
-                agent_settings_list.append(agent_settings)
-
-        def create_nav_events(agent_settings_list):
-            def set_agent_view(requested_agent: str):
-                for agent in self.list_of_agent_instances:
-                    if requested_agent == agent.CLASS_UI_NAME:
-                        self.config.current_agent_name = agent.CLASS_NAME
-                        self.config.current_agent_ui_name = agent.CLASS_UI_NAME
-                        self.current_agent_instance = agent
-
-                GradioBase.update_settings_file = True
-
-            def get_nav_evt(evt: gr.SelectData):
-                output = set_agent_view(evt.value)
-                return output
-
-            for agent_nav_tab in agent_settings_list:
-                agent_nav_tab.select(
-                    fn=get_nav_evt,
+            with gr.Tab(label=self.ceq_agent.CLASS_UI_NAME):
+                components["chat_tab_enabled_ceq_checkbox"] = gr.Checkbox(
+                    label="Enable CEQ Agent",
+                    value=False,
+                    elem_id="chat_tab_enabled_ceq_checkbox",
                 )
-
-        create_nav_events(agent_settings_list)
+                self.ceq_agent.create_main_chat_ui()
+            with gr.Tab(label=self.ceq_agent.llm_service.CLASS_UI_NAME):
+                self.ceq_agent.llm_service.create_settings_ui()
 
         GradioBase.create_settings_event_listener(self.config, components)
 

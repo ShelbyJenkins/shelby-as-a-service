@@ -26,7 +26,7 @@ class ServiceBase(AppBase):
     current_provider_model_instance: Optional[Type] = None
     session: Session
 
-    list_of_required_class_instances: Optional[list[Type]] = None
+    list_of_required_class_instances: list[Type]
     list_of_provider_instances: list[Type]
 
     def __init__(

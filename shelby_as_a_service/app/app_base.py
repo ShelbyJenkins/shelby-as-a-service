@@ -99,11 +99,11 @@ class AppBase:
         Returns:
         - None
         """
-        import interfaces as interfaces
+        import interfaces as sprites
 
-        AppBase.AVAILABLE_SPRITES: list[Type] = interfaces.AVAILABLE_SPRITES
-        AppBase.AVAILABLE_SPRITES_TYPINGS = interfaces.AVAILABLE_SPRITES_TYPINGS
-        AppBase.AVAILABLE_SPRITES_UI_NAMES: list[str] = interfaces.AVAILABLE_SPRITES_UI_NAMES
+        AppBase.AVAILABLE_SPRITES: list[Type] = sprites.AVAILABLE_SPRITES
+        AppBase.AVAILABLE_SPRITES_TYPINGS = sprites.AVAILABLE_SPRITES_TYPINGS
+        AppBase.AVAILABLE_SPRITES_UI_NAMES: list[str] = sprites.AVAILABLE_SPRITES_UI_NAMES
         for sprite in AppBase.AVAILABLE_SPRITES:
             if sprite.CLASS_NAME in AppBase.app_config.enabled_sprites:
                 # ConfigManager.add_extensions_to_sprite(
