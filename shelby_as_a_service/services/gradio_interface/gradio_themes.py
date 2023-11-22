@@ -18,15 +18,9 @@ class AtYourServiceTheme(Base):
         padding: 0 !important;
     }
 
-    #main_row {
-        height: 100vh;
-        width: 100vw;
-        display: flex;
-        box-sizing: border-box;
-        flex-direction: row;
-    }
+
     #SETTINGS_UI_COL {
-        height: 100vh;
+        height: 99vh;
         display: flex;
         box-sizing: border-box;
         flex-direction: column;
@@ -35,24 +29,36 @@ class AtYourServiceTheme(Base):
         border-right-width: 4px !important; 
     }
     
-    #primary_ui_col {
+
+    #primary_ui_row {
         height: 100vh;
+        width: 100vw;
         display: flex;
-        flex-direction: col;
         box-sizing: border-box;
+        flex-direction: row;
     }
-    .primary_ui_row {
+    .primary_ui_tabs {
+        display: flex;
+        flex-direction: column;
         height: 100%;
-        display: flex;
         box-sizing: border-box;
-        flex-direction: column;
     }
-    .primary_ui_col > div:first-child {
+    .primary_ui_tab {
         display: flex;
         flex-direction: column;
-        flex-grow: 1 !important;
+        height: 96%;
+        box-sizing: border-box;
     }
-    .chat_tab_button {
+    .view_ui_row {
+        display: flex;
+        flex-direction: row;
+        height: 100%;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+
+    .action_button {
         margin: 3% !important;
         width: auto !important;
     }
@@ -63,6 +69,12 @@ class AtYourServiceTheme(Base):
 
     """
 
+    # .primary_ui_tab .gap {
+    #     display: flex;
+    #     flex-direction: column;
+    #     height: 99%;
+    #     box-sizing: border-box;
+    # }
     def __init__(
         self,
         *,

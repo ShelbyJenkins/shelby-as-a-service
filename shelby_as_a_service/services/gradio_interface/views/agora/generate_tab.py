@@ -10,20 +10,19 @@ from services.gradio_interface.gradio_base import GradioBase
 
 
 class ClassConfigModel(BaseModel):
-    current_agent_name: str = "vanillallm_agent"
-    current_agent_ui_name: str = "VanillaLLM Agent"
+    # current_agent_name: str = "vanillallm_agent"
+    # current_agent_ui_name: str = "VanillaLLM Agent"
     chat_tab_enabled_ceq_checkbox: bool = False
 
     class Config:
         extra = "ignore"
 
 
-class GenerateView(GradioBase):
+class GenerateTab(GradioBase):
     class_name = Literal["generate_view"]
     CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Generate"
-    SETTINGS_UI_COL = 2
-    PRIMARY_UI_COL = 8
+
     REQUIRED_CLASSES: list[Type] = agents.AVAILABLE_AGENTS
     AVAILABLE_AGENTS_TYPINGS = agents.AVAILABLE_AGENTS_TYPINGS
     AVAILABLE_AGENTS_UI_NAMES: list[str] = agents.AVAILABLE_AGENTS_UI_NAMES
@@ -38,13 +37,11 @@ class GenerateView(GradioBase):
             self.list_of_agent_instances: list[
                 agents.CEQAgent
             ] = self.list_of_required_class_instances
-            self.current_agent_instance: agents.CEQAgent = self.get_requested_class(
-                requested_class=self.config.current_agent_name,
-                available_classes=self.REQUIRED_CLASSES,
-            )
 
-    def set_view_event_handlers(self):
-        pass
+            # self.current_agent_instance: agents.CEQAgent = self.get_requested_class(
+            #     requested_class=self.config.current_agent_name,
+            #     available_classes=self.REQUIRED_CLASSES,
+            # )
 
     def run_chat(self, chat_in):
         self.log.info(f"Running query: {chat_in}")
@@ -64,39 +61,28 @@ class GenerateView(GradioBase):
             )
         yield from response
 
-    def create_primary_ui(self):
+    def create_tab_ui(self):
         components = {}
-
-        with gr.Column(elem_classes="primary_ui_col"):
-            components["chat_tab_out_text"] = gr.Textbox(
-                show_label=False,
-                interactive=False,
-                placeholder=f"Welcome to {GenerateView.CLASS_UI_NAME}",
-                elem_id="chat_tab_out_text",
-                elem_classes="chat_tab_out_text_class",
-                scale=7,
-            )
-
-            components["chat_tab_in_text"] = gr.Textbox(
-                show_label=False,
-                placeholder="Send a message",
-                elem_id="chat_tab_in_text",
-                elem_classes="chat_tab_in_text_class",
-                scale=3,
-            )
-
-            with gr.Row():
-                with gr.Column(
+        with gr.Row(elem_classes="agora_ui_tab_row"):
+            with gr.Column(scale=1):
+                components["chat_tab_in_text"] = gr.Textbox(
+                    lines=50,
+                    show_label=False,
+                    placeholder="Query, or URI",
+                    autofocus=True,
                     min_width=0,
-                ):
-                    components["chat_tab_generate_button"] = gr.Button(
-                        value="Generate",
-                        variant="primary",
-                        elem_classes="chat_tab_button",
-                        min_width=0,
-                    )
-                with gr.Column(scale=3):
-                    with gr.Accordion(label="Tools", open=False, visible=True):
+                )
+            with gr.Column(scale=9):
+                with gr.Row(equal_height=True):
+                    with gr.Accordion(label="Advanced", open=False):
+                        components["chat_tab_enabled_ceq_checkbox"] = gr.Checkbox(
+                            label="Enable CEQ Agent",
+                            value=False,
+                            elem_id="chat_tab_enabled_ceq_checkbox",
+                        )
+                        self.ceq_agent.create_main_chat_ui()
+                        self.ceq_agent.llm_service.create_settings_ui()
+
                         with gr.Row():
                             components["chat_tab_status_text"] = gr.Textbox(
                                 label="status_text",
@@ -104,31 +90,31 @@ class GenerateView(GradioBase):
                                 max_lines=1,
                                 show_label=False,
                                 placeholder="...status",
-                                elem_id=f"{GenerateView.CLASS_NAME}_chat_tab_status_text",
+                                elem_id=f"{GenerateTab.CLASS_NAME}_chat_tab_status_text",
                             )
                         with gr.Row():
                             components["chat_tab_stop_button"] = gr.Button(
                                 value="Stop",
                                 variant="primary",
-                                elem_classes="chat_tab_button",
+                                elem_classes="action_button",
                                 min_width=0,
                             )
                             components["chat_tab_reset_button"] = gr.Button(
                                 value="Reset",
                                 variant="primary",
-                                elem_classes="chat_tab_button",
+                                elem_classes="action_button",
                                 min_width=0,
                             )
                             components["chat_tab_undo_button"] = gr.Button(
                                 value="Undo",
                                 variant="primary",
-                                elem_classes="chat_tab_button",
+                                elem_classes="action_button",
                                 min_width=0,
                             )
                             components["chat_tab_retry_button"] = gr.Button(
                                 value="Retry",
                                 variant="primary",
-                                elem_classes="chat_tab_button",
+                                elem_classes="action_button",
                                 min_width=0,
                             )
 
@@ -170,26 +156,61 @@ class GenerateView(GradioBase):
                                     interactive=False,
                                     show_label=False,
                                 )
+                with gr.Row(elem_classes="agora_ui_textbox_row"):
+                    components["chat_tab_out_text"] = gr.Textbox(
+                        show_label=False,
+                        placeholder=f"Your search results will appear here.",
+                        elem_id="chat_tab_out_text",
+                        max_lines=30,
+                        lines=10,
+                        interactive=False,
+                    )
+                with gr.Row(equal_height=True):
+                    components["chat_tab_in_text"] = gr.Textbox(
+                        lines=2,
+                        max_lines=5,
+                        show_label=False,
+                        placeholder="Query, or URI",
+                        autofocus=True,
+                    )
 
-        self.create_event_handlers(components)
+                with gr.Row(equal_height=True):
+                    components["generate_button"] = gr.Button(
+                        value="Generate",
+                        variant="primary",
+                        min_width=0,
+                        scale=2,
+                    )
+                    gr.Radio(
+                        show_label=False,
+                        choices=["URL from Web", "Local Docs", "Custom"],
+                        scale=3,
+                    )
+                    components["chat_tab_stop_button"] = gr.Button(
+                        value="Stop",
+                        variant="stop",
+                        # elem_classes="action_button",
+                        min_width=0,
+                        scale=1,
+                    )
+                    components["chat_tab_reset_button"] = gr.Button(
+                        value="Clear",
+                        variant="primary",
+                        # elem_classes="action_button",
+                        min_width=0,
+                        scale=1,
+                    )
+                    components["chat_tab_retry_button"] = gr.Button(
+                        value="Retry",
+                        variant="primary",
+                        # elem_classes="action_button",
+                        min_width=0,
+                        scale=1,
+                    )
+
+        # GradioBase.create_settings_event_listener(self.config, components)
 
         return components
-
-    def create_settings_ui(self):
-        components = {}
-
-        with gr.Column():
-            with gr.Tab(label=self.ceq_agent.CLASS_UI_NAME):
-                components["chat_tab_enabled_ceq_checkbox"] = gr.Checkbox(
-                    label="Enable CEQ Agent",
-                    value=False,
-                    elem_id="chat_tab_enabled_ceq_checkbox",
-                )
-                self.ceq_agent.create_main_chat_ui()
-            with gr.Tab(label=self.ceq_agent.llm_service.CLASS_UI_NAME):
-                self.ceq_agent.llm_service.create_settings_ui()
-
-        GradioBase.create_settings_event_listener(self.config, components)
 
     def create_event_handlers(self, components):
         def get_spend():

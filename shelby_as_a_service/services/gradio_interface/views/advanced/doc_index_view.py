@@ -16,8 +16,6 @@ class DocIndexView(GradioBase):
     class_name = Literal["context_index_view"]
     CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Context Index"
-    SETTINGS_UI_COL = 4
-    PRIMARY_UI_COL = 6
 
     domain_tab_dict: dict[str, Any]
     source_tab_dict: dict[str, Any]

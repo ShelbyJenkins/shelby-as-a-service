@@ -9,19 +9,14 @@ class AdvancedView(GradioBase):
     class_name = Literal["advanced_view"]
     CLASS_NAME: str = get_args(class_name)[0]
     CLASS_UI_NAME: str = "Advanced"
-    SETTINGS_UI_COL = 6
-    PRIMARY_UI_COL = 4
 
     def __init__(self, config_file_dict: dict[str, Any] = {}, **kwargs):
         super().__init__(config_file_dict=config_file_dict, **kwargs)
 
-    def set_view_event_handlers(self):
-        pass
-
-    def create_primary_ui(self):
+    def create_view_ui(self):
         components = {}
 
-        with gr.Column(elem_classes="primary_ui_col"):
+        with gr.Column():
             components["chat_tab_out_text"] = gr.Textbox(
                 show_label=False,
                 interactive=False,
@@ -31,6 +26,6 @@ class AdvancedView(GradioBase):
                 scale=7,
             )
 
-    def create_settings_ui(self):
-        with gr.Column():
-            gr.Textbox(value="To Implement")
+    @property
+    def view_css(self) -> str:
+        return ""
